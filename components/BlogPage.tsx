@@ -67,7 +67,7 @@ const BLOG_POSTS = [
         author: "Logistics Team",
         date: "Jan 15, 2026",
         readTime: "4 min read",
-        image: "https://images.unsplash.com/photo-1557597774-9d2739f85a76?auto=format&fit=crop&q=80&w=800"
+        image: "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&q=80&w=800"
     }
 ];
 

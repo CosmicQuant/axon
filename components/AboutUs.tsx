@@ -45,6 +45,32 @@ const AboutUs: React.FC<AboutUsProps> = ({ onOpenAuth }) => {
                 </div>
             </section>
 
+            {/* Vision & Mission Section */}
+            <section className="py-20 bg-white">
+                <div className="max-w-6xl mx-auto px-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                        <div className="p-10 rounded-[3rem] bg-slate-50 border border-slate-100 hover:shadow-xl transition-all duration-500 group">
+                            <div className="w-16 h-16 bg-brand-600 rounded-2xl flex items-center justify-center text-white mb-8 group-hover:scale-110 transition-transform">
+                                <Globe className="w-8 h-8" />
+                            </div>
+                            <h2 className="text-3xl font-black text-slate-900 mb-6 tracking-tight">Our Vision</h2>
+                            <p className="text-lg text-gray-600 font-medium leading-relaxed">
+                                To become Africa’s most intelligent logistics backbone, powering the future of commerce through seamless, AI-driven delivery infrastructure that connects people and opportunities across the continent.
+                            </p>
+                        </div>
+                        <div className="p-10 rounded-[3rem] bg-slate-900 text-white hover:shadow-2xl transition-all duration-500 group">
+                            <div className="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center text-slate-900 mb-8 group-hover:scale-110 transition-transform">
+                                <Target className="w-8 h-8" />
+                            </div>
+                            <h2 className="text-3xl font-black mb-6 tracking-tight">Our Mission</h2>
+                            <p className="text-lg text-gray-300 font-medium leading-relaxed">
+                                To empower businesses and individuals across Kenya with instant, transparent, and hyper-efficient logistics solutions. We are committed to eliminating the friction of distance and time through technology.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             {/* AI Core Section */}
             <section className="py-24 max-w-6xl mx-auto px-4">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
