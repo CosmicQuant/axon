@@ -1,7 +1,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Box, ShieldCheck, Zap, MapPin, Truck, Clock, Smartphone, ChevronRight, CheckCircle2, Building2, Star, Navigation, Package, Users, Map, Bike, Car, Search, Home, Rocket, Shield, Briefcase } from 'lucide-react';
+import {
+   ArrowRight, Box, ShieldCheck, Zap, MapPin, Truck, Clock, Smartphone,
+   ChevronRight, CheckCircle2, Building2, Star, Navigation, Package,
+   Users, Map, Bike, Car, Search, Home, Rocket, Shield, Briefcase,
+   Brain, Eye, LayoutGrid, Globe, ShieldAlert
+} from 'lucide-react';
 import { parseNaturalLanguageOrder } from '../services/geminiService';
 import { mapService } from '../services/mapService';
 import { useAuth } from '../context/AuthContext';
@@ -360,10 +365,10 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick }) => {
             </div>
 
             {/* Content */}
-            <div className="relative z-20 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center pt-20 pb-24 pointer-events-auto">
+            <div className="relative z-20 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center pt-10 sm:pt-12 pb-12 pointer-events-auto">
 
                {/* Badge */}
-               <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-white/90 backdrop-blur-md border border-brand-200 shadow-sm text-brand-700 text-xs font-bold tracking-wide uppercase mb-4">
+               <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-white/90 backdrop-blur-md border border-brand-200 shadow-sm text-brand-700 text-xs font-bold tracking-wide uppercase mb-3 mt-2">
                   <span className="relative flex h-2 w-2 mr-2">
                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
                      <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-500"></span>
@@ -372,51 +377,72 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick }) => {
                </div>
 
                {/* Headline - Adjusted for Mobile (text-4xl base instead of 5xl) */}
-               <h1 className="text-4xl sm:text-6xl md:text-7xl font-bold text-slate-900 tracking-tight leading-[1.1] drop-shadow-sm mb-4">
+               <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold text-slate-900 tracking-tight leading-[1.1] drop-shadow-sm mb-2">
                   Send anything, <br />
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-green-500">Fast & Reliable.</span>
                </h1>
 
-               <p className="max-w-2xl mx-auto text-lg sm:text-xl text-slate-600 font-medium leading-relaxed mb-4 sm:mb-6">
+               <p className="max-w-2xl mx-auto text-sm sm:text-base text-slate-600 font-medium leading-relaxed mb-4 sm:mb-6">
                   From Boda Boda errands to 40ft container trailers. <br className="hidden sm:block" />
                   Connect with verified drivers in seconds using Kenya's smartest logistics platform.
                </p>
 
-               {/* Service Type Quick Select */}
-               <div className="max-w-2xl mx-auto w-full mb-4 sm:mb-6 flex justify-center gap-2 sm:gap-4 animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-200">
-                  {[
-                     { id: 'send', icon: Package, label: 'Send Anything', color: 'text-brand-600', bg: 'bg-brand-50', border: 'border-brand-600', desc: 'Personal & Errands', action: handleSendAnything },
-                     { id: 'business', icon: Briefcase, label: 'Business', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-600', desc: 'Bulk & Corporate', action: handleBusinessClick },
-                  ].map((s) => (
-                     <button
-                        key={s.id}
-                        disabled={isAnalyzing}
-                        onClick={s.action}
-                        className={`flex-1 flex flex-col items-center py-2 px-1 sm:py-4 sm:px-6 rounded-xl sm:rounded-[2rem] border-2 ${s.border} ${s.bg} hover:bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden ${isAnalyzing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                     >
-                        <div className="absolute top-0 right-0 p-1 sm:p-2 opacity-5 group-hover:opacity-10 transition-opacity">
-                           <s.icon className="w-6 h-6 sm:w-12 sm:h-12" />
+               {/* Dual Engine Gateway (Ultra Compact) */}
+               <div className="max-w-2xl mx-auto grid grid-cols-2 gap-3 mb-4 sm:mb-6 text-left">
+                  {/* Individual Engine */}
+                  <div
+                     onClick={handleSendAnything}
+                     className="bg-white p-3 sm:p-4 rounded-xl shadow-md border border-slate-100 flex flex-col group cursor-pointer hover:border-brand-300 transition-all duration-300"
+                  >
+                     <div className="flex justify-between items-center mb-2">
+                        <div className="w-8 h-8 bg-brand-50 rounded-lg flex items-center justify-center text-brand-600 group-hover:scale-110 transition-transform">
+                           <Package className="w-4 h-4" />
                         </div>
-                        <s.icon className={`w-4 h-4 sm:w-7 sm:h-7 mb-1 sm:mb-2 ${s.color} group-hover:scale-110 transition-transform duration-300`} />
-                        <span className={`text-[8px] sm:text-xs font-black uppercase tracking-widest ${s.color}`}>{s.label}</span>
-                        <span className={`text-[6px] sm:text-[8px] font-bold uppercase tracking-tighter mt-0.5 text-slate-600`}>{s.desc}</span>
-                     </button>
-                  ))}
+                        <span className="text-[7px] font-black uppercase tracking-widest text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">Personal</span>
+                     </div>
+                     <h3 className="text-sm sm:text-base font-black text-slate-900 mb-0.5">Send Anything</h3>
+                     <p className="text-slate-500 font-medium text-[9px] sm:text-[10px] leading-tight mb-2">
+                        Instant on-demand consumer deliveries.
+                     </p>
+                     <div className="mt-auto flex items-center text-brand-600 font-bold text-[9px] uppercase tracking-wider">
+                        Start <ArrowRight className="ml-1 w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                     </div>
+                  </div>
+
+                  {/* Enterprise Engine */}
+                  <div
+                     onClick={handleBusinessClick}
+                     className="bg-slate-900 p-3 sm:p-4 rounded-xl shadow-md text-white flex flex-col group cursor-pointer hover:ring-2 hover:ring-white/20 transition-all duration-300"
+                  >
+                     <div className="flex justify-between items-center mb-2">
+                        <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                           <Briefcase className="w-4 h-4" />
+                        </div>
+                        <span className="text-[7px] font-black uppercase tracking-widest text-slate-400 bg-white/5 px-2 py-0.5 rounded-full">Enterprise</span>
+                     </div>
+                     <h3 className="text-sm sm:text-base font-black mb-0.5">Business</h3>
+                     <p className="text-slate-400 font-medium text-[9px] sm:text-[10px] leading-tight mb-2">
+                        Enterprise logistics with unified intelligence.
+                     </p>
+                     <div className="mt-auto flex items-center text-white font-bold text-[9px] uppercase tracking-wider">
+                        Explore <ArrowRight className="ml-1 w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                     </div>
+                  </div>
                </div>
 
-               {/* Smart Input - Bolt Style */}
-               <div className="max-w-2xl mx-auto w-full pt-1 mb-4 sm:mb-8">
+               {/* Smart Input - Bolt Style (Resized for vertical space) */}
+               <div className="max-w-2xl mx-auto w-full mb-3 sm:mb-4">
                   <form onSubmit={handleQuickSubmit} className="relative group">
-                     <div className="absolute -inset-1 bg-gradient-to-r from-brand-400 to-green-300 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-1000"></div>
+                     <div className="absolute -inset-1 bg-gradient-to-r from-brand-400 to-green-300 rounded-2xl blur opacity-20 group-hover:opacity-30 transition duration-1000"></div>
 
-                     <div className="relative bg-white rounded-2xl shadow-2xl p-1.5 sm:p-2 flex items-center gap-2 border border-gray-100 focus-within:ring-2 focus-within:ring-brand-500/50 transition-all duration-300">
-                        <div className="pl-3 sm:pl-4 self-start pt-[20px] sm:pt-[30px]">
-                           <Search className="w-5 h-5 sm:w-6 sm:h-6 text-gray-900" />
+                     <div className="relative bg-white rounded-2xl shadow-xl p-1.5 flex items-center gap-2 border border-gray-100 focus-within:ring-2 focus-within:ring-brand-500/50 transition-all duration-300">
+                        <div className="pl-3 self-center">
+                           <Search className="w-5 h-5 text-gray-900" />
                         </div>
                         <textarea
                            ref={textareaRef}
                            rows={1}
-                           className="flex-1 min-w-0 bg-transparent border-none focus:ring-0 text-gray-900 placeholder-slate-400 text-sm sm:text-lg font-medium py-[16px] sm:py-[26px] resize-none overflow-hidden leading-relaxed"
+                           className="flex-1 min-w-0 bg-transparent border-none focus:ring-0 text-gray-900 placeholder-slate-400 text-sm sm:text-base font-medium py-3 sm:py-4 resize-none overflow-hidden leading-relaxed"
                            placeholder={placeholder || "Where to?"}
                            value={quickInput}
                            onChange={handleTextareaChange}
@@ -424,13 +450,13 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick }) => {
                         <button
                            type="submit"
                            disabled={isAnalyzing || !quickInput.trim()}
-                           className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl transition-all font-bold text-xs sm:text-sm mr-1 sm:mr-2 whitespace-nowrap shadow-md hover:shadow-lg self-end mb-1.5 sm:mb-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                           className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-xl transition-all font-bold text-xs sm:text-sm mr-1 whitespace-nowrap shadow-md self-center disabled:opacity-50"
                         >
                            {isAnalyzing ? (
                               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                            ) : (
                               <>
-                                 <span>Send</span> <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
+                                 <span>Send</span> <ArrowRight className="w-3 h-3" />
                               </>
                            )}
                         </button>
@@ -438,9 +464,9 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick }) => {
                   </form>
 
                   {/* Quick Tap Destinations */}
-                  <div className="mt-8 w-full max-w-2xl mx-auto">
-                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3 text-center">Quick Tap Destinations</p>
-                     <div className="flex flex-wrap justify-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                  <div className="mt-4 w-full max-w-2xl mx-auto">
+                     <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2 text-center">Quick Tap</p>
+                     <div className="flex flex-wrap justify-center gap-2">
                         {(historyDestinations.length > 0 ? historyDestinations : [
                            { label: 'Nairobi', icon: MapPin },
                            { label: 'Mombasa', icon: MapPin },
@@ -468,22 +494,90 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick }) => {
                   </div>
                </div>
 
-               {/* Quick Features */}
-               <div className="flex flex-wrap justify-center gap-3 sm:gap-6">
-                  <div className="flex items-center space-x-2 text-slate-700 font-bold text-xs sm:text-sm bg-white/[0.11] backdrop-blur-xl px-4 py-2 sm:px-5 sm:py-2.5 rounded-full border border-white/10 shadow-xl hover:scale-105 transition-transform cursor-default">
-                     <Clock className="w-4 h-4 text-brand-500" />
-                     <span>Under 60 min pickup</span>
+               {/* Quick Features - Condensed */}
+               <div className="flex flex-wrap justify-center gap-2 sm:gap-4 mt-2">
+                  <div className="flex items-center space-x-2 text-slate-700 font-bold text-[10px] sm:text-xs bg-white/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 shadow-sm hover:scale-105 transition-transform cursor-default">
+                     <Clock className="w-3.5 h-3.5 text-brand-500" />
+                     <span>Sub-60 min pickup</span>
                   </div>
-                  <div className="flex items-center space-x-2 text-slate-700 font-bold text-xs sm:text-sm bg-white/[0.11] backdrop-blur-xl px-4 py-2 sm:px-5 sm:py-2.5 rounded-full border border-white/10 shadow-xl hover:scale-105 transition-transform cursor-default">
-                     <ShieldCheck className="w-4 h-4 text-brand-500" />
-                     <span>Goods Insured</span>
+                  <div className="flex items-center space-x-2 text-slate-700 font-bold text-[10px] sm:text-xs bg-white/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 shadow-sm hover:scale-105 transition-transform cursor-default">
+                     <ShieldCheck className="w-3.5 h-3.5 text-brand-500" />
+                     <span>Insured Goods</span>
                   </div>
-                  <div className="flex items-center space-x-2 text-slate-700 font-bold text-xs sm:text-sm bg-white/[0.11] backdrop-blur-xl px-4 py-2 sm:px-5 sm:py-2.5 rounded-full border border-white/10 shadow-xl hover:scale-105 transition-transform cursor-default">
-                     <Smartphone className="w-4 h-4 text-brand-500" />
-                     <span>Real-time Tracking</span>
+                  <div className="flex items-center space-x-2 text-slate-700 font-bold text-[10px] sm:text-xs bg-white/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 shadow-sm hover:scale-105 transition-transform cursor-default">
+                     <Smartphone className="w-3.5 h-3.5 text-brand-500" />
+                     <span>Live Tracking</span>
                   </div>
                </div>
 
+            </div>
+         </div>
+
+         {/* --- SECTION 1.8: THE UNIFIED INTELLIGENCE LAYER --- */}
+         <div className="py-24 bg-white relative overflow-hidden pointer-events-auto">
+            <div className="max-w-7xl mx-auto px-4 relative z-10">
+               <div className="text-center mb-20">
+                  <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-brand-50 rounded-full text-brand-600 text-xs font-black uppercase tracking-widest mb-6">
+                     <Brain className="w-4 h-4" /> Smart Infrastructure
+                  </div>
+                  <h2 className="text-4xl md:text-5xl font-black text-slate-900 mb-6 tracking-tight font-sans">The Intelligence Layer</h2>
+                  <p className="text-slate-600 max-w-2xl mx-auto text-lg font-medium">
+                     We don't just move items. We provide the technology that powers Africa's most efficient logistics networks.
+                  </p>
+               </div>
+
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-12 sm:gap-16">
+                  {/* Pillar 1 */}
+                  <div
+                     onClick={() => navigate('/solutions/predictive-orchestration')}
+                     className="group cursor-pointer"
+                  >
+                     <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center text-brand-600 mb-8 group-hover:scale-110 group-hover:bg-brand-600 group-hover:text-white transition-all duration-500 shadow-sm">
+                        <Brain className="w-8 h-8" />
+                     </div>
+                     <h3 className="text-xl font-bold text-slate-900 mb-4">Predictive Orchestration</h3>
+                     <p className="text-slate-500 font-medium leading-relaxed mb-6">
+                        AI-driven routing that forecasts demand to eliminate idle time and maximize fulfillment speed.
+                     </p>
+                     <div className="text-brand-600 font-bold flex items-center text-sm uppercase tracking-widest">
+                        Learn More <ChevronRight className="w-4 h-4 ml-1" />
+                     </div>
+                  </div>
+
+                  {/* Pillar 2 */}
+                  <div
+                     onClick={() => navigate('/solutions/real-time-visibility')}
+                     className="group cursor-pointer"
+                  >
+                     <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 mb-8 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-500 shadow-sm">
+                        <Eye className="w-8 h-8" />
+                     </div>
+                     <h3 className="text-xl font-bold text-slate-900 mb-4">Unified Visibility</h3>
+                     <p className="text-slate-500 font-medium leading-relaxed mb-6">
+                        Live telemetry and mission-critical dashboards providing end-to-end transparency for every movement.
+                     </p>
+                     <div className="text-blue-600 font-bold flex items-center text-sm uppercase tracking-widest">
+                        Learn More <ChevronRight className="w-4 h-4 ml-1" />
+                     </div>
+                  </div>
+
+                  {/* Pillar 3 */}
+                  <div
+                     onClick={() => navigate('/solutions/enterprise-compliance')}
+                     className="group cursor-pointer"
+                  >
+                     <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 mb-8 group-hover:scale-110 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-500 shadow-sm">
+                        <ShieldCheck className="w-8 h-8" />
+                     </div>
+                     <h3 className="text-xl font-bold text-slate-900 mb-4">Supply Chain Integrity</h3>
+                     <p className="text-slate-500 font-medium leading-relaxed mb-6">
+                        Bridging the trust gap with verified identity, automated safety protocols, and immutable digital trails.
+                     </p>
+                     <div className="text-emerald-600 font-bold flex items-center text-sm uppercase tracking-widest">
+                        Learn More <ChevronRight className="w-4 h-4 ml-1" />
+                     </div>
+                  </div>
+               </div>
             </div>
          </div>
 
@@ -729,35 +823,48 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick }) => {
          </div>
 
          {/* --- SECTION 4: STATS / TRUST --- */}
-         <div className="border-y border-gray-100 bg-slate-50/50 py-16 pointer-events-auto">
-            <div className="max-w-6xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-               <div className="flex flex-col items-center">
-                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4 text-green-600">
-                     <Package className="w-6 h-6" />
-                  </div>
-                  <div className="text-3xl font-extrabold text-slate-900 mb-1">50k+</div>
-                  <div className="text-sm font-medium text-slate-500 uppercase tracking-wide">Deliveries Completed</div>
+         <div className="bg-slate-900 py-24 relative overflow-hidden pointer-events-auto">
+            <div className="absolute inset-0 opacity-10">
+               <div className="absolute top-0 left-0 w-full h-full" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.1) 1px, transparent 0)', backgroundSize: '40px 40px' }} />
+            </div>
+
+            <div className="max-w-7xl mx-auto px-4 relative z-10">
+               <div className="text-center mb-16">
+                  <h2 className="text-white text-3xl font-black uppercase tracking-[0.2em] opacity-40">Infrastructure at Scale</h2>
                </div>
-               <div className="flex flex-col items-center">
-                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4 text-blue-600">
-                     <Users className="w-6 h-6" />
+
+               <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-12">
+                  <div className="flex flex-col items-center group">
+                     <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mb-6 border border-white/10 group-hover:bg-brand-500/20 group-hover:border-brand-500/50 transition-all">
+                        <Package className="w-7 h-7 text-brand-500" />
+                     </div>
+                     <div className="text-4xl sm:text-5xl font-black text-white mb-2 tabular-nums">50k+</div>
+                     <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Monthly Fulfillment</div>
                   </div>
-                  <div className="text-3xl font-extrabold text-slate-900 mb-1">2,500+</div>
-                  <div className="text-sm font-medium text-slate-500 uppercase tracking-wide">Registered Drivers</div>
-               </div>
-               <div className="flex flex-col items-center">
-                  <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-4 text-orange-600">
-                     <Map className="w-6 h-6" />
+
+                  <div className="flex flex-col items-center group">
+                     <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mb-6 border border-white/10 group-hover:bg-blue-500/20 group-hover:border-blue-500/50 transition-all">
+                        <Users className="w-7 h-7 text-blue-500" />
+                     </div>
+                     <div className="text-4xl sm:text-5xl font-black text-white mb-2 tabular-nums">2,500+</div>
+                     <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Connected Couriers</div>
                   </div>
-                  <div className="text-3xl font-extrabold text-slate-900 mb-1">15</div>
-                  <div className="text-sm font-medium text-slate-500 uppercase tracking-wide">Cities Covered</div>
-               </div>
-               <div className="flex flex-col items-center">
-                  <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mb-4 text-yellow-600">
-                     <Star className="w-6 h-6 fill-current" />
+
+                  <div className="flex flex-col items-center group">
+                     <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mb-6 border border-white/10 group-hover:bg-orange-500/20 group-hover:border-orange-500/50 transition-all">
+                        <Globe className="w-7 h-7 text-orange-500" />
+                     </div>
+                     <div className="text-4xl sm:text-5xl font-black text-white mb-2 tabular-nums">98%</div>
+                     <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">On-Time Accuracy</div>
                   </div>
-                  <div className="text-3xl font-extrabold text-slate-900 mb-1">4.8/5</div>
-                  <div className="text-sm font-medium text-slate-500 uppercase tracking-wide">Customer Rating</div>
+
+                  <div className="flex flex-col items-center group">
+                     <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mb-6 border border-white/10 group-hover:bg-green-500/20 group-hover:border-green-500/50 transition-all">
+                        <ShieldAlert className="w-7 h-7 text-green-500" />
+                     </div>
+                     <div className="text-4xl sm:text-5xl font-black text-white mb-2 tabular-nums">0.02%</div>
+                     <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Incident Ratio</div>
+                  </div>
                </div>
             </div>
          </div>

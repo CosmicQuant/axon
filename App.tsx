@@ -30,6 +30,9 @@ const FAQPage = lazy(() => import('./components/FAQPage'));
 const SecurityPage = lazy(() => import('./components/SecurityPage'));
 const ContactUs = lazy(() => import('./components/ContactUs'));
 const VulnerabilityReport = lazy(() => import('./components/VulnerabilityReport'));
+const PredictiveOrchestration = lazy(() => import('./components/PredictiveOrchestration'));
+const RealTimeVisibility = lazy(() => import('./components/RealTimeVisibility'));
+const EnterpriseCompliance = lazy(() => import('./components/EnterpriseCompliance'));
 
 const SkeletonFallback = () => (
   <div className="flex h-screen w-full items-center justify-center bg-gray-50">
@@ -206,6 +209,9 @@ const App = () => {
                 <Route path="/security" element={<SecurityPage />} />
                 <Route path="/contact" element={<ContactUs />} />
                 <Route path="/report-vulnerability" element={<VulnerabilityReport />} />
+                <Route path="/solutions/predictive-orchestration" element={<PredictiveOrchestration />} />
+                <Route path="/solutions/real-time-visibility" element={<RealTimeVisibility />} />
+                <Route path="/solutions/enterprise-compliance" element={<EnterpriseCompliance />} />
 
                 {/* Catch all */}
                 <Route path="*" element={<Navigate to="/" replace />} />
@@ -235,7 +241,7 @@ const App = () => {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-8">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
                   <div>
                     <h4 className="text-white font-black text-xs uppercase tracking-widest mb-6">Service</h4>
                     <ul className="space-y-4 text-sm font-medium text-gray-400">
@@ -263,7 +269,15 @@ const App = () => {
                       <li><button onClick={() => navigate('/contact')} className="hover:text-white transition-colors text-left">Contact Us</button></li>
                     </ul>
                   </div>
-                  <div className="hidden sm:block">
+                  <div>
+                    <h4 className="text-white font-black text-xs uppercase tracking-widest mb-6">Solutions</h4>
+                    <ul className="space-y-4 text-sm font-medium text-gray-400">
+                      <li><button onClick={() => navigate('/solutions/predictive-orchestration')} className="hover:text-white transition-colors text-left">Predictive Orchestration</button></li>
+                      <li><button onClick={() => navigate('/solutions/real-time-visibility')} className="hover:text-white transition-colors text-left">Unified Visibility</button></li>
+                      <li><button onClick={() => navigate('/solutions/enterprise-compliance')} className="hover:text-white transition-colors text-left">Supply Chain Integrity</button></li>
+                    </ul>
+                  </div>
+                  <div>
                     <h4 className="text-white font-black text-xs uppercase tracking-widest mb-6">Support</h4>
                     <ul className="space-y-4 text-sm font-medium text-gray-400">
                       <li><button onClick={() => navigate('/faq')} className="hover:text-white transition-colors text-left">FAQs & Help</button></li>

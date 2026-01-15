@@ -1,6 +1,7 @@
 
 import React from 'react';
-import { CheckCircle2, Building2, BarChart3, Globe, ArrowRight, Zap, Layers, ChevronRight } from 'lucide-react';
+import { CheckCircle2, Building2, BarChart3, Globe, ArrowRight, Zap, Layers, ChevronRight, Brain, Eye, ShieldCheck } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 interface BusinessLandingProps {
    onGetStarted: () => void;
@@ -132,66 +133,89 @@ const BusinessLanding: React.FC<BusinessLandingProps> = ({ onGetStarted, onLogin
 
          {/* Features Grid */}
          <div className="py-24 bg-slate-50">
-            <div className="max-w-7xl mx-auto px-4">
+            {/* ... EXISTING CODE ... */}
+         </div>
+
+         {/* Smart Infrastructure Pillars */}
+         <div className="py-24 bg-slate-900 text-white overflow-hidden relative">
+            <div className="max-w-7xl mx-auto px-4 relative z-10">
                <div className="text-center mb-16">
-                  <h2 className="text-3xl font-bold text-slate-900 mb-4">Built for efficiency at scale</h2>
-                  <p className="text-slate-600 max-w-2xl mx-auto text-lg">
-                     We replace manual dispatching with intelligent automation, saving you hours every week.
+                  <h2 className="text-4xl font-bold mb-4 tracking-tight">Smart Logistics Infrastructure</h2>
+                  <p className="text-slate-400 max-w-2xl mx-auto text-lg">
+                     Move beyond basic delivery. TumaFast provides the intelligence layer for Africa's most complex supply chains.
                   </p>
                </div>
 
                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                  {/* Feature 1 */}
-                  <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 hover:shadow-xl transition-all duration-300 flex flex-col h-full">
-                     <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 mb-6">
-                        <Layers className="w-6 h-6" />
+                  {/* Pillar 1 */}
+                  <Link
+                     to="/solutions/predictive-orchestration"
+                     className="group bg-white/5 border border-white/10 p-10 rounded-3xl hover:bg-white/10 transition-all duration-500 flex flex-col h-full relative overflow-hidden"
+                  >
+                     <div className="w-14 h-14 bg-brand-500/20 rounded-2xl flex items-center justify-center text-brand-400 mb-8 group-hover:scale-110 transition-transform duration-500">
+                        <Brain className="w-7 h-7" />
                      </div>
-                     <h3 className="text-xl font-bold text-slate-900 mb-3">Bulk Order Upload</h3>
-                     <p className="text-slate-500 leading-relaxed mb-6 flex-grow">
-                        Upload hundreds of orders via CSV or use our Smart Paste tool to schedule multiple deliveries in seconds.
+                     <h3 className="text-2xl font-bold mb-4">Predictive Orchestration</h3>
+                     <p className="text-slate-400 leading-relaxed mb-8 flex-grow">
+                        AI-driven route optimization and demand forecasting that eliminates fleet idle time and maximizes fulfillment velocity.
                      </p>
-                     <button
-                        onClick={() => onNavigateToDashboard('BULK')}
-                        className="text-blue-600 font-bold flex items-center hover:translate-x-2 transition-transform self-start"
-                     >
-                        Start Bulk Upload <ChevronRight className="w-4 h-4 ml-1" />
-                     </button>
-                  </div>
+                     <div className="flex items-center text-brand-400 font-bold group-hover:gap-2 transition-all">
+                        <span>Explore Intelligence Layer</span>
+                        <ArrowRight className="ml-2 w-5 h-5" />
+                     </div>
+                     <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                        <Brain className="w-32 h-32 -mr-8 -mt-8" />
+                     </div>
+                  </Link>
 
-                  {/* Feature 2 */}
-                  <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 hover:shadow-xl transition-all duration-300 flex flex-col h-full">
-                     <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 mb-6">
-                        <Zap className="w-6 h-6" />
+                  {/* Pillar 2 */}
+                  <Link
+                     to="/solutions/real-time-visibility"
+                     className="group bg-white/5 border border-white/10 p-10 rounded-3xl hover:bg-white/10 transition-all duration-500 flex flex-col h-full relative overflow-hidden"
+                  >
+                     <div className="w-14 h-14 bg-blue-500/20 rounded-2xl flex items-center justify-center text-blue-400 mb-8 group-hover:scale-110 transition-transform duration-500">
+                        <Eye className="w-7 h-7" />
                      </div>
-                     <h3 className="text-xl font-bold text-slate-900 mb-3">Developer API</h3>
-                     <p className="text-slate-500 leading-relaxed mb-6 flex-grow">
-                        Connect your e-commerce store directly to our fleet. Webhooks for status updates and automated dispatching.
+                     <h3 className="text-2xl font-bold mb-4">Unified Visibility</h3>
+                     <p className="text-slate-400 leading-relaxed mb-8 flex-grow">
+                        Mission-critical telemetry and live control towers that provide end-to-end transparency for every movement in your network.
                      </p>
-                     <button
-                        onClick={() => onNavigateToDashboard('API')}
-                        className="text-emerald-600 font-bold flex items-center hover:translate-x-2 transition-transform self-start"
-                     >
-                        View Documentation <ChevronRight className="w-4 h-4 ml-1" />
-                     </button>
-                  </div>
+                     <div className="flex items-center text-blue-400 font-bold group-hover:gap-2 transition-all">
+                        <span>Explore visibility Tower</span>
+                        <ArrowRight className="ml-2 w-5 h-5" />
+                     </div>
+                     <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                        <Eye className="w-32 h-32 -mr-8 -mt-8" />
+                     </div>
+                  </Link>
 
-                  {/* Feature 3 */}
-                  <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 hover:shadow-xl transition-all duration-300 flex flex-col h-full">
-                     <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 mb-6">
-                        <BarChart3 className="w-6 h-6" />
+                  {/* Pillar 3 */}
+                  <Link
+                     to="/solutions/enterprise-compliance"
+                     className="group bg-white/5 border border-white/10 p-10 rounded-3xl hover:bg-white/10 transition-all duration-500 flex flex-col h-full relative overflow-hidden"
+                  >
+                     <div className="w-14 h-14 bg-emerald-500/20 rounded-2xl flex items-center justify-center text-emerald-400 mb-8 group-hover:scale-110 transition-transform duration-500">
+                        <ShieldCheck className="w-7 h-7" />
                      </div>
-                     <h3 className="text-xl font-bold text-slate-900 mb-3">Analytics & ETIMS Invoicing</h3>
-                     <p className="text-slate-500 leading-relaxed mb-6 flex-grow">
-                        Track spend, delivery times, and success rates. We automatically email you ETIMS-compliant invoices for your tax records.
+                     <h3 className="text-2xl font-bold mb-4">Supply Chain Integrity</h3>
+                     <p className="text-slate-400 leading-relaxed mb-8 flex-grow">
+                        Bridging the trust gap with verified identity, automated safety protocols, and immutable digital trails.
                      </p>
-                     <button
-                        onClick={() => onNavigateToDashboard('OVERVIEW')}
-                        className="text-indigo-600 font-bold flex items-center hover:translate-x-2 transition-transform self-start"
-                     >
-                        View Reports <ChevronRight className="w-4 h-4 ml-1" />
-                     </button>
-                  </div>
+                     <div className="flex items-center text-emerald-400 font-bold group-hover:gap-2 transition-all">
+                        <span>Explore Integrity Engine</span>
+                        <ArrowRight className="ml-2 w-5 h-5" />
+                     </div>
+                     <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                        <ShieldCheck className="w-32 h-32 -mr-8 -mt-8" />
+                     </div>
+                  </Link>
                </div>
+            </div>
+
+            {/* Background decorative elements */}
+            <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+               <div className="absolute -top-24 -left-24 w-96 h-96 bg-brand-600/10 rounded-full blur-[120px]" />
+               <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-blue-600/10 rounded-full blur-[120px]" />
             </div>
          </div>
 
