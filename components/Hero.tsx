@@ -365,10 +365,10 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick }) => {
             </div>
 
             {/* Content */}
-            <div className="relative z-20 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center pt-10 sm:pt-12 pb-12 pointer-events-auto">
+            <div className="relative z-20 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center pt-8 sm:pt-12 pb-16 pointer-events-auto">
 
                {/* Badge */}
-               <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-white/90 backdrop-blur-md border border-brand-200 shadow-sm text-brand-700 text-xs font-bold tracking-wide uppercase mb-3 mt-2">
+               <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-white/90 backdrop-blur-md border border-brand-200 shadow-sm text-brand-700 text-xs font-bold tracking-wide uppercase mb-3">
                   <span className="relative flex h-2 w-2 mr-2">
                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
                      <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-500"></span>
@@ -376,73 +376,68 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick }) => {
                   Live in Nairobi • Mombasa • Kisumu
                </div>
 
-               {/* Headline - Adjusted for Mobile (text-4xl base instead of 5xl) */}
-               <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold text-slate-900 tracking-tight leading-[1.1] drop-shadow-sm mb-2">
+               {/* Headline - Compressed */}
+               <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold text-slate-900 tracking-tight leading-[1.1] mb-3">
                   Send anything, <br />
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-green-500">Fast & Reliable.</span>
                </h1>
 
-               <p className="max-w-2xl mx-auto text-sm sm:text-base text-slate-600 font-medium leading-relaxed mb-4 sm:mb-6">
-                  From Boda Boda errands to 40ft container trailers. <br className="hidden sm:block" />
-                  Connect with verified drivers in seconds using Kenya's smartest logistics platform.
+               <p className="max-w-xl mx-auto text-sm sm:text-base text-slate-600 font-medium leading-relaxed mb-4 sm:mb-6">
+                  From door-to-door Boda errands to 40ft container trailers. Connect with verified drivers and enterprise-grade solutions in seconds using Kenya's smartest logistics platform.
                </p>
 
-               {/* Dual Engine Gateway (Ultra Compact) */}
-               <div className="max-w-2xl mx-auto grid grid-cols-2 gap-3 mb-4 sm:mb-6 text-left">
+               {/* Dual Engine Gateway (Reduced Height) */}
+               <div className="max-w-2xl mx-auto grid grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6 text-left">
                   {/* Individual Engine */}
                   <div
                      onClick={handleSendAnything}
-                     className="bg-white p-3 sm:p-4 rounded-xl shadow-md border border-slate-100 flex flex-col group cursor-pointer hover:border-brand-300 transition-all duration-300"
+                     className="bg-white p-3 sm:p-4 rounded-2xl shadow-lg border border-slate-100 flex flex-col group cursor-pointer hover:border-brand-300 transition-all duration-300"
                   >
-                     <div className="flex justify-between items-center mb-2">
-                        <div className="w-8 h-8 bg-brand-50 rounded-lg flex items-center justify-center text-brand-600 group-hover:scale-110 transition-transform">
+                     <div className="flex justify-between items-center mb-1.5">
+                        <div className="w-8 h-8 bg-brand-50 rounded-xl flex items-center justify-center text-brand-600">
                            <Package className="w-4 h-4" />
                         </div>
                         <span className="text-[7px] font-black uppercase tracking-widest text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">Personal</span>
                      </div>
                      <h3 className="text-sm sm:text-base font-black text-slate-900 mb-0.5">Send Anything</h3>
-                     <p className="text-slate-500 font-medium text-[9px] sm:text-[10px] leading-tight mb-2">
-                        Instant on-demand consumer deliveries.
-                     </p>
+                     <p className="text-[10px] text-slate-500 font-medium mb-2 leading-tight">Instant on-demand consumer deliveries.</p>
                      <div className="mt-auto flex items-center text-brand-600 font-bold text-[9px] uppercase tracking-wider">
-                        Start <ArrowRight className="ml-1 w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                        Start <ArrowRight className="ml-1 w-3 h-3" />
                      </div>
                   </div>
 
                   {/* Enterprise Engine */}
                   <div
                      onClick={handleBusinessClick}
-                     className="bg-slate-900 p-3 sm:p-4 rounded-xl shadow-md text-white flex flex-col group cursor-pointer hover:ring-2 hover:ring-white/20 transition-all duration-300"
+                     className="bg-slate-900 p-3 sm:p-4 rounded-2xl shadow-lg text-white flex flex-col group cursor-pointer hover:ring-2 hover:ring-white/20 transition-all duration-300"
                   >
-                     <div className="flex justify-between items-center mb-2">
-                        <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                     <div className="flex justify-between items-center mb-1.5">
+                        <div className="w-8 h-8 bg-white/10 rounded-xl flex items-center justify-center text-white">
                            <Briefcase className="w-4 h-4" />
                         </div>
                         <span className="text-[7px] font-black uppercase tracking-widest text-slate-400 bg-white/5 px-2 py-0.5 rounded-full">Enterprise</span>
                      </div>
-                     <h3 className="text-sm sm:text-base font-black mb-0.5">Business</h3>
-                     <p className="text-slate-400 font-medium text-[9px] sm:text-[10px] leading-tight mb-2">
-                        Enterprise logistics with unified intelligence.
-                     </p>
+                     <h3 className="text-sm sm:text-base font-black mb-0.5">Enterprise Solutions</h3>
+                     <p className="text-[10px] text-slate-400 font-medium mb-2 leading-tight">Enterprise logistics with unified intelligence.</p>
                      <div className="mt-auto flex items-center text-white font-bold text-[9px] uppercase tracking-wider">
-                        Explore <ArrowRight className="ml-1 w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                        Explore <ArrowRight className="ml-1 w-3 h-3" />
                      </div>
                   </div>
                </div>
 
-               {/* Smart Input - Bolt Style (Resized for vertical space) */}
-               <div className="max-w-2xl mx-auto w-full mb-3 sm:mb-4">
+               {/* Smart Input - Bolt Style */}
+               <div className="max-w-2xl mx-auto w-full pt-1 mb-4">
                   <form onSubmit={handleQuickSubmit} className="relative group">
-                     <div className="absolute -inset-1 bg-gradient-to-r from-brand-400 to-green-300 rounded-2xl blur opacity-20 group-hover:opacity-30 transition duration-1000"></div>
+                     <div className="absolute -inset-1 bg-gradient-to-r from-brand-400 to-green-300 rounded-2xl blur opacity-10 group-hover:opacity-20 transition duration-1000"></div>
 
-                     <div className="relative bg-white rounded-2xl shadow-xl p-1.5 flex items-center gap-2 border border-gray-100 focus-within:ring-2 focus-within:ring-brand-500/50 transition-all duration-300">
+                     <div className="relative bg-white rounded-2xl shadow-xl p-1.5 flex items-center gap-2 border border-gray-100 focus-within:ring-2 focus-within:ring-brand-500/30 transition-all duration-300">
                         <div className="pl-3 self-center">
-                           <Search className="w-5 h-5 text-gray-900" />
+                           <Search className="w-5 h-5 text-gray-400" />
                         </div>
                         <textarea
                            ref={textareaRef}
                            rows={1}
-                           className="flex-1 min-w-0 bg-transparent border-none focus:ring-0 text-gray-900 placeholder-slate-400 text-sm sm:text-base font-medium py-3 sm:py-4 resize-none overflow-hidden leading-relaxed"
+                           className="flex-1 min-w-0 bg-transparent border-none focus:ring-0 text-gray-900 placeholder-slate-400 text-sm sm:text-lg font-medium py-3 sm:py-5 resize-none overflow-hidden leading-relaxed"
                            placeholder={placeholder || "Where to?"}
                            value={quickInput}
                            onChange={handleTextareaChange}
@@ -450,23 +445,21 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick }) => {
                         <button
                            type="submit"
                            disabled={isAnalyzing || !quickInput.trim()}
-                           className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-xl transition-all font-bold text-xs sm:text-sm mr-1 whitespace-nowrap shadow-md self-center disabled:opacity-50"
+                           className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 sm:px-5 rounded-xl transition-all font-bold text-xs sm:text-sm mr-1 shadow-md disabled:opacity-50"
                         >
                            {isAnalyzing ? (
                               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                            ) : (
-                              <>
-                                 <span>Send</span> <ArrowRight className="w-3 h-3" />
-                              </>
+                              <ArrowRight className="w-4 h-4" />
                            )}
                         </button>
                      </div>
                   </form>
 
                   {/* Quick Tap Destinations */}
-                  <div className="mt-4 w-full max-w-2xl mx-auto">
-                     <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2 text-center">Quick Tap</p>
-                     <div className="flex flex-wrap justify-center gap-2">
+                  <div className="mt-3 w-full max-w-2xl mx-auto">
+                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 text-center">Quick Tap Destinations</p>
+                     <div className="flex flex-wrap justify-center gap-1.5">
                         {(historyDestinations.length > 0 ? historyDestinations : [
                            { label: 'Nairobi', icon: MapPin },
                            { label: 'Mombasa', icon: MapPin },
@@ -484,29 +477,29 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick }) => {
                                  setQuickInput(query);
                                  performSearch(query);
                               }}
-                              className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-full text-xs font-bold text-slate-700 hover:bg-white hover:border-brand-300 hover:text-brand-600 transition-all shadow-sm active:scale-95"
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-full text-[10px] font-bold text-slate-700 hover:bg-white hover:border-brand-300 hover:text-brand-600 transition-all shadow-sm active:scale-95"
                            >
-                              <dest.icon className="w-3 h-3 text-brand-500" />
-                              <span className="truncate max-w-[120px]">{dest.label.split(',')[0]}</span>
+                              <dest.icon className="w-2.5 h-2.5 text-brand-500" />
+                              <span className="truncate max-w-[100px]">{dest.label.split(',')[0]}</span>
                            </button>
                         ))}
                      </div>
                   </div>
                </div>
 
-               {/* Quick Features - Condensed */}
-               <div className="flex flex-wrap justify-center gap-2 sm:gap-4 mt-2">
-                  <div className="flex items-center space-x-2 text-slate-700 font-bold text-[10px] sm:text-xs bg-white/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 shadow-sm hover:scale-105 transition-transform cursor-default">
-                     <Clock className="w-3.5 h-3.5 text-brand-500" />
-                     <span>Sub-60 min pickup</span>
+               {/* Quick Features - Compact */}
+               <div className="mt-6 flex flex-wrap justify-center gap-3 sm:gap-4">
+                  <div className="flex items-center space-x-2 text-slate-600 font-bold text-[10px] sm:text-xs bg-white/50 backdrop-blur-sm px-3 py-1.5 rounded-full border border-slate-100 shadow-sm">
+                     <Clock className="w-3 h-3 text-brand-500" />
+                     <span>Under 60 min pickup</span>
                   </div>
-                  <div className="flex items-center space-x-2 text-slate-700 font-bold text-[10px] sm:text-xs bg-white/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 shadow-sm hover:scale-105 transition-transform cursor-default">
-                     <ShieldCheck className="w-3.5 h-3.5 text-brand-500" />
-                     <span>Insured Goods</span>
+                  <div className="flex items-center space-x-2 text-slate-600 font-bold text-[10px] sm:text-xs bg-white/50 backdrop-blur-sm px-3 py-1.5 rounded-full border border-slate-100 shadow-sm">
+                     <ShieldCheck className="w-3 h-3 text-brand-500" />
+                     <span>Goods Insured</span>
                   </div>
-                  <div className="flex items-center space-x-2 text-slate-700 font-bold text-[10px] sm:text-xs bg-white/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 shadow-sm hover:scale-105 transition-transform cursor-default">
-                     <Smartphone className="w-3.5 h-3.5 text-brand-500" />
-                     <span>Live Tracking</span>
+                  <div className="flex items-center space-x-2 text-slate-600 font-bold text-[10px] sm:text-xs bg-white/50 backdrop-blur-sm px-3 py-1.5 rounded-full border border-slate-100 shadow-sm">
+                     <Smartphone className="w-3 h-3 text-brand-500" />
+                     <span>Real-time Tracking</span>
                   </div>
                </div>
 
@@ -514,14 +507,20 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick }) => {
          </div>
 
          {/* --- SECTION 1.8: THE UNIFIED INTELLIGENCE LAYER --- */}
-         <div className="py-24 bg-white relative overflow-hidden pointer-events-auto">
+         <div className="py-24 bg-slate-900 relative overflow-hidden pointer-events-auto">
+            {/* Visual Accents */}
+            <div className="absolute top-0 left-0 w-full h-full opacity-10">
+               <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-brand-500 rounded-full blur-[120px]"></div>
+               <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500 rounded-full blur-[120px]"></div>
+            </div>
+
             <div className="max-w-7xl mx-auto px-4 relative z-10">
                <div className="text-center mb-20">
-                  <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-brand-50 rounded-full text-brand-600 text-xs font-black uppercase tracking-widest mb-6">
+                  <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/5 backdrop-blur-md border border-white/10 rounded-full text-brand-400 text-xs font-black uppercase tracking-widest mb-6">
                      <Brain className="w-4 h-4" /> Smart Infrastructure
                   </div>
-                  <h2 className="text-4xl md:text-5xl font-black text-slate-900 mb-6 tracking-tight font-sans">The Intelligence Layer</h2>
-                  <p className="text-slate-600 max-w-2xl mx-auto text-lg font-medium">
+                  <h2 className="text-4xl md:text-5xl font-black text-white mb-6 tracking-tight font-sans">The Intelligence Layer</h2>
+                  <p className="text-slate-400 max-w-2xl mx-auto text-lg font-medium">
                      We don't just move items. We provide the technology that powers Africa's most efficient logistics networks.
                   </p>
                </div>
@@ -532,14 +531,14 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick }) => {
                      onClick={() => navigate('/solutions/predictive-orchestration')}
                      className="group cursor-pointer"
                   >
-                     <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center text-brand-600 mb-8 group-hover:scale-110 group-hover:bg-brand-600 group-hover:text-white transition-all duration-500 shadow-sm">
+                     <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center text-brand-400 mb-8 group-hover:scale-110 group-hover:bg-brand-600 group-hover:text-white transition-all duration-500 shadow-sm border border-white/5">
                         <Brain className="w-8 h-8" />
                      </div>
-                     <h3 className="text-xl font-bold text-slate-900 mb-4">Predictive Orchestration</h3>
-                     <p className="text-slate-500 font-medium leading-relaxed mb-6">
+                     <h3 className="text-xl font-bold text-white mb-4">Predictive Orchestration</h3>
+                     <p className="text-slate-400 font-medium leading-relaxed mb-6 italic opacity-80">
                         AI-driven routing that forecasts demand to eliminate idle time and maximize fulfillment speed.
                      </p>
-                     <div className="text-brand-600 font-bold flex items-center text-sm uppercase tracking-widest">
+                     <div className="text-brand-400 font-bold flex items-center text-sm uppercase tracking-widest">
                         Learn More <ChevronRight className="w-4 h-4 ml-1" />
                      </div>
                   </div>
@@ -549,14 +548,14 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick }) => {
                      onClick={() => navigate('/solutions/real-time-visibility')}
                      className="group cursor-pointer"
                   >
-                     <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 mb-8 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-500 shadow-sm">
+                     <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center text-blue-400 mb-8 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-500 shadow-sm border border-white/5">
                         <Eye className="w-8 h-8" />
                      </div>
-                     <h3 className="text-xl font-bold text-slate-900 mb-4">Unified Visibility</h3>
-                     <p className="text-slate-500 font-medium leading-relaxed mb-6">
+                     <h3 className="text-xl font-bold text-white mb-4">Unified Visibility</h3>
+                     <p className="text-slate-400 font-medium leading-relaxed mb-6 italic opacity-80">
                         Live telemetry and mission-critical dashboards providing end-to-end transparency for every movement.
                      </p>
-                     <div className="text-blue-600 font-bold flex items-center text-sm uppercase tracking-widest">
+                     <div className="text-blue-400 font-bold flex items-center text-sm uppercase tracking-widest">
                         Learn More <ChevronRight className="w-4 h-4 ml-1" />
                      </div>
                   </div>
@@ -566,14 +565,14 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick }) => {
                      onClick={() => navigate('/solutions/enterprise-compliance')}
                      className="group cursor-pointer"
                   >
-                     <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 mb-8 group-hover:scale-110 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-500 shadow-sm">
+                     <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center text-emerald-400 mb-8 group-hover:scale-110 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-500 shadow-sm border border-white/5">
                         <ShieldCheck className="w-8 h-8" />
                      </div>
-                     <h3 className="text-xl font-bold text-slate-900 mb-4">Supply Chain Integrity</h3>
-                     <p className="text-slate-500 font-medium leading-relaxed mb-6">
+                     <h3 className="text-xl font-bold text-white mb-4">Supply Chain Integrity</h3>
+                     <p className="text-slate-400 font-medium leading-relaxed mb-6 italic opacity-80">
                         Bridging the trust gap with verified identity, automated safety protocols, and immutable digital trails.
                      </p>
-                     <div className="text-emerald-600 font-bold flex items-center text-sm uppercase tracking-widest">
+                     <div className="text-emerald-400 font-bold flex items-center text-sm uppercase tracking-widest">
                         Learn More <ChevronRight className="w-4 h-4 ml-1" />
                      </div>
                   </div>

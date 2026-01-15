@@ -243,10 +243,18 @@ const App = () => {
 
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
                   <div>
+                    <h4 className="text-white font-black text-xs uppercase tracking-widest mb-6">Company</h4>
+                    <ul className="space-y-4 text-sm font-medium text-gray-400">
+                      <li><button onClick={() => navigate('/about')} className="hover:text-white transition-colors text-left">About Us</button></li>
+                      <li><button onClick={() => navigate('/blog')} className="hover:text-white transition-colors text-left">Blog</button></li>
+                      <li><button onClick={() => navigate('/contact')} className="hover:text-white transition-colors text-left">Contact Us</button></li>
+                    </ul>
+                  </div>
+                  <div>
                     <h4 className="text-white font-black text-xs uppercase tracking-widest mb-6">Service</h4>
                     <ul className="space-y-4 text-sm font-medium text-gray-400">
-                      <li><button onClick={() => navigate('/book')} className="hover:text-brand-400 transition-colors">Book a Delivery</button></li>
-                      <li><button onClick={() => navigate('/business')} className="hover:text-brand-400 transition-colors">TumaFast for Business</button></li>
+                      <li><button onClick={() => navigate('/book')} className="hover:text-brand-400 transition-colors text-left">Book a Delivery</button></li>
+                      <li><button onClick={() => navigate('/business')} className="hover:text-brand-400 transition-colors text-left">TumaFast for Business</button></li>
                       <li>
                         <button
                           onClick={() => {
@@ -254,19 +262,11 @@ const App = () => {
                             setAuthModalView('SIGNUP');
                             setShowAuthModal(true);
                           }}
-                          className="hover:text-brand-400 transition-colors"
+                          className="hover:text-brand-400 transition-colors text-left"
                         >
                           Drive with Us
                         </button>
                       </li>
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className="text-white font-black text-xs uppercase tracking-widest mb-6">Company</h4>
-                    <ul className="space-y-4 text-sm font-medium text-gray-400">
-                      <li><button onClick={() => navigate('/about')} className="hover:text-white transition-colors text-left">About Us</button></li>
-                      <li><button onClick={() => navigate('/blog')} className="hover:text-white transition-colors text-left">Blog</button></li>
-                      <li><button onClick={() => navigate('/contact')} className="hover:text-white transition-colors text-left">Contact Us</button></li>
                     </ul>
                   </div>
                   <div>
