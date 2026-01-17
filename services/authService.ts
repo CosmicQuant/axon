@@ -94,11 +94,11 @@ export const authService = {
     console.log("Service: Starting Google Auth...");
     try {
       let firebaseUser;
+      
+      const isNative = Capacitor.isNativePlatform();
+      console.log("Is Native:", isNative);
 
-      const platform = Capacitor.getPlatform();
-      console.log("Current Platform:", platform);
-
-      if (platform === 'android' || platform === 'ios') {
+      if (isNative) {
         console.log("Service: Using Web Google Popup");
         const result = await signInWithPopup(auth, googleProvider);
         firebaseUser = result.user;
