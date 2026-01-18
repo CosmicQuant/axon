@@ -45,8 +45,8 @@ const BottomNav: React.FC<BottomNavProps> = ({ onOpenAuth }) => {
             id: 'history',
             label: 'Orders',
             icon: Package,
-            path: '/history',
-            onClick: () => handleAuthGuard('/history')
+            path: getDashboardPath(), // Updated to direct to Dashboard
+            onClick: () => handleAuthGuard(getDashboardPath())
         },
         {
             id: 'action',
