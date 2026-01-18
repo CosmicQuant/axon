@@ -341,7 +341,7 @@ const CustomerDashboard: React.FC = () => {
                 </header>
 
                 {/* VIEW CONTENT */}
-                <div className="p-4 sm:p-8 space-y-6 flex-1 overflow-x-hidden">
+                <div className="p-4 sm:p-8 space-y-6 flex-1 w-full max-w-[100vw] overflow-x-hidden">
                     {currentView === 'DELIVERIES' ? (
                         <>
                             {/* Tracking Card - Now at top of deliveries */}
