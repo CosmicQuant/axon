@@ -182,7 +182,10 @@ const App = () => {
 
   // Hide BottomNav on Map pages (Book/Track) and Driver Dashboard (Active Job view)
   // to prevent overlapping with bottom drawers/sheets
-  const shouldShowBottomNav = !location.pathname.startsWith('/book') &&
+  // AND Only show on Native Platform (APK/IPA), hide on Mobile Web
+  const shouldShowBottomNav =
+    Capacitor.isNativePlatform() &&
+    !location.pathname.startsWith('/book') &&
     !location.pathname.startsWith('/track') &&
     !location.pathname.startsWith('/driver');
 
@@ -203,6 +206,8 @@ const App = () => {
               }}
               isMapPage={isMapPage}
               isDarkBackground={['/business', '/fulfillment', '/intelligence', '/payments', '/fleet', '/security', '/contact', '/about', '/privacy', '/terms', '/blog', '/faq'].includes(location.pathname)}
+              // Pass platform state to Navbar to apply extra padding on Native Apps
+              isNativePlatform={Capacitor.isNativePlatform()}
             />
           )}
 

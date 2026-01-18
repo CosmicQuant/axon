@@ -1,4 +1,6 @@
 import { APP_CONFIG } from '../config';
+import { Geolocation } from '@capacitor/geolocation'; // Import Capacitor Geolocation
+import { Capacitor } from '@capacitor/core';
 
 interface Coordinates {
     lat: number;
@@ -134,6 +136,57 @@ export const mapService = {
                 }
             });
         });
+    },
+
+    /**
+     * Get current location
+     */
+    getCurrentLocation: async (): Promise<Coordinates> => {
+        try {
+            // First check if native
+            if (Capacitor.isNativePlatform()) {
+                // Request permissions first on native
+                const perm = await Geolocation.checkPermissions();
+                if (perm.location !== 'granted') {
+                    const req = await Geolocation.requestPermissions({ permissions: ['location'] });
+                    if (req.location !== 'granted') {
+                        throw new Error("Location permission denied");
+                    }
+                }
+
+                // Use Capacitor Geolocation
+                // enableHighAccuracy: true is KEY for the "Turn on precise location" prompt
+                const position = await Geolocation.getCurrentPosition({
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 3000 // Don't use very old cached positions
+                });
+                return {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+            } else {
+                // Web Fallback
+                return new Promise((resolve, reject) => {
+                    if (!navigator.geolocation) {
+                        reject(new Error("Geolocation not supported"));
+                        return;
+                    }
+                    navigator.geolocation.getCurrentPosition(
+                        (pos) => resolve({
+                            lat: pos.coords.latitude,
+                            lng: pos.coords.longitude
+                        }),
+                        (err) => reject(err),
+                        { enableHighAccuracy: true }
+                    );
+                });
+            }
+        } catch (error) {
+            console.error("Error getting location", error);
+            // Default to Nairobi if failed
+            return { lat: -1.2921, lng: 36.8219 };
+        }
     },
 
     /**

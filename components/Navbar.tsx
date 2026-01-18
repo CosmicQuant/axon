@@ -12,9 +12,10 @@ interface NavbarProps {
   isMapPage?: boolean;
   isMobileMenuOpen?: boolean;
   onToggleMobileMenu?: () => void;
+  isNativePlatform?: boolean;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ onOpenProfile, onLogin, isDarkBackground, isMapPage, isMobileMenuOpen, onToggleMobileMenu }) => {
+const Navbar: React.FC<NavbarProps> = ({ onOpenProfile, onLogin, isDarkBackground, isMapPage, isMobileMenuOpen, onToggleMobileMenu, isNativePlatform }) => {
   const { user, logout, isAuthenticated } = useAuth();
   const { showConfirm } = usePrompt();
   const navigate = useNavigate();
@@ -87,7 +88,7 @@ const Navbar: React.FC<NavbarProps> = ({ onOpenProfile, onLogin, isDarkBackgroun
   };
 
   return (
-    <nav className="absolute top-0 left-0 right-0 z-[100] w-full bg-transparent transition-all pointer-events-none">
+    <nav className={`absolute top-0 left-0 right-0 z-[100] w-full bg-transparent transition-all pointer-events-none ${isNativePlatform ? 'pt-8' : ''}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 flex justify-between items-center pointer-events-auto">
         {/* Logo or Back Button */}
         {isMapPage ? (

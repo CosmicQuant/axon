@@ -338,6 +338,15 @@ export const authService = {
 
   // Logout
   logout: async () => {
+    try {
+      if (Capacitor.isNativePlatform()) {
+        // Force Google Sign-Out on native devices to clear the "Sticky" session
+        await GoogleAuth.signOut();
+      }
+    } catch (error) {
+      // Allow non-blocking failure (e.g. if user wasn't logged in with Google)
+      console.log('Native Google Logout skipped or failed', error);
+    }
     await signOut(auth);
   },
 

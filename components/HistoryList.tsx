@@ -207,10 +207,10 @@ const HistoryList: React.FC<HistoryListProps> = ({ onTrackOrder, onReorder }) =>
                 <div className="p-4 md:p-6">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2 mb-2">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
                         <button
                           onClick={() => handleCopyId(order.id)}
-                          className="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold bg-gray-100 text-gray-600 uppercase tracking-widest hover:bg-brand-50 hover:text-brand-600 hover:border-brand-200 border border-transparent transition-all group/copy"
+                          className="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold bg-gray-100 text-gray-600 uppercase tracking-widest hover:bg-brand-50 hover:text-brand-600 hover:border-brand-200 border border-transparent transition-all group/copy shrink-0"
                           title="Click to copy full Tracking ID"
                         >
                           <span className="mr-2">ID: {order.id}</span>
@@ -277,17 +277,17 @@ const HistoryList: React.FC<HistoryListProps> = ({ onTrackOrder, onReorder }) =>
                               order.status === 'pending' ? 'bg-amber-500 text-white border border-amber-400' :
                                 'bg-gray-500 text-white border border-gray-400'
                         }`}>
-                        {order.status === 'delivered' ? <CheckCircle className="w-3 h-3 mr-1.5" /> :
-                          order.status === 'cancelled' ? <XCircle className="w-3 h-3 mr-1.5" /> :
-                            order.status === 'in_transit' ? <Navigation className="w-3 h-3 mr-1.5" /> :
-                              order.status === 'driver_assigned' ? <User className="w-3 h-3 mr-1.5" /> :
-                                <Clock className="w-3 h-3 mr-1.5" />}
-                        {order.status.replace('_', ' ')}
+                        {order.status === 'delivered' ? <CheckCircle className="w-3 h-3 mr-1.5 shrink-0" /> :
+                          order.status === 'cancelled' ? <XCircle className="w-3 h-3 mr-1.5 shrink-0" /> :
+                            order.status === 'in_transit' ? <Navigation className="w-3 h-3 mr-1.5 shrink-0" /> :
+                              order.status === 'driver_assigned' ? <User className="w-3 h-3 mr-1.5 shrink-0" /> :
+                                <Clock className="w-3 h-3 mr-1.5 shrink-0" />}
+                        <span className="truncate max-w-[15ch] min-[320px]:max-w-[20ch] sm:max-w-none">{order.status.replace('_', ' ')}</span>
                       </span>
 
                       {isOngoing && (
-                        <div className="text-right mb-3">
-                          <p className="text-[10px] font-black text-brand-600 uppercase tracking-tighter bg-brand-50 px-2 py-1 rounded border border-brand-100">
+                        <div className="flex justify-end w-full">
+                          <p className="inline-block text-[10px] font-black text-brand-600 uppercase tracking-tighter bg-brand-50 px-2 py-1 rounded border border-brand-100 whitespace-nowrap">
                             ETA: {getETA()}
                           </p>
                         </div>
@@ -304,9 +304,9 @@ const HistoryList: React.FC<HistoryListProps> = ({ onTrackOrder, onReorder }) =>
                       {/* Pickup */}
                       <div className="relative flex items-center space-x-3 z-10">
                         <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0 shadow-[0_0_10px_rgba(16,185,129,0.4)]"></div>
-                        <div className="flex flex-col">
+                        <div className="flex flex-col flex-1 min-w-0 pr-2">
                           <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Pickup</span>
-                          <span className="text-xs font-bold text-gray-700">{order.pickup}</span>
+                          <span className="text-xs font-bold text-gray-700 break-words">{order.pickup}</span>
                         </div>
                       </div>
 
@@ -319,13 +319,13 @@ const HistoryList: React.FC<HistoryListProps> = ({ onTrackOrder, onReorder }) =>
 
                         if (intermediateStops.length <= 2) {
                           return intermediateStops.map((stop) => (
-                            <div key={stop.id} className="relative flex items-center space-x-3 z-10">
+                            <div key={stop.id} className="relative flex items-center space-x-3 z-10 w-full min-w-0">
                               <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${stop.status === 'completed' ? 'bg-emerald-500' : 'bg-brand-400 shadow-[0_0_8px_rgba(34,197,94,0.3)]'}`}></div>
-                              <div className="flex flex-col">
+                              <div className="flex flex-col flex-1 min-w-0 pr-2">
                                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                                   {stop.type === 'waypoint' ? 'Stop' : 'Drop-off'}
                                 </span>
-                                <span className="text-xs font-bold text-gray-600 truncate max-w-[200px]">{stop.address}</span>
+                                <span className="text-xs font-bold text-gray-600 truncate w-full">{stop.address}</span>
                               </div>
                             </div>
                           ));
@@ -339,11 +339,11 @@ const HistoryList: React.FC<HistoryListProps> = ({ onTrackOrder, onReorder }) =>
                         return (
                           <>
                             {/* First Stop */}
-                            <div className="relative flex items-center space-x-3 z-10">
+                            <div className="relative flex items-center space-x-3 z-10 w-full min-w-0">
                               <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${firstStop.status === 'completed' ? 'bg-emerald-500' : 'bg-brand-400'}`}></div>
-                              <div className="flex flex-col">
+                              <div className="flex flex-col flex-1 min-w-0 pr-2">
                                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Stop 1</span>
-                                <span className="text-xs font-bold text-gray-600 truncate max-w-[200px]">{firstStop.address}</span>
+                                <span className="text-xs font-bold text-gray-600 truncate w-full">{firstStop.address}</span>
                               </div>
                             </div>
 
@@ -360,11 +360,11 @@ const HistoryList: React.FC<HistoryListProps> = ({ onTrackOrder, onReorder }) =>
                             </div>
 
                             {/* Last Stop */}
-                            <div className="relative flex items-center space-x-3 z-10">
+                            <div className="relative flex items-center space-x-3 z-10 w-full min-w-0">
                               <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${lastStop.status === 'completed' ? 'bg-emerald-500' : 'bg-brand-400'}`}></div>
-                              <div className="flex flex-col">
+                              <div className="flex flex-col flex-1 min-w-0 pr-2">
                                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Stop {intermediateStops.length}</span>
-                                <span className="text-xs font-bold text-gray-600 truncate max-w-[200px]">{lastStop.address}</span>
+                                <span className="text-xs font-bold text-gray-600 truncate w-full">{lastStop.address}</span>
                               </div>
                             </div>
                           </>
@@ -374,9 +374,9 @@ const HistoryList: React.FC<HistoryListProps> = ({ onTrackOrder, onReorder }) =>
                       {/* Final Dropoff */}
                       <div className="relative flex items-center space-x-3 z-10">
                         <div className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0 shadow-[0_0_10px_rgba(239,68,68,0.4)]"></div>
-                        <div className="flex flex-col">
+                        <div className="flex flex-col flex-1 min-w-0 pr-2">
                           <span className="text-[10px] font-black text-red-600 uppercase tracking-widest">Final Destination</span>
-                          <span className="text-xs font-bold text-gray-700">{order.dropoff}</span>
+                          <span className="text-xs font-bold text-gray-700 break-words">{order.dropoff}</span>
                         </div>
                       </div>
                     </div>
@@ -397,7 +397,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ onTrackOrder, onReorder }) =>
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
+                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
                       {order.status === 'delivered' && (
                         <>
                           <button
