@@ -12,6 +12,7 @@ import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { usePrompt } from '../context/PromptContext';
 import { LOCATION_COORDINATES } from '../constants';
+import { useLocation } from 'react-router-dom';
 import {
    LayoutDashboard, Map, Package, Wallet, User as UserIcon, LogOut,
    ChevronRight, Star, TrendingUp, Clock, MapPin, Navigation, CheckCircle,
@@ -33,6 +34,22 @@ const DriverDashboardContent: React.FC<DriverDashboardProps> = ({ user, onGoHome
    const { showAlert } = usePrompt();
    const { isLoaded, setPickupCoords, setDropoffCoords, setWaypointCoords, setOrderState, fitBounds, setDriverCoords, setDriverBearing, setDriverVehicleType, setRoutePolyline, requestUserLocation, driverCoords } = useMapState();
    const [currentView, setCurrentView] = useState<DashboardView>('OVERVIEW');
+   const location = useLocation();
+
+   useEffect(() => {
+      const params = new URLSearchParams(location.search);
+      const view = params.get('view') as DashboardView;
+      const openMenu = params.get('menu');
+
+      if (view && ['OVERVIEW', 'MARKET', 'JOBS', 'DELIVERIES', 'EARNINGS', 'PROFILE'].includes(view)) {
+         setCurrentView(view);
+      }
+
+      if (openMenu === 'open') {
+         setIsSidebarOpen(true);
+      }
+   }, [location.search]);
+
    const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile toggle
    const [isOnline, setIsOnline] = useState(true);
    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -183,7 +200,8 @@ const DriverDashboardContent: React.FC<DriverDashboardProps> = ({ user, onGoHome
    // Geocode Active Job and Sync with Global Map
    useEffect(() => {
       const syncMap = async () => {
-         if (activeJob && currentView === 'JOBS' && isLoaded) {
+         // Changed so that it syncs even if currentView isn't 'JOBS' (for 'OVERVIEW')
+         if (activeJob && (currentView === 'JOBS' || currentView === 'OVERVIEW') && isLoaded) {
             const p = activeJob.pickupCoords || await mapService.geocodeAddress(activeJob.pickup);
             const d = activeJob.dropoffCoords || await mapService.geocodeAddress(activeJob.dropoff);
             setActiveJobCoords({ pickup: p, dropoff: d });

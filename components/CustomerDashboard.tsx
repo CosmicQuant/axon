@@ -11,14 +11,32 @@ import {
     EyeOff, Key, ShieldCheck, FileText, Info, ChevronDown, ChevronUp,
     RefreshCw, Check, Home, Briefcase, X as CloseIcon, Loader, AlertTriangle, Power, QrCode, Menu, Globe
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 
 const CustomerDashboard: React.FC = () => {
     const { user, logout, updateUser, updatePassword, deleteAccount } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
 
     const [currentView, setCurrentView] = useState<'DELIVERIES' | 'SETTINGS'>('DELIVERIES');
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const view = params.get('view');
+        const openMenu = params.get('menu');
+
+        if (view === 'SETTINGS') {
+            setCurrentView('SETTINGS');
+        } else if (view === 'DELIVERIES') {
+            setCurrentView('DELIVERIES');
+        }
+
+        if (openMenu === 'open') {
+            setIsSidebarOpen(true);
+        }
+    }, [location.search]);
+
     const [trackingInput, setTrackingInput] = useState('');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 

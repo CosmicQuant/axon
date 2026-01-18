@@ -88,7 +88,7 @@ const Navbar: React.FC<NavbarProps> = ({ onOpenProfile, onLogin, isDarkBackgroun
   };
 
   return (
-    <nav className={`absolute top-0 left-0 right-0 z-[100] w-full bg-transparent transition-all pointer-events-none ${isNativePlatform ? 'pt-8' : ''}`}>
+    <nav className={`absolute top-0 left-0 right-0 z-[100] w-full bg-transparent transition-all pointer-events-none ${isNativePlatform ? 'pt-6' : ''}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 flex justify-between items-center pointer-events-auto">
         {/* Logo or Back Button */}
         {isMapPage ? (

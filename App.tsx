@@ -41,11 +41,13 @@ const PaymentCollection = lazy(() => import('./components/PaymentCollection'));
 const FleetManagement = lazy(() => import('./components/FleetManagement'));
 
 const SkeletonFallback = () => (
-  <div className="flex h-screen w-full items-center justify-center bg-gray-50">
+  <div className="flex h-screen w-full items-center justify-center bg-white">
     <div className="flex flex-col items-center gap-4 animate-pulse">
-      <div className="w-16 h-16 bg-gray-200 rounded-full" />
-      <div className="h-4 w-40 bg-gray-200 rounded-lg" />
-      <div className="h-3 w-28 bg-gray-200 rounded-lg" />
+      <img
+        src="/truck.png"
+        alt="Loading..."
+        className="w-72 h-72 object-contain drop-shadow-lg"
+      />
     </div>
   </div>
 );

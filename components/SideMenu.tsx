@@ -44,7 +44,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ isOpen, onClose, onProfile, onLogin
             ></div>
 
             {/* Menu Content */}
-            <div className="relative w-full max-w-sm bg-white h-full shadow-2xl overflow-y-auto animate-in slide-in-from-left duration-300">
+            <div className="relative w-full max-w-sm bg-white h-full shadow-2xl overflow-y-auto animate-in slide-in-from-left duration-300 pb-32">
 
                 {/* Close Button */}
                 <button
@@ -88,7 +88,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ isOpen, onClose, onProfile, onLogin
                 </div>
 
                 {/* Menu Items */}
-                <div className="p-4 space-y-2 pb-24">
+                <div className="p-4 space-y-2 pb-32">
 
                     <MenuItem
                         icon={LayoutDashboard}

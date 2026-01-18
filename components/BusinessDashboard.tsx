@@ -11,6 +11,7 @@ import { LOCATION_COORDINATES, GOOGLE_MAPS_LIBRARIES } from '../constants';
 import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 import BulkOrderModal from './BulkOrderModal';
+import { useLocation } from 'react-router-dom';
 
 interface BusinessDashboardProps {
     user: User;
@@ -88,7 +89,23 @@ print(order.id)`
 
 const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user, onNewRequest, onGoHome, onTrackOrder, initialTab }) => {
     const { logout, updateUser, deleteAccount } = useAuth();
-    const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'DELIVERIES' | 'FLEET' | 'BULK' | 'ADDRESSES' | 'API' | 'PROFILE'>('OVERVIEW');
+    const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'DELIVERIES' | 'FLEET' | 'BULK' | 'ADDRESSES' | 'API' | 'PROFILE'>(initialTab as any || 'OVERVIEW');
+
+    const location = useLocation();
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const tab = params.get('tab');
+        const openMenu = params.get('menu');
+
+        if (tab && ['OVERVIEW', 'DELIVERIES', 'FLEET', 'BULK', 'ADDRESSES', 'API', 'PROFILE'].includes(tab)) {
+            setActiveTab(tab as any);
+        }
+
+        if (openMenu === 'open') {
+            setIsSidebarOpen(true);
+        }
+    }, [location.search]);
+
     const [bulkInput, setBulkInput] = useState('');
     const [parsedBulkOrders, setParsedBulkOrders] = useState<(Partial<DeliveryOrder> & {
         validationStatus?: 'VALID' | 'ERROR' | 'GEOCODING' | 'GEOCODED_SUCCESS' | 'GEOCODED_FAILED';

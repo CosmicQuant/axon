@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Package, Plus, User, MapPin, Truck } from 'lucide-react';
+import { Home, Package, Plus, User, MapPin, Truck, LayoutGrid, DollarSign, Navigation, Send, Car } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'framer-motion';
 
@@ -13,16 +13,6 @@ const BottomNav: React.FC<BottomNavProps> = ({ onOpenAuth }) => {
     const location = useLocation();
     const { isAuthenticated, user } = useAuth();
 
-    // Determine dashboard path based on role
-    const getDashboardPath = () => {
-        if (!user) return '/';
-        switch (user.role) {
-            case 'driver': return '/driver';
-            case 'business': return '/business-dashboard';
-            default: return '/customer-dashboard';
-        }
-    };
-
     const handleAuthGuard = (path: string) => {
         if (!isAuthenticated) {
             onOpenAuth?.();
@@ -31,9 +21,17 @@ const BottomNav: React.FC<BottomNavProps> = ({ onOpenAuth }) => {
         }
     };
 
-    const isActive = (path: string) => location.pathname === path;
+    const isActive = (path: string) => {
+        // Simple exact match check or strict sub-path check could be problematic with query params
+        // So we just check if pathname matches for now, unless specific logic needed
+        // For query params specific views, we compare full path + search key or just base path
+        if (location.pathname === path) return true;
+        // Check if includes for deep links
+        if (path.includes('?') && location.pathname + location.search === path) return true;
+        return false;
+    };
 
-    const navItems = [
+    const getCustomerNavItems = () => [
         {
             id: 'home',
             label: 'Home',
@@ -42,25 +40,20 @@ const BottomNav: React.FC<BottomNavProps> = ({ onOpenAuth }) => {
             onClick: () => navigate('/')
         },
         {
-            id: 'history',
-            label: 'Orders',
+            id: 'deliveries',
+            label: 'Deliveries',
             icon: Package,
-            path: getDashboardPath(), // Updated to direct to Dashboard
-            onClick: () => handleAuthGuard(getDashboardPath())
+            path: user?.role === 'business' ? '/business-dashboard?tab=DELIVERIES' : '/customer-dashboard?view=DELIVERIES',
+            onClick: () => handleAuthGuard(user?.role === 'business' ? '/business-dashboard?tab=DELIVERIES' : '/customer-dashboard?view=DELIVERIES')
         },
         {
-            id: 'action',
-            label: user?.role === 'driver' ? 'Go Online' : 'Book',
-            icon: user?.role === 'driver' ? Truck : Plus,
-            path: user?.role === 'driver' ? '/driver' : '/book',
+            id: 'send',
+            label: 'Send',
+            icon: Send, // or Plus
+            path: '/book',
             isAction: true,
-            onClick: () => {
-                if (user?.role === 'driver') {
-                    navigate('/driver');
-                } else {
-                    navigate('/book');
-                }
-            }
+            actionColor: 'bg-brand-600',
+            onClick: () => navigate('/book')
         },
         {
             id: 'track',
@@ -73,10 +66,52 @@ const BottomNav: React.FC<BottomNavProps> = ({ onOpenAuth }) => {
             id: 'profile',
             label: 'Profile',
             icon: User,
-            path: getDashboardPath(),
-            onClick: () => handleAuthGuard(getDashboardPath())
-        },
+            path: user?.role === 'business' ? '/business-dashboard?menu=open' : '/customer-dashboard?menu=open',
+            onClick: () => handleAuthGuard(user?.role === 'business' ? '/business-dashboard?menu=open' : '/customer-dashboard?menu=open')
+        }
     ];
+
+    const getDriverNavItems = () => [
+        {
+            id: 'home',
+            label: 'Home',
+            icon: Home,
+            path: '/driver?view=OVERVIEW',
+            onClick: () => handleAuthGuard('/driver?view=OVERVIEW')
+        },
+        {
+            id: 'marketplace',
+            label: 'Marketplace',
+            icon: LayoutGrid, // or Store
+            path: '/driver?view=MARKET',
+            onClick: () => handleAuthGuard('/driver?view=MARKET')
+        },
+        {
+            id: 'active-job',
+            label: 'Active Job',
+            icon: Car, // Using Car as steering wheel proxy since SteeringWheel is not in lucide 0.555
+            path: '/driver?view=JOBS', // Map/Active Job view
+            isAction: true,
+            actionColor: 'bg-green-600', // Green button
+            onClick: () => handleAuthGuard('/driver?view=JOBS')
+        },
+        {
+            id: 'earnings',
+            label: 'Earnings',
+            icon: DollarSign,
+            path: '/driver?view=EARNINGS',
+            onClick: () => handleAuthGuard('/driver?view=EARNINGS')
+        },
+        {
+            id: 'profile',
+            label: 'Profile',
+            icon: User,
+            path: '/driver?view=PROFILE',
+            onClick: () => handleAuthGuard('/driver?view=PROFILE') // or ?menu=open if they want sidebar
+        }
+    ];
+
+    const navItems = user?.role === 'driver' ? getDriverNavItems() : getCustomerNavItems();
 
     return (
         <motion.div
@@ -94,7 +129,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ onOpenAuth }) => {
                                 key={item.id}
                                 whileTap={{ scale: 0.9 }}
                                 onClick={item.onClick}
-                                className="relative -top-5 w-14 h-14 bg-brand-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-brand-500/40"
+                                className={`relative -top-5 w-14 h-14 ${item.actionColor || 'bg-brand-600'} rounded-2xl flex items-center justify-center text-white shadow-xl shadow-brand-500/40`}
                             >
                                 <item.icon className="w-6 h-6" />
                             </motion.button>

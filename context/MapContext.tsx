@@ -210,30 +210,15 @@ export const MapProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, []);
 
     const requestUserLocation = useCallback(async (): Promise<Coordinates | null> => {
-        return new Promise((resolve) => {
-            if (!navigator.geolocation) {
-                console.error("Geolocation is not supported by this browser.");
-                resolve(null);
-                return;
-            }
-
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const coords = {
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude
-                    };
-                    setUserLocation(coords);
-                    setMapCenterInternal(coords);
-                    resolve(coords);
-                },
-                (error) => {
-                    console.error("Error getting location:", error);
-                    resolve(null);
-                },
-                { enableHighAccuracy: true }
-            );
-        });
+        try {
+            const coords = await mapService.getCurrentLocation();
+            setUserLocation(coords);
+            setMapCenterInternal(coords);
+            return coords;
+        } catch (error) {
+            console.error("Error getting location:", error);
+            return null;
+        }
     }, []);
 
     // Automatic Routing Effect - Removed to allow pages to control routing logic (e.g. driver-to-destination)
