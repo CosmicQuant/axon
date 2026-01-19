@@ -663,9 +663,9 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick, onDriverCl
                   </form>
 
                   {/* Quick Tap Destinations */}
-                  <div className="mt-2 w-full max-w-2xl mx-auto">
+                  <div className="mt-2 w-full max-w-2xl mx-auto pb-4">
                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 text-center">Quick Tap Destinations</p>
-                     <div className="flex flex-wrap justify-center gap-1.5">
+                     <div className="flex flex-wrap justify-center gap-1.5 max-h-[60px] overflow-hidden">
                         {(historyDestinations.length > 0 ? historyDestinations : [
                            { label: 'Nairobi', icon: MapPin },
                            { label: 'Mombasa', icon: MapPin },

@@ -57,11 +57,13 @@ const App = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) {
-      GoogleAuth.initialize();
-    } else {
+    if (Capacitor.isNativePlatform()) {
       // Initialize Native Google Auth
-      GoogleAuth.initialize();
+      GoogleAuth.initialize({
+        clientId: '672048373138-ja58begjt0ieksollh1lmqacos65luus.apps.googleusercontent.com',
+        scopes: ['profile', 'email'],
+        grantOfflineAccess: true,
+      });
 
       // Request Location Permissions
       const requestPermissions = async () => {

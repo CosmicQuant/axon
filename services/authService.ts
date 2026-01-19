@@ -100,7 +100,11 @@ export const authService = {
 
       if (isNative) {
         console.log("Service: Using Native Google Auth");
-        GoogleAuth.initialize();
+        GoogleAuth.initialize({
+          clientId: '672048373138-ja58begjt0ieksollh1lmqacos65luus.apps.googleusercontent.com',
+          scopes: ['profile', 'email'],
+          grantOfflineAccess: true,
+        });
         const googleUser = await GoogleAuth.signIn();
         const credential = GoogleAuthProvider.credential(googleUser.authentication.idToken);
         const result = await signInWithCredential(auth, credential);

@@ -1102,8 +1102,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ prefillData, onOrderComplete,
     };
 
     return (
-        <div className="w-full h-full flex flex-col pointer-events-none">
-            <div className="mt-auto pointer-events-auto w-full max-w-2xl mx-auto px-4 sm:px-6 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] sm:pb-[calc(env(safe-area-inset-bottom,0px)+2rem)]">
+        <div className="w-full h-full flex flex-col justify-end pointer-events-none">
+            <div className="pointer-events-auto w-full max-w-2xl mx-auto px-4 sm:px-6 pb-[env(safe-area-inset-bottom,0px)]">
 
                 {/* Step Indicator - Removed for One-Click Flow */}
                 {/* {!isCollapsed && (
@@ -1116,9 +1116,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ prefillData, onOrderComplete,
           </div>
         )} */}
 
-                {/* Main Card - Bottom Sheet Style (60% max, sits at bottom with safe-area padding) */}
+                {/* Main Card - Professional Bottom Sheet (75% max when expanded) */}
                 <div
-                    className={`bg-white/95 backdrop-blur-2xl rounded-t-[2.5rem] shadow-[0_-10px_50px_rgba(0,0,0,0.15)] border-t border-x border-white/50 overflow-hidden transition-all duration-500 transform animate-in slide-in-from-bottom-10 ${isCollapsed ? (isMapSelecting ? 'max-h-[220px]' : 'max-h-[140px]') : 'max-h-[60vh]'}`}
+                    className={`bg-white backdrop-blur-2xl rounded-t-[2rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] border-t border-x border-gray-200 overflow-hidden transition-all duration-500 transform ${isCollapsed ? (isMapSelecting ? 'max-h-[200px]' : 'max-h-[150px]') : 'max-h-[75vh]'}`}
                 >
                     {/* Drawer Handle / Drag Zone */}
                     <div
@@ -1254,8 +1254,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ prefillData, onOrderComplete,
 
                     <div
                         ref={formContainerRef}
-                        className={`px-8 pb-8 transition-opacity duration-300 overflow-y-auto no-scrollbar ${isCollapsed ? 'opacity-0 pointer-events-none h-0' : 'opacity-100 flex-1'}`}
-                        style={{ maxHeight: 'calc(60vh - 80px)' }}
+                        className={`px-6 sm:px-8 pb-6 transition-opacity duration-300 overflow-y-auto no-scrollbar ${isCollapsed ? 'opacity-0 pointer-events-none h-0' : 'opacity-100 flex-1'}`}
+                        style={{ maxHeight: 'calc(75vh - 70px)' }}
                     >
                         <div className="space-y-6 animate-in fade-in duration-500">
                             <div className="flex justify-between items-start">
