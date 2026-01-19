@@ -277,7 +277,7 @@ const App = () => {
                         // Native App: Prompt explicitly for Business Auth
                         if (Capacitor.isNativePlatform()) {
                           setAuthModalRole('business');
-                          setAuthModalView('LOGIN'); 
+                          setAuthModalView('LOGIN');
                           setAuthModalTitle('Enterprise Access');
                           setAuthModalDesc('Sign in or register to access enterprise solutions.');
                           setShowAuthModal(true);
