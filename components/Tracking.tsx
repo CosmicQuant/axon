@@ -335,7 +335,7 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
     const verificationCode = Math.floor(1000 + Math.random() * 9000).toString();
     setEditForm(prev => ({
       ...prev,
-      waypoints: [...prev.waypoints, { id, address: '', coords: null, verificationCode }]
+      waypoints: [...prev.waypoints, { id, address: '', coords: null as any, verificationCode, status: 'pending' as const, type: 'waypoint' as const }]
     }));
   };
 
@@ -512,7 +512,7 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
 
         {/* Main Collapsible Card - Professional Bottom Sheet (75% max when expanded) */}
         <div
-          className={`bg-white backdrop-blur-2xl rounded-t-[2rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] border-t border-x border-gray-200 overflow-hidden transition-all duration-500 transform pb-[env(safe-area-inset-bottom,0px)] ${isCollapsed ? (isMapSelecting ? 'max-h-[220px]' : 'max-h-[160px]') : 'max-h-[75vh] overflow-y-auto no-scrollbar'}`}
+          className={`bg-white backdrop-blur-2xl rounded-t-[2rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] border-t border-x border-gray-200 overflow-hidden transition-all duration-500 transform pb-[env(safe-area-inset-bottom,0px)] ${isCollapsed ? (isMapSelecting ? 'max-h-[160px]' : 'max-h-[120px]') : 'max-h-[75vh] overflow-y-auto no-scrollbar'}`}
         >
           {/* Drawer Handle / Drag Zone */}
           <div
@@ -591,80 +591,34 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
                   <div className="flex items-center justify-between w-full animate-in fade-in slide-in-from-bottom-2 px-2">
                     <div className="flex items-center space-x-3 overflow-hidden flex-1">
                       <div className="flex flex-col min-w-0 w-full">
-                        <div className="flex items-center space-x-2 w-full overflow-hidden">
+                        <div className="flex items-center space-x-1.5 w-full overflow-hidden">
                           <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0"></div>
-                          <span className="text-[10px] sm:text-xs font-bold text-gray-700 truncate max-w-[60px] sm:max-w-[120px]">{order.pickup}</span>
+                          <span className="text-[11px] font-bold text-gray-700 truncate flex-1 min-w-0">{order.pickup}</span>
 
-                          {order.stops && order.stops.length > 1 && (
-                            <>
-                              <ArrowRight className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                              <div className="w-2 h-2 rounded-full bg-brand-400 flex-shrink-0"></div>
-                              <span className="text-[10px] sm:text-xs font-bold text-gray-700 truncate max-w-[60px] sm:max-w-[100px]">
-                                {order.stops[0].address}
-                              </span>
-                              {order.stops.length > 2 && (
-                                <span className="text-[10px] font-black text-gray-400 flex-shrink-0">...</span>
-                              )}
-                            </>
+                          {order.stops && order.stops.length > 0 && (
+                            <span className="text-[10px] font-black text-gray-400 flex-shrink-0 px-1">• • •</span>
                           )}
 
                           <ArrowRight className="w-3 h-3 text-gray-400 flex-shrink-0" />
                           <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0"></div>
-                          <span className="text-[10px] sm:text-xs font-bold text-gray-700 truncate max-w-[60px] sm:max-w-[120px]">{order.dropoff}</span>
+                          <span className="text-[11px] font-bold text-gray-700 truncate flex-1 min-w-0">{order.dropoff}</span>
                         </div>
-
-                        <div className="flex items-center space-x-2 mt-1.5 w-full overflow-hidden">
-                          <span className="text-xs font-black text-gray-900 truncate max-w-[150px] sm:max-w-[300px]">
-                            {order.items?.description || (order as any).itemDescription || 'Package'}
+                        <div className="flex items-center space-x-2 mt-1">
+                          <span className="text-xs font-black text-gray-900 truncate max-w-[140px]">
+                            {(order.status === 'driver_assigned' || order.status === 'in_transit') && order.driver?.name
+                              ? order.driver.name
+                              : (order.items?.description || 'Package')}
                           </span>
                           <span className="text-gray-300">•</span>
-                          <span className="text-[10px] font-black text-brand-600 whitespace-nowrap">KES {order.price.toLocaleString()}</span>
+                          <span className="text-[10px] font-black text-brand-600">KES {order.price.toLocaleString()}</span>
+                          <span className="text-gray-300">•</span>
+                          <span className={`text-[9px] font-black uppercase ${order.status === 'delivered' ? 'text-emerald-600' : 'text-brand-600'}`}>
+                            {order.status === 'driver_assigned' ? 'Pickup' : order.status === 'in_transit' ? 'Delivering' : order.status.replace('_', ' ')}
+                          </span>
                         </div>
-
-                        {order.status !== 'delivered' && order.status !== 'cancelled' && (
-                          <div className="flex items-center space-x-2 mt-1 w-full overflow-hidden">
-                            <div className="flex items-center space-x-1 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100 flex-shrink-0">
-                              {(() => {
-                                const VIcon = getVehicleIcon(order.vehicle);
-                                return <VIcon className="w-2.5 h-2.5 text-gray-500" />;
-                              })()}
-                              <span className="text-[9px] font-bold text-gray-600 uppercase tracking-tighter">
-                                {order.vehicle?.split(' ')[0]}
-                              </span>
-                            </div>
-                            <div className="flex items-center space-x-1 flex-shrink-0">
-                              <Clock className="w-2.5 h-2.5 text-brand-500" />
-                              <span className="text-[9px] font-black text-brand-600 uppercase tracking-tighter whitespace-nowrap">
-                                {(() => {
-                                  const now = new Date();
-                                  let arrival: Date;
-                                  if (order.remainingDuration) {
-                                    arrival = new Date(now.getTime() + order.remainingDuration * 1000);
-                                  } else {
-                                    const mins = parseInt(order.estimatedDuration?.split(' ')[0] || '30');
-                                    arrival = new Date(now.getTime() + mins * 60 * 1000);
-                                  }
-                                  const timeOptions: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' };
-                                  const dateOptions: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
-                                  return `${arrival.toLocaleTimeString([], timeOptions)}, ${arrival.toLocaleDateString([], dateOptions)}`;
-                                })()}
-                              </span>
-                            </div>
-                          </div>
-                        )}
                       </div>
                     </div>
-                    <div className="flex-shrink-0 ml-4 flex flex-col items-end space-y-2">
-                      <span className={`text-[8px] font-black px-2 py-1 rounded-md uppercase tracking-widest border shadow-sm ${order.status === 'delivered' ? 'bg-emerald-500 text-white border-emerald-400' :
-                        order.status === 'cancelled' ? 'bg-red-500 text-white border-red-400' :
-                          'bg-brand-600 text-white border-brand-500'
-                        }`}>
-                        {order.status === 'driver_assigned' ? 'Pickup' :
-                          order.status === 'in_transit' ? 'Delivering' :
-                            order.status.replace('_', ' ')}
-                      </span>
-                      <ChevronUp className="w-4 h-4 text-gray-400 animate-bounce" />
-                    </div>
+                    <ChevronUp className="w-5 h-5 text-brand-600 flex-shrink-0" />
                   </div>
                 )
               )}

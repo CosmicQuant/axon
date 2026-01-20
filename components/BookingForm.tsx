@@ -1118,7 +1118,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ prefillData, onOrderComplete,
 
                 {/* Main Card - Professional Bottom Sheet (75% max when expanded) */}
                 <div
-                    className={`bg-white backdrop-blur-2xl rounded-t-[2rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] border-t border-x border-gray-200 overflow-hidden transition-all duration-500 transform pb-[env(safe-area-inset-bottom,0px)] ${isCollapsed ? (isMapSelecting ? 'max-h-[220px]' : 'max-h-[170px]') : 'max-h-[75vh]'}`}
+                    className={`bg-white backdrop-blur-2xl rounded-t-[2rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] border-t border-x border-gray-200 overflow-hidden transition-all duration-500 transform pb-[env(safe-area-inset-bottom,0px)] ${isCollapsed ? (isMapSelecting ? 'max-h-[160px]' : 'max-h-[120px]') : 'max-h-[75vh]'}`}
                 >
                     {/* Drawer Handle / Drag Zone */}
                     <div
@@ -1180,26 +1180,17 @@ const BookingForm: React.FC<BookingFormProps> = ({ prefillData, onOrderComplete,
                                             <div className="flex items-center justify-between w-full">
                                                 <div className="flex items-center space-x-2 overflow-hidden flex-1 mr-2">
                                                     <div className="flex flex-col min-w-0 w-full">
-                                                        <div className="flex items-center space-x-2 w-full overflow-hidden">
+                                                        <div className="flex items-center space-x-1.5 w-full overflow-hidden">
                                                             <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0"></div>
-                                                            <span className="text-[10px] sm:text-xs font-bold text-gray-700 truncate max-w-[60px] sm:max-w-[120px]">{pickup || "Pickup"}</span>
+                                                            <span className="text-[11px] font-bold text-gray-700 truncate flex-1 min-w-0">{pickup || "Set pickup"}</span>
 
                                                             {waypoints.length > 0 && (
-                                                                <>
-                                                                    <ArrowRight className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                                                                    <div className="w-2 h-2 rounded-full bg-brand-400 flex-shrink-0"></div>
-                                                                    <span className="text-[10px] sm:text-xs font-bold text-gray-700 truncate max-w-[60px] sm:max-w-[100px]">
-                                                                        {waypoints[0].address || "Stop 1"}
-                                                                    </span>
-                                                                    {waypoints.length > 1 && (
-                                                                        <span className="text-[10px] font-black text-gray-400 flex-shrink-0">...</span>
-                                                                    )}
-                                                                </>
+                                                                <span className="text-[10px] font-black text-gray-400 flex-shrink-0 px-1">• • •</span>
                                                             )}
 
                                                             <ArrowRight className="w-3 h-3 text-gray-400 flex-shrink-0" />
                                                             <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0"></div>
-                                                            <span className="text-[10px] sm:text-xs font-bold text-gray-700 truncate max-w-[60px] sm:max-w-[120px]">{dropoff || "Dropoff"}</span>
+                                                            <span className="text-[11px] font-bold text-gray-700 truncate flex-1 min-w-0">{dropoff || "Set dropoff"}</span>
                                                         </div>
 
                                                         <div className="flex items-center space-x-2 mt-1.5 w-full overflow-hidden">
