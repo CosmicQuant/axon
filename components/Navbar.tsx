@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Truck, Clock, User, ChevronDown, Repeat, LayoutDashboard, LogOut, Briefcase, Settings, Menu, X, Shield, Lock, Home, Globe, Bell, Calendar, Trash2, ArrowLeft } from 'lucide-react';
+import { Truck, Clock, User, ChevronDown, Repeat, LayoutDashboard, LogOut, Briefcase, Settings, Menu, X, Shield, Lock, Home, Globe, Bell, Calendar, Trash2, ArrowLeft, Activity } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { usePrompt } from '../context/PromptContext';
 import DropdownMenu from './DropdownMenu';
@@ -56,7 +56,7 @@ const Navbar: React.FC<NavbarProps> = ({ onOpenProfile, onLogin, isDarkBackgroun
 
   const handleDriveClick = () => {
     if (!user) {
-      onLogin?.('driver', 'Earn with TumaFast', 'Sign in to start receiving delivery requests.');
+      onLogin?.('driver', 'Earn with AXON', 'Sign in to start receiving delivery requests.');
       return;
     }
     if (user.role === 'customer' || user.role === 'business') {
@@ -104,9 +104,9 @@ const Navbar: React.FC<NavbarProps> = ({ onOpenProfile, onLogin, isDarkBackgroun
             onClick={handleLogoClick}
           >
             <div className="bg-gradient-to-br from-brand-500 to-brand-600 p-2 rounded-xl shadow-lg group-hover:shadow-brand-300 transition-all duration-300">
-              <Truck className="text-white w-5 h-5" />
+              <Activity className="text-white w-5 h-5" />
             </div>
-            <span className={`font-black text-2xl tracking-tight transition-colors duration-300 ${isDarkBackground ? 'text-white' : 'text-slate-900'}`}>Tuma<span className={isDarkBackground ? 'text-brand-400' : 'text-brand-600'}>Fast</span></span>
+            <span className={`font-black text-2xl tracking-tight transition-colors duration-300 ${isDarkBackground ? 'text-white' : 'text-slate-900'}`}>Axon</span>
           </div>
         )}
 
@@ -192,7 +192,7 @@ const Navbar: React.FC<NavbarProps> = ({ onOpenProfile, onLogin, isDarkBackgroun
             </>
           ) : (
             <button
-              onClick={onLogin}
+              onClick={() => onLogin?.()}
               className={`text-sm font-black px-6 py-2.5 rounded-full transition-all active:scale-95 ${isMapPage ? 'bg-brand-600 text-white pointer-events-auto' : 'bg-brand-600 text-white'}`}
             >
               Sign In

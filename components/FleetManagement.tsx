@@ -49,7 +49,7 @@ const FleetManagement: React.FC = () => {
                         transition={{ delay: 0.1 }}
                         className="text-xl md:text-2xl text-slate-400 max-w-3xl mx-auto font-medium leading-relaxed"
                     >
-                        TumaFast's Fleet Management layer provides real-time telemetry and predictive maintenance for your entire commercial vehicle deployment.
+                        AXON's Fleet Management layer provides real-time telemetry and predictive maintenance for your entire commercial vehicle deployment.
                     </motion.p>
                 </div>
 
@@ -106,7 +106,7 @@ const FleetManagement: React.FC = () => {
                     <div className="max-w-4xl mx-auto px-12 relative z-10 text-center">
                         <h2 className="text-4xl md:text-6xl font-black mb-8 tracking-tight">One Console. One Mission.</h2>
                         <p className="text-xl text-brand-100 mb-12 font-medium leading-relaxed">
-                            Stop guessing vehicle locations. TumaFast integrates directly with your existing hardware or provides our own proprietary IoT solution to bring every asset into a unified telemetry stream.
+                            Stop guessing vehicle locations. AXON integrates directly with your existing hardware or provides our own proprietary IoT solution to bring every asset into a unified telemetry stream.
                         </p>
                         <div className="flex flex-col sm:flex-row gap-6 justify-center">
                             <button

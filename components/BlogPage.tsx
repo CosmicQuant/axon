@@ -18,7 +18,7 @@ const BLOG_POSTS = [
             </blockquote>
 
             <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">Predictive Logistics</h3>
-            <p className="mb-6">By analyzing years of traffic patterns, TumaFast's AI can predict traffic surges in Westlands or Industrial Area before they happen. This allows our dispatch system to pre-allocate drivers to zones before orders are even placed, slashingwait times to under 30 minutes for most city deliveries.</p>
+            <p className="mb-6">By analyzing years of traffic patterns, AXON's AI can predict traffic surges in Westlands or Industrial Area before they happen. This allows our dispatch system to pre-allocate drivers to zones before orders are even placed, slashingwait times to under 30 minutes for most city deliveries.</p>
             
             <p>As we move into 2026, the focus shifts toward autonomous delivery pilots and drone coordination, ensuring Kenya remains at the forefront of the global logistics revolution.</p>
         `,
@@ -30,13 +30,13 @@ const BLOG_POSTS = [
     },
     {
         id: 2,
-        title: "Scaling Your Business with TumaFast Fleet",
-        excerpt: "Why enterprise businesses are choosing TumaFast as their primary logistics partner for long-term growth and operational efficiency.",
+        title: "Scaling Your Business with AXON Fleet",
+        excerpt: "Why enterprise businesses are choosing AXON as their primary logistics partner for long-term growth and operational efficiency.",
         content: `
             <p className="mb-6">For SMEs and large enterprises in East Africa, managing its own delivery fleet is often a distraction from core business activities. Maintenance, fuel costs, and driver management create overhead that saps potential for growth.</p>
             
             <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">Elastic Infrastructure</h3>
-            <p className="mb-6">The primary advantage of TumaFast for Business is elasticity. During peak seasons like Christmas or Valentine's Day, businesses can scale their delivery capacity by 500% instantly without hiring a single employee. You only pay for the deliveries you make, turning a fixed cost into a variable one.</p>
+            <p className="mb-6">The primary advantage of AXON for Business is elasticity. During peak seasons like Christmas or Valentine's Day, businesses can scale their delivery capacity by 500% instantly without hiring a single employee. You only pay for the deliveries you make, turning a fixed cost into a variable one.</p>
             
             <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">API Integration</h3>
             <p className="mb-6">Modern businesses need automated workflows. Our enterprise API allows platforms to trigger delivery requests automatically when a customer checks out. This seamless integration ensures that the delivery process starts the second a payment is confirmed.</p>
@@ -57,7 +57,7 @@ const BLOG_POSTS = [
             <p className="mb-6">Trust is the currency of the logistics industry. When a customer hands over a high-value item—be it a laptop or sensitive documents—they need absolute certainty it will reach the destination safely.</p>
             
             <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">The Three Pillars of Safety</h3>
-            <p className="mb-4"><strong>1. Real-time Vetting:</strong> Every TumaFast driver undergoes a multi-stage background check, including identity verification and personal references. Our digital "Driver Score" updates after every trip based on speed, safety, and customer feedback.</p>
+            <p className="mb-4"><strong>1. Real-time Vetting:</strong> Every AXON driver undergoes a multi-stage background check, including identity verification and personal references. Our digital "Driver Score" updates after every trip based on speed, safety, and customer feedback.</p>
             <p className="mb-4"><strong>2. Digital Escrow:</strong> Through our deep integration with M-Pesa, payments can be held in escrow until the recipient confirms delivery via a secure OTP (One Time Password).</p>
             <p className="mb-6"><strong>3. Live Telemetry:</strong> Customers don't just see a dot on a map; they see the driver's progress with sub-5-meter accuracy, along with estimated time of arrival that updates every 10 seconds.</p>
             

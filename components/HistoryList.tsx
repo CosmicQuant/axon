@@ -537,7 +537,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ onTrackOrder, onReorder }) =>
               {/* Receipt Header */}
               <div className="flex justify-between items-start mb-8 border-b border-gray-100 pb-6">
                 <div>
-                  <h2 className="text-3xl font-black text-brand-600 tracking-tighter">TUMAFAST</h2>
+                  <h2 className="text-3xl font-black text-brand-600 tracking-tighter">AXON</h2>
                   <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Official Delivery Receipt</p>
                 </div>
                 <div className="text-right">
@@ -593,7 +593,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ onTrackOrder, onReorder }) =>
 
               {/* Footer */}
               <div className="text-center border-t border-gray-100 pt-6">
-                <p className="text-[10px] text-gray-400 font-medium">Thank you for choosing Tumafast Kenya. This is a computer-generated receipt.</p>
+                <p className="text-[10px] text-gray-400 font-medium">Thank you for choosing AXON Kenya. This is a computer-generated receipt.</p>
               </div>
             </div>
 

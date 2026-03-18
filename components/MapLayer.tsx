@@ -356,18 +356,17 @@ const MapLayer: React.FC<MapLayerProps> = ({ driverLabel }) => {
                     </React.Fragment>
                 ))}
 
-                {decodedPath.length > 0 && (
-                    <Polyline
-                        path={decodedPath}
-                        options={{
-                            strokeColor: '#2563eb',
-                            strokeOpacity: 1,
-                            strokeWeight: 6,
-                            geodesic: true,
-                            zIndex: 100
-                        }}
-                    />
-                )}
+                <Polyline
+                    path={decodedPath}
+                    options={{
+                        strokeColor: '#2563eb',
+                        strokeOpacity: 1,
+                        strokeWeight: 6,
+                        geodesic: true,
+                        zIndex: 100,
+                        visible: decodedPath.length > 0
+                    }}
+                />
             </GoogleMap>
 
             {(orderState === 'MATCHING' && !isMapSelecting) && (

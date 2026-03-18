@@ -8,7 +8,7 @@ export const APP_CONFIG = {
   USE_MOCK_BACKEND: false,
 
   // Firebase Functions URL (Update this with your actual project URL)
-  API_BASE_URL: 'https://us-central1-tumafast-kenya.cloudfunctions.net',
+  API_BASE_URL: 'https://us-central1-axon-8b0a8.cloudfunctions.net',
 
   // Google Gemini API Key
   GEMINI_API_KEY: import.meta.env.VITE_GEMINI_API_KEY || '',

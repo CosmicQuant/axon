@@ -50,7 +50,7 @@ const PrivacyPolicy: React.FC = () => {
                             </h2>
 
                             <p className="text-slate-400 text-xl leading-relaxed mb-16 font-medium">
-                                At TumaFast, we follow a simple principle: your data belongs to you. We only collect what is strictly necessary to provide industrial-grade logistics services and ensure institutional-level security.
+                                At AXON, we follow a simple principle: your data belongs to you. We only collect what is strictly necessary to provide industrial-grade logistics services and ensure institutional-level security.
                             </p>
 
                             <div className="space-y-20">
@@ -125,7 +125,7 @@ const PrivacyPolicy: React.FC = () => {
                                     </div>
                                     <div>
                                         <p className="text-sm font-bold text-white">Legal Desk</p>
-                                        <a href="mailto:privacy@tumafast.xyz" className="text-xs text-brand-400 font-black uppercase tracking-widest hover:underline">privacy@tumafast.xyz</a>
+                                        <a href="mailto:privacy@axon.xyz" className="text-xs text-brand-400 font-black uppercase tracking-widest hover:underline">privacy@axon.xyz</a>
                                     </div>
                                 </div>
                                 <div className="flex gap-4">

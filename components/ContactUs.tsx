@@ -37,7 +37,7 @@ const ContactUs: React.FC = () => {
 
                         <div className="space-y-10 mb-16">
                             {[
-                                { icon: Mail, title: 'Email Us', info: 'hello@tumafast.co.ke', sub: 'We reply within 24 hours' },
+                                { icon: Mail, title: 'Email Us', info: 'hello@Axon.co.ke', sub: 'We reply within 24 hours' },
                                 { icon: Phone, title: 'Call Us', info: '+254 742 490 499', sub: 'Available Mon-Fri, 8am-6pm' },
                                 { icon: Globe, title: 'Regional Support', info: '+254 711 775 856', sub: 'For order tracking & status' },
                                 { icon: MapPin, title: 'Our Office', info: 'Nairobi, Kenya', sub: 'Visit us anytime' }

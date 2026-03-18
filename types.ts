@@ -90,6 +90,10 @@ export interface User {
     updates: { email: boolean; push: boolean; sms: boolean };
     security: { email: boolean; push: boolean; sms: boolean };
   };
+  savedAddresses?: AddressBookEntry[];
+  twoFAEnabled?: boolean;
+  status?: 'active' | 'suspended' | 'pending';
+  photoURL?: string;
 }
 
 export interface SignupProfileDetails {
@@ -187,6 +191,8 @@ export interface DeliveryOrder {
   endTime?: string;
   serviceType: ServiceType;
   stops?: RouteStop[]; // Optional: for multi-stop orders
+  total?: number; // Total cost (legacy)
+  dropoffAddress?: string; // Legacy
 }
 
 export interface Review {
@@ -244,4 +250,5 @@ export interface DriverMetrics {
     date: string;
     customerName?: string;
   }[];
+  status?: string;
 }

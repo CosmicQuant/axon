@@ -1,8 +1,8 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">TumaFast</string>
-    <string name="title_activity_main">TumaFast</string>
-    <string name="package_name">com.tumafast.kenya</string>
-    <string name="custom_url_scheme">com.tumafast.kenya</string>
+    <string name="app_name">Axon</string>
+    <string name="title_activity_main">Axon</string>
+    <string name="package_name">com.Axon.kenya</string>
+    <string name="custom_url_scheme">com.Axon.kenya</string>
     <string name="server_client_id">672048373138-ja58begjt0ieksollh1lmqacos65luus.apps.googleusercontent.com</string>
 </resources>

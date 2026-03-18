@@ -10,7 +10,8 @@ import { useAuth } from '../context/AuthContext';
 import { usePrompt } from '../context/PromptContext';
 import { BookingSchema } from '../schemas';
 import { useMapState } from '@/context/MapContext';
-import { MapPin, Box, Truck, CreditCard, Info, User, Phone, Wallet, Check, ChevronLeft, ChevronRight, Banknote, Clock, Calendar, AlertTriangle, DollarSign, Bike, Car, Smartphone, GripVertical, Navigation, Map, ArrowRight, ChevronUp, Edit2, Home, Building2 as Building, Zap, Rocket, Shield, Plus, X, List, Scale } from 'lucide-react';
+import { MapPin, Box, Truck, CreditCard, Info, User, Phone, Wallet, Check, ChevronLeft, ChevronRight, Banknote, Clock, Calendar, AlertTriangle, DollarSign, Bike, Car, Smartphone, GripVertical, Navigation, Map, ArrowRight, ChevronUp, Edit2, Home, Building2 as Building, Zap, Rocket, Shield, Plus, X, List, Scale, Package, MoreVertical, ChevronDown, AlertCircle, Search, Image as ImageIcon, Camera } from 'lucide-react';
+import { storageService } from '../services/storageService';
 
 interface BookingFormProps {
     prefillData?: any;
@@ -28,11 +29,14 @@ const BookingForm: React.FC<BookingFormProps> = ({ prefillData, onOrderComplete,
         mapCenter, isPanning,
         pickupCoords, setPickupCoords,
         dropoffCoords, setDropoffCoords,
-        fitBounds, requestUserLocation,
-        userLocation, setRoutePolyline,
+        setRoutePolyline,
+        activeInput, setActiveInput,
         isMapSelecting, setIsMapSelecting,
-        setMapCenter, activeInput, setActiveInput,
-        setAllowMarkerClick, waypointCoords, setWaypointCoords,
+        setMapCenter, fitBounds,
+        setAllowMarkerClick,
+        waypointCoords, setWaypointCoords,
+        requestUserLocation,
+        userLocation,
         setDriverVehicleType
     } = useMapState();
 
@@ -95,7 +99,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ prefillData, onOrderComplete,
 
     // Step 1: Route & Item & Time
     const [pickup, setPickup] = useState(prefillData?.pickup || '');
+    const prevPickupRef = useRef(pickup);
     const [dropoff, setDropoff] = useState(prefillData?.dropoff || '');
+    const prevDropoffRef = useRef(dropoff);
 
     const [itemDesc, setItemDesc] = useState(prefillData?.items?.description || prefillData?.itemDescription || '');
     const [itemImage, setItemImage] = useState<string | null>(prefillData?.itemImage || null);
@@ -146,6 +152,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ prefillData, onOrderComplete,
     // Price State
     const [priceQuote, setPriceQuote] = useState<number>(prefillData?.price || 0);
     const [calculatingPrice, setCalculatingPrice] = useState(false);
+    const [isUploadingImage, setIsUploadingImage] = useState(false);
     const [distance, setDistance] = useState<number>(0);
     const [estArrival, setEstArrival] = useState<{ arrivalTime: string, arrivalDate: string } | null>(null);
 
@@ -514,9 +521,16 @@ const BookingForm: React.FC<BookingFormProps> = ({ prefillData, onOrderComplete,
                     if (route) {
                         setRoutePolyline(route.geometry);
                         setDistance(route.distance);
+                    } else {
+                        // Clear previous route if current points are unroutable
+                        setRoutePolyline(null);
+                        setDistance(0);
                     }
                 } catch (error) {
                     console.error("Routing error:", error);
+                    // Clear previous route if it failed
+                    setRoutePolyline(null);
+                    setDistance(0);
                 } finally {
                     setCalculatingPrice(false);
                 }
@@ -530,15 +544,31 @@ const BookingForm: React.FC<BookingFormProps> = ({ prefillData, onOrderComplete,
         return () => clearTimeout(timer);
     }, [pickupCoords, dropoffCoords, waypoints, isLoaded, isPanning, setRoutePolyline, setWaypointCoords]);
 
-    // Debounced Geocoding for typed addresses (Updates COORDS ONLY, doesn't overwrite text)
     useEffect(() => {
-        if (isMapSelecting || isPanning || !isLoaded) return;
+        if (!isLoaded) return;
+
+        const pickupChanged = pickup !== prevPickupRef.current;
+        const dropoffChanged = dropoff !== prevDropoffRef.current;
+
+        if (!pickupChanged && !dropoffChanged) return;
+
+        // Update the refs so we know what they last were
+        prevPickupRef.current = pickup;
+        prevDropoffRef.current = dropoff;
+
+        // If actively panning or selecting on the map, don't trigger typing auto-geocode 
+        if (isMapSelecting || isPanning) return;
+
+        // Instantly hide the route when they actively type a new address
+        if ((pickupChanged && pickup.length > 5) || (dropoffChanged && dropoff.length > 5)) {
+            setRoutePolyline(null);
+        }
 
         const timer = setTimeout(async () => {
-            if (activeInput === 'pickup' && pickup.length > 5) {
+            if (activeInput === 'pickup' && pickup.length > 5 && pickupChanged) {
                 const coords = await mapService.geocodeAddress(pickup);
                 if (coords) setPickupCoords(coords);
-            } else if (activeInput === 'dropoff' && dropoff.length > 5) {
+            } else if (activeInput === 'dropoff' && dropoff.length > 5 && dropoffChanged) {
                 const coords = await mapService.geocodeAddress(dropoff);
                 if (coords) setDropoffCoords(coords);
             }
@@ -750,6 +780,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ prefillData, onOrderComplete,
     }, [pickupCoords, dropoffCoords, waypointCoords, orderState, activeInput, waypoints, isMapSelecting]);
 
     const handleBook = async () => {
+        if (!user) {
+            onRequireAuth && onRequireAuth('Create an Account', 'You need an account to book deliveries.');
+            return;
+        }
+
         const formatPhone = (p: string) => {
             let cleaned = p.replace(/[\s\-()]/g, '');
             if (cleaned.startsWith('0')) {
@@ -1015,7 +1050,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ prefillData, onOrderComplete,
         setWaypoints(newWaypoints);
     };
 
-    // Suggestion Handlers
     const handleInputChange = async (type: 'pickup' | 'dropoff' | 'waypoint', value: string, index?: number) => {
         if (type === 'pickup') {
             setPickup(value);
@@ -1041,7 +1075,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ prefillData, onOrderComplete,
             updateWaypoint(index, value);
             if (value.length > 2) {
                 const results = await mapService.getSuggestions(value);
-                setDropoffSuggestions(results); // Share results bank
+                // We share the dropoff suggestions bank for waypoints to save state variables
+                setDropoffSuggestions(results); 
                 setShowDropoffSuggestions(true);
                 setActiveWaypointIndex(index);
             } else {
@@ -1051,11 +1086,17 @@ const BookingForm: React.FC<BookingFormProps> = ({ prefillData, onOrderComplete,
     };
 
     const handleSuggestionSelect = async (type: 'pickup' | 'dropoff' | 'waypoint', suggestion: { label: string, lat: number, lng: number }) => {
+        // Because the New Places API AutocompleteSuggestion format only returns the string, the lat/lng is 0,0
+        // We must geocode the selected string to get the actual coordinates before feeding it to the map
         let coords = { lat: suggestion.lat, lng: suggestion.lng };
+        
         if (coords.lat === 0 && coords.lng === 0) {
             const resolved = await mapService.geocodeAddress(suggestion.label);
             if (resolved) {
                 coords = { lat: resolved.lat, lng: resolved.lng };
+            } else {
+                 showAlert('Location Not Found', 'Could not locate the exact coordinates for this suggestion.', 'warning');
+                 return; // Do not proceed if geocoding fails on the suggestion
             }
         }
 
@@ -1937,14 +1978,25 @@ const BookingForm: React.FC<BookingFormProps> = ({ prefillData, onOrderComplete,
                                             type="file"
                                             accept="image/*"
                                             className="hidden"
-                                            onChange={(e) => {
+                                            onChange={async (e) => {
                                                 const file = e.target.files?.[0];
                                                 if (file) {
-                                                    const reader = new FileReader();
-                                                    reader.onloadend = () => {
-                                                        setItemImage(reader.result as string);
-                                                    };
-                                                    reader.readAsDataURL(file);
+                                                    setIsUploadingImage(true);
+                                                    try {
+                                                        const path = `orders/items/${Date.now()}_${file.name}`;
+                                                        const url = await storageService.uploadFile(file, path);
+                                                        setItemImage(url);
+                                                    } catch (err) {
+                                                        console.error("Error uploading image:", err);
+                                                        // Fallback to base64 if upload fails
+                                                        const reader = new FileReader();
+                                                        reader.onloadend = () => {
+                                                            setItemImage(reader.result as string);
+                                                        };
+                                                        reader.readAsDataURL(file);
+                                                    } finally {
+                                                        setIsUploadingImage(false);
+                                                    }
                                                 }
                                             }}
                                         />

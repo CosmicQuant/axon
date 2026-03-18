@@ -1,33 +1,33 @@
 {
   "project_info": {
-    "project_number": "672048373138",
-    "project_id": "experienceticket",
-    "storage_bucket": "experienceticket.firebasestorage.app"
+    "project_number": "770691922911",
+    "project_id": "axon-8b0a8",
+    "storage_bucket": "axon-8b0a8.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:672048373138:android:dbc05b600d1f32a1ab754b",
+        "mobilesdk_app_id": "1:770691922911:android:87a4f3d60d55d0b32de26a",
         "android_client_info": {
-          "package_name": "com.tumafast.kenya"
+          "package_name": "com.axon.kenya"
         }
       },
       "oauth_client": [
         {
-          "client_id": "672048373138-ja58begjt0ieksollh1lmqacos65luus.apps.googleusercontent.com",
+          "client_id": "770691922911-bcibeedoho5qfm1na7di312rsom4iv6d.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyBwgJbacIDRwZgCl3CtCevgmsIJVdRpvac"
+          "current_key": "AIzaSyCOIntjFo3VI-EjsZYLFZfXEZRBjL_72bc"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "672048373138-ja58begjt0ieksollh1lmqacos65luus.apps.googleusercontent.com",
+              "client_id": "770691922911-bcibeedoho5qfm1na7di312rsom4iv6d.apps.googleusercontent.com",
               "client_type": 3
             }
           ]

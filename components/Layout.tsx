@@ -51,7 +51,7 @@ const Layout: React.FC<LayoutProps> = ({ onOpenProfile, onLogin }) => {
                     <footer className="bg-secondary-900 text-gray-400 py-12 border-t border-gray-800 pointer-events-auto">
                         <div className="max-w-6xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-6">
                             <div className="text-center md:text-left">
-                                <span className="text-xl font-bold text-white mb-2 block">TumaFast</span>
+                                <span className="text-xl font-bold text-white mb-2 block">AXON</span>
                                 <p className="max-w-xs text-sm mx-auto md:mx-0">
                                     Connecting Kenyan businesses and individuals with reliable logistics solutions.
                                 </p>

@@ -1,8 +1,8 @@
 ---
-description: How to deploy the TumaFast app to Firebase Hosting
+description: How to deploy the Axon app to Firebase Hosting
 ---
 
-# Deploying TumaFast to Firebase Hosting
+# Deploying Axon to Firebase Hosting
 
 This guide walks you through deploying the application to Firebase Hosting.
 
@@ -50,7 +50,7 @@ Hosting URL: https://your-project-id.web.app
 ```
 
 ## Custom Domain (Optional)
-To use a custom domain like `tumafast.co.ke`:
+To use a custom domain like `axon.co.ke`:
 1. Go to Firebase Console → Hosting → Add custom domain
 2. Follow the DNS verification steps
 3. Firebase provides free SSL certificates

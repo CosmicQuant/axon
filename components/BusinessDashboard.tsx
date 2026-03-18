@@ -55,7 +55,7 @@ const INITIAL_FLEET = [
 ];
 
 const CODE_SNIPPETS = {
-    curl: `curl -X POST https://api.tumafast.co.ke/v1/orders \\
+    curl: `curl -X POST https://api.AXON.co.ke/v1/orders \\
   -H "Authorization: Bearer sk_live_..." \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -64,9 +64,9 @@ const CODE_SNIPPETS = {
     "items": "Documents",
     "vehicle": "BODA"
   }'`,
-    node: `const tumafast = require('tumafast')('sk_live_...');
+    node: `const AXON = require('AXON')('sk_live_...');
 
-const order = await tumafast.orders.create({
+const order = await AXON.orders.create({
   pickup: 'Westlands',
   dropoff: 'CBD',
   items: 'Documents',
@@ -74,10 +74,10 @@ const order = await tumafast.orders.create({
 });
 
 console.log(order.id);`,
-    python: `import tumafast
-tumafast.api_key = "sk_live_..."
+    python: `import AXON
+AXON.api_key = "sk_live_..."
 
-order = tumafast.Order.create(
+order = AXON.Order.create(
     pickup="Westlands",
     dropoff="CBD",
     items="Documents",
@@ -130,7 +130,7 @@ const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user, onNewReques
 
     // API Console Upgrade State
     const [liveMode, setLiveMode] = useState(false);
-    const [webhookUrl, setWebhookUrl] = useState('https://api.your-company.com/webhooks/tumafast');
+    const [webhookUrl, setWebhookUrl] = useState('https://api.your-company.com/webhooks/AXON');
     const [webhookEvents, setWebhookEvents] = useState({
         // Order Events
         'order.created': true,
@@ -299,7 +299,8 @@ const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user, onNewReques
     const { isLoaded } = useJsApiLoader({
         id: 'google-map-script',
         googleMapsApiKey: APP_CONFIG.GOOGLE_MAPS_API_KEY,
-        libraries: GOOGLE_MAPS_LIBRARIES
+        libraries: GOOGLE_MAPS_LIBRARIES,
+        version: "beta"
     });
     const [map, setMap] = useState<google.maps.Map | null>(null);
 
@@ -614,7 +615,7 @@ const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user, onNewReques
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "tumafast_bulk_template.csv");
+        link.setAttribute("download", "AXON_bulk_template.csv");
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -627,7 +628,7 @@ const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user, onNewReques
         const html = `
           <html>
             <head>
-              <title>TumaFast Waybills - ${new Date().toLocaleDateString()}</title>
+              <title>AXON Waybills - ${new Date().toLocaleDateString()}</title>
               <style>
                 body { font-family: 'Courier New', Courier, monospace; margin: 0; padding: 20px; color: #000; }
                 .waybill { border: 2px solid #000; margin-bottom: 40px; padding: 20px; page-break-inside: avoid; max-width: 800px; }
@@ -655,7 +656,7 @@ const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user, onNewReques
                 <div class="waybill">
                   <div class="header">
                      <div>
-                        <div class="logo">TUMAFAST DEPLOY</div>
+                        <div class="logo">AXON DEPLOY</div>
                         <div class="section" style="margin-top: 5px;">
                             <span style="background: #000; color: #fff; padding: 2px 6px; font-size: 12px; font-weight: bold;">${order.serviceType || 'Standard'}</span>
                         </div>
@@ -692,7 +693,7 @@ const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user, onNewReques
                   </div>
 
                   <div class="footer">
-                     Driver: Please verify Recipient ID matches above • Handle with Care • TumaFast Logistics
+                     Driver: Please verify Recipient ID matches above • Handle with Care • AXON Logistics
                   </div>
                 </div>
               `).join('')}
@@ -2585,7 +2586,7 @@ const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user, onNewReques
                             {/* Receipt Header */}
                             <div className="flex justify-between items-start mb-8 border-b border-gray-100 pb-6">
                                 <div>
-                                    <h2 className="text-3xl font-black text-brand-600 tracking-tighter">TUMAFAST</h2>
+                                    <h2 className="text-3xl font-black text-brand-600 tracking-tighter">AXON</h2>
                                     <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Official Delivery Receipt</p>
                                 </div>
                                 <div className="text-right">
@@ -2641,7 +2642,7 @@ const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user, onNewReques
 
                             {/* Footer */}
                             <div className="text-center border-t border-gray-100 pt-6">
-                                <p className="text-[10px] text-gray-400 font-medium">Thank you for choosing Tumafast Kenya. This is a computer-generated receipt.</p>
+                                <p className="text-[10px] text-gray-400 font-medium">Thank you for choosing AXON Kenya. This is a computer-generated receipt.</p>
                             </div>
                         </div>
 

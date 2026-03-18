@@ -89,24 +89,46 @@ export const mapService = {
             return [];
         }
 
-        return new Promise((resolve) => {
-            const service = new google.maps.places.AutocompleteService();
-            service.getPlacePredictions({
+        try {
+            const request = {
                 input: translatedQuery,
-                componentRestrictions: { country: 'ke' }
-            }, (predictions, status) => {
-                if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
-                    const results = predictions.map(p => ({
-                        label: p.description,
+                includedRegionCodes: ['ke']
+            };
+            
+            // Cast to any since standard @types/google.maps might not be fully updated to the 2026 API spec
+            const AutocompleteSuggestion = (google.maps.places as any).AutocompleteSuggestion;
+
+            if (AutocompleteSuggestion && AutocompleteSuggestion.fetchAutocompleteSuggestions) {
+                const response = await AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
+                if (response && response.suggestions) {
+                    return response.suggestions.map((s: any) => ({
+                        // The text wrapper contains the display text for the prediction
+                        label: s.placePrediction.text.text,
                         lat: 0,
                         lng: 0
                     }));
-                    resolve(results);
-                } else {
-                    resolve([]);
                 }
-            });
-        });
+                return [];
+            } else {
+                // Fallback to old API if for some reason the new class isn't mounted yet
+                return new Promise((resolve) => {
+                    const service = new google.maps.places.AutocompleteService();
+                    service.getPlacePredictions({
+                        input: translatedQuery,
+                        componentRestrictions: { country: 'ke' }
+                    }, (predictions, status) => {
+                        if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+                            resolve(predictions.map(p => ({ label: p.description, lat: 0, lng: 0 })));
+                        } else {
+                            resolve([]);
+                        }
+                    });
+                });
+            }
+        } catch (error) {
+            console.error("Autocomplete request failed:", error);
+            return [];
+        }
     },
 
     /**
@@ -122,12 +144,15 @@ export const mapService = {
             const geocoder = new google.maps.Geocoder();
             geocoder.geocode({ location: { lat, lng } }, (results, status) => {
                 if (status === google.maps.GeocoderStatus.OK && results && results.length > 0) {
-                    // Filter out results that are primarily plus codes
-                    // Prefer results with 'establishment', 'point_of_interest' or 'premise'
-                    const bestResult = results.find(r =>
-                        !r.types.includes('plus_code') &&
-                        (r.types.includes('establishment') || r.types.includes('point_of_interest') || r.types.includes('premise'))
-                    ) || results.find(r => !r.types.includes('plus_code')) || results[0];
+                    // Filter out raw plus codes. Ride-hailing apps want the closest named street or building.
+                    const validResults = results.filter(r => !r.types.includes('plus_code'));
+
+                    // Prioritize specific location types to get the most human-readable option
+                    const bestResult = validResults.find(r => r.types.includes('route') || r.types.includes('street_address')) 
+                        || validResults.find(r => r.types.includes('point_of_interest') || r.types.includes('establishment'))
+                        || validResults.find(r => r.types.includes('neighborhood') || r.types.includes('sublocality'))
+                        || validResults[0] 
+                        || results[0]; // Absolute fallback
 
                     resolve(bestResult.formatted_address);
                 } else {
@@ -141,7 +166,7 @@ export const mapService = {
     /**
      * Get current location
      */
-    getCurrentLocation: async (): Promise<Coordinates> => {
+    getCurrentLocation: async (): Promise<Coordinates | null> => {
         try {
             // First check if native
             if (Capacitor.isNativePlatform()) {
@@ -184,8 +209,8 @@ export const mapService = {
             }
         } catch (error) {
             console.error("Error getting location", error);
-            // Default to Nairobi if failed
-            return { lat: -1.2921, lng: 36.8219 };
+            // Default to null if failed
+            return null;
         }
     },
 
@@ -214,47 +239,112 @@ export const mapService = {
             return null;
         }
 
-        return new Promise((resolve) => {
-            const directionsService = new google.maps.DirectionsService();
-            const gWaypoints = waypoints.map(w => ({
-                location: w,
-                stopover: true
-            }));
-
-            directionsService.route({
-                origin: start,
-                destination: end,
-                waypoints: gWaypoints,
-                travelMode: google.maps.TravelMode.DRIVING,
-                optimizeWaypoints: true
-            }, (result, status) => {
-                if (status === google.maps.DirectionsStatus.OK && result && result.routes.length > 0) {
-                    const route = result.routes[0];
-
-                    // Sum up all legs for total distance/duration
-                    let totalDistance = 0;
-                    let totalDuration = 0;
-                    route.legs.forEach(leg => {
-                        totalDistance += leg.distance?.value || 0;
-                        totalDuration += leg.duration?.value || 0;
-                    });
-
-                    const geometry = typeof route.overview_polyline === 'string'
-                        ? route.overview_polyline
-                        : (route.overview_polyline as any).points;
-
-                    resolve({
-                        geometry: geometry,
-                        distance: totalDistance,
-                        duration: totalDuration,
-                        waypoint_order: route.waypoint_order // Return the optimized order
-                    });
-                } else {
-                    console.error("Directions request failed due to " + status);
-                    resolve(null);
+        try {
+            // First try dynamic import for modern library access (Routes API)
+            let RouteClass: any = null;
+            if (google.maps.importLibrary) {
+                try {
+                    const routesLib = await google.maps.importLibrary("routes") as any;
+                    RouteClass = routesLib.Route;
+                } catch (e) {
+                    console.warn("Failed to dynamically import routes library", e);
                 }
-            });
-        });
+            }
+            if (!RouteClass) {
+                RouteClass = (google.maps as any).routes?.Route;
+            }
+
+            if (RouteClass && RouteClass.computeRoutes) {
+                // Formatting for New Routes API, strictly casting string coords to numbers
+                // JS SDK expects plain LatLngLiteral ({lat, lng}), not the REST API nested {location: {latLng: ...}} format
+                const requestWaypoints = waypoints.map(w => ({
+                    location: { lat: parseFloat(w.lat as any), lng: parseFloat(w.lng as any) }
+                }));
+
+                const request = {
+                    origin: { lat: parseFloat(start.lat as any), lng: parseFloat(start.lng as any) },
+                    destination: { lat: parseFloat(end.lat as any), lng: parseFloat(end.lng as any) },
+                    intermediates: requestWaypoints,
+                    travelMode: 'DRIVING',
+                    routingPreference: 'TRAFFIC_AWARE',
+                    computeAlternativeRoutes: false,
+                    routeModifiers: { avoidTolls: false, avoidHighways: false, avoidFerries: true },
+                    optimizeWaypointOrder: true, // Reorders the waypoints for fastest route
+                    // JS SDK field mask uses flat property names, not REST dot-notation
+                    fields: [
+                        'distanceMeters',
+                        'durationMillis',
+                        'optimizedIntermediateWaypointIndices',
+                        'path'
+                    ]
+                };
+
+                const response = await RouteClass.computeRoutes(request);
+                
+                if (response && response.routes && response.routes.length > 0) {
+                    const route = response.routes[0];
+                    // route.path may contain LatLng instances (with .lat() method) or plain objects
+                    const pathArray = route.path
+                        ? route.path.map((p: any) => ({
+                            lat: typeof p.lat === 'function' ? p.lat() : p.lat,
+                            lng: typeof p.lng === 'function' ? p.lng() : p.lng
+                        }))
+                        : [];
+                    return {
+                        geometry: pathArray, // MapLayer handles Array<{lat, lng}> format
+                        distance: route.distanceMeters || 0,
+                        duration: Math.round((route.durationMillis || 0) / 1000), // Convert ms to seconds
+                        waypoint_order: route.optimizedIntermediateWaypointIndices || waypoints.map((_, i) => i)
+                    };
+                }
+                return null;
+            } else {
+                // Fallback to old Directions API
+                return new Promise((resolve) => {
+                    const directionsService = new google.maps.DirectionsService();
+                    const gWaypoints = waypoints.map(w => ({
+                        location: w,
+                        stopover: true
+                    }));
+
+                    directionsService.route({
+                        origin: start,
+                        destination: end,
+                        waypoints: gWaypoints,
+                        travelMode: google.maps.TravelMode.DRIVING,
+                        optimizeWaypoints: true
+                    }, (result, status) => {
+                        if (status === google.maps.DirectionsStatus.OK && result && result.routes.length > 0) {
+                            const route = result.routes[0];
+
+                            let totalDistance = 0;
+                            let totalDuration = 0;
+                            route.legs.forEach(leg => {
+                                totalDistance += leg.distance?.value || 0;
+                                totalDuration += leg.duration?.value || 0;
+                            });
+
+                            const geometry = typeof route.overview_polyline === 'string'
+                                ? route.overview_polyline
+                                : (route.overview_polyline as any).points;
+
+                            resolve({
+                                geometry: geometry,
+                                distance: totalDistance,
+                                duration: totalDuration,
+                                waypoint_order: route.waypoint_order // Return the optimized order
+                            });
+                        } else {
+                            console.error("Directions request failed due to " + status);
+                            resolve(null);
+                        }
+                    });
+                });
+            }
+        } catch (error) {
+            console.error("Route calculation failed:", error);
+            return null;
+        }
     },
 
     /**

@@ -59,7 +59,7 @@ const ApiDocumentation = () => {
                     </div>
                     <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-4">API Reference</h1>
                     <p className="text-xl text-slate-400 max-w-2xl font-light">
-                        Integrate TumaFast's autonomous logistics network directly into your application. Create orders, track shipments, and receive real-time webhook events.
+                        Integrate AXON's autonomous logistics network directly into your application. Create orders, track shipments, and receive real-time webhook events.
                     </p>
                 </div>
             </div>
@@ -90,7 +90,7 @@ const ApiDocumentation = () => {
                             <div className="bg-brand-50 rounded-xl p-4 border border-brand-100">
                                 <h4 className="text-brand-900 font-bold text-sm mb-1">Need help?</h4>
                                 <p className="text-xs text-brand-700/80 mb-3">Join our developer community for support.</p>
-                                <a href="mailto:api@tumafast.co.ke" className="text-xs font-bold text-brand-600 hover:text-brand-700">Contact Support →</a>
+                                <a href="mailto:api@AXON.co.ke" className="text-xs font-bold text-brand-600 hover:text-brand-700">Contact Support →</a>
                             </div>
                         </div>
                     </div>
@@ -111,14 +111,14 @@ const ApiDocumentation = () => {
                                         <div>
                                             <h2 className="text-3xl font-bold text-slate-900 mb-4">Getting Started</h2>
                                             <p className="text-slate-600 leading-relaxed">
-                                                The TumaFast API is organized around REST. Our API has predictable resource-oriented URLs, accepts JSON-encoded request bodies, returns JSON-encoded responses, and uses standard HTTP response codes, authentication, and verbs.
+                                                The AXON API is organized around REST. Our API has predictable resource-oriented URLs, accepts JSON-encoded request bodies, returns JSON-encoded responses, and uses standard HTTP response codes, authentication, and verbs.
                                             </p>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             <div className="p-6 bg-slate-50 rounded-xl border border-slate-100 hover:border-brand-200 transition-colors">
                                                 <div className="w-10 h-10 bg-white rounded-lg shadow-sm flex items-center justify-center text-brand-600 mb-4 border border-slate-100"><Globe className="w-5 h-5" /></div>
                                                 <h3 className="font-bold text-slate-900 mb-2">Base URL</h3>
-                                                <code className="text-xs bg-slate-200 px-2 py-1 rounded text-slate-700 font-mono">https://us-central1-tumafast-kenya.cloudfunctions.net/v1</code>
+                                                <code className="text-xs bg-slate-200 px-2 py-1 rounded text-slate-700 font-mono">https://us-central1-AXON-kenya.cloudfunctions.net/v1</code>
                                             </div>
                                             <div className="p-6 bg-slate-50 rounded-xl border border-slate-100 hover:border-brand-200 transition-colors">
                                                 <div className="w-10 h-10 bg-white rounded-lg shadow-sm flex items-center justify-center text-brand-600 mb-4 border border-slate-100"><Server className="w-5 h-5" /></div>
@@ -137,7 +137,7 @@ const ApiDocumentation = () => {
                                         <div>
                                             <h2 className="text-3xl font-bold text-slate-900 mb-4">Authentication</h2>
                                             <p className="text-slate-600 leading-relaxed mb-6">
-                                                The TumaFast API uses API keys to authenticate requests. You can view and manage your API keys in the <Link to="/business-dashboard" className="text-brand-600 font-bold hover:underline">Business Dashboard</Link>.
+                                                The AXON API uses API keys to authenticate requests. You can view and manage your API keys in the <Link to="/business-dashboard" className="text-brand-600 font-bold hover:underline">Business Dashboard</Link>.
                                             </p>
                                             <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 flex gap-3 text-amber-900 mb-8">
                                                 <Shield className="w-5 h-5 flex-shrink-0 mt-0.5" />
@@ -152,7 +152,7 @@ const ApiDocumentation = () => {
                                             </p>
                                             <CodeBlock
                                                 language="bash"
-                                                code={`curl https://us-central1-tumafast-kenya.cloudfunctions.net/v1/orders \\
+                                                code={`curl https://us-central1-AXON-kenya.cloudfunctions.net/v1/orders \\
   -H "Authorization: Bearer sk_test_..." \\
   -d pickup="Westlands"`}
                                             />
@@ -308,7 +308,7 @@ POST /v1/orders
   "object": "order",
   "status": "pending",
   "created": 1678901234,
-  "tracking_url": "https://tumafast.co.ke/track/ord_8sa89d7s89"
+  "tracking_url": "https://AXON.co.ke/track/ord_8sa89d7s89"
 }`}
                                                 />
                                             </div>
@@ -479,7 +479,7 @@ POST /v1/quotes
                                         <div>
                                             <h2 className="text-3xl font-bold text-slate-900 mb-4">Errors</h2>
                                             <p className="text-slate-600 mb-6">
-                                                TumaFast uses conventional HTTP response codes to indicate the success or failure of an API request.
+                                                AXON uses conventional HTTP response codes to indicate the success or failure of an API request.
                                             </p>
                                             <div className="overflow-hidden rounded-xl border border-slate-200">
                                                 <table className="w-full text-sm text-left">
@@ -521,7 +521,7 @@ POST /v1/quotes
             {/* Footer Area with links back */}
             <div className="bg-white border-t border-slate-200 py-12">
                 <div className="max-w-7xl mx-auto px-6 text-center">
-                    <p className="text-slate-400 text-sm">© {new Date().getFullYear()} TumaFast Kenya Ltd. Platform Documentation.</p>
+                    <p className="text-slate-400 text-sm">© {new Date().getFullYear()} AXON Kenya Ltd. Platform Documentation.</p>
                 </div>
             </div>
         </div>

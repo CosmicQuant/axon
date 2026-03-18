@@ -319,8 +319,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, defaultView = 'L
                   </h2>
                   <p className="text-sm text-gray-500 mt-1 font-medium italic">
                     {customDescription || (view === 'LOGIN'
-                      ? 'Access your TumaFast dashboard.'
-                      : (role === 'business' ? 'Scale your business logistics.' : 'Join TumaFast to start moving.'))}
+                      ? 'Access your AXON dashboard.'
+                      : (role === 'business' ? 'Scale your business logistics.' : 'Join AXON to start moving.'))}
                   </p>
                 </div>
                 <button

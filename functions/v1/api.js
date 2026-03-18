@@ -148,7 +148,7 @@ app.post('/orders', authenticate, async (req, res) => {
             object: 'order',
             status: 'pending',
             created: Date.now(),
-            tracking_url: `https://tumafast.co.ke/track/${docRef.id}`,
+            tracking_url: `https://axon.co.ke/track/${docRef.id}`,
             environment: req.business.mode
         });
 
@@ -221,7 +221,7 @@ app.get('/orders/:id', authenticate, async (req, res) => {
             object: 'order',
             status: data.status,
             driver: data.driver || null,
-            tracking_url: `https://tumafast.co.ke/track/${doc.id}`
+            tracking_url: `https://axon.co.ke/track/${doc.id}`
         });
 
     } catch (error) {

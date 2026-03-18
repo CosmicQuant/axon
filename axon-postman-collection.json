@@ -1,8 +1,8 @@
 {
     "info": {
-        "_postman_id": "tumafast-enterprise-api-v1",
-        "name": "TumaFast Enterprise API v1",
-        "description": "Official Logistics API for TumaFast Kenya. Integrate on-demand delivery into your e-commerce or ERP system.",
+        "_postman_id": "axon-enterprise-api-v1",
+        "name": "Axon Enterprise API v1",
+        "description": "Official Logistics API for Axon Kenya. Integrate on-demand delivery into your e-commerce or ERP system.",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     "variable": [

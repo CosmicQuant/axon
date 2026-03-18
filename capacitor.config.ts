@@ -1,13 +1,13 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.tumafast.kenya',
-  appName: 'TumaFast',
+  appId: 'com.axon.kenya',
+  appName: 'Axon',
   webDir: 'dist',
   plugins: {
     GoogleAuth: {
       scopes: ['profile', 'email'],
-      serverClientId: '672048373138-ja58begjt0ieksollh1lmqacos65luus.apps.googleusercontent.com',
+      serverClientId: '770691922911-bcibeedoho5qfm1na7di312rsom4iv6d.apps.googleusercontent.com',
       forceCodeForRefreshToken: true,
     },
     StatusBar: {

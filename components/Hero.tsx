@@ -84,7 +84,7 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick, onDriverCl
                   lng: position.coords.longitude
                });
             },
-            (error) => {
+            (error: any) => {
                console.error("Geolocation error:", error);
                resolve(null);
             },
@@ -1003,7 +1003,7 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick, onDriverCl
                   <div className="relative z-10 max-w-4xl mx-auto px-4">
                      <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">Ready to move something?</h2>
                      <p className="text-slate-300 text-lg mb-10 max-w-2xl mx-auto">
-                        Join thousands of Kenyans who trust TumaFast for their daily logistics.
+                        Join thousands of Kenyans who trust AXON for their daily logistics.
                         Fast, reliable, and affordable.
                      </p>
                      <div className="flex flex-col sm:flex-row justify-center gap-4">

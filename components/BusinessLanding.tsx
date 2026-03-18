@@ -46,7 +46,7 @@ const BusinessLanding: React.FC<BusinessLandingProps> = ({ user, onGetStarted, o
                   preload="auto"
                   className="w-full h-full object-cover scale-105"
                >
-                  <source src="https://storage.googleapis.com/tumafast/video_20251215_161601_edit.mp4" type="video/mp4" />
+                  <source src="https://storage.googleapis.com/AXON/video_20251215_161601_edit.mp4" type="video/mp4" />
                </video>
 
                {/* Dark overlay removed as requested */}
@@ -58,7 +58,7 @@ const BusinessLanding: React.FC<BusinessLandingProps> = ({ user, onGetStarted, o
                <div className="max-w-3xl text-left">
                   <div className="inline-flex items-center space-x-2 bg-black/30 border border-white/20 rounded-full px-4 py-1.5 mb-8 backdrop-blur-md shadow-lg">
                      <span className="flex h-2 w-2 rounded-full bg-green-400"></span>
-                     <span className="text-sm font-semibold text-white tracking-wide">TumaFast for Enterprise</span>
+                     <span className="text-sm font-semibold text-white tracking-wide">AXON for Enterprise</span>
                   </div>
                   <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-8 leading-[1.1] drop-shadow-xl text-white">
                      Smart logistics infrastructure for <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-emerald-300">high-growth enterprises.</span>
@@ -101,7 +101,7 @@ const BusinessLanding: React.FC<BusinessLandingProps> = ({ user, onGetStarted, o
                   {/* KOKO Networks */}
                   <div className="group flex flex-col items-center justify-center">
                      <img
-                        src="https://storage.googleapis.com/tumafast/koko.png"
+                        src="https://storage.googleapis.com/AXON/koko.png"
                         alt="KOKO Networks"
                         className="h-16 w-auto object-contain transition-transform duration-300 hover:scale-105"
                      />
@@ -110,7 +110,7 @@ const BusinessLanding: React.FC<BusinessLandingProps> = ({ user, onGetStarted, o
                   {/* Jumia Kenya */}
                   <div className="group flex flex-col items-center justify-center">
                      <img
-                        src="https://storage.googleapis.com/tumafast/jumia.jpg"
+                        src="https://storage.googleapis.com/AXON/jumia.jpg"
                         alt="JUMIA"
                         className="h-16 w-auto object-contain transition-transform duration-300 hover:scale-105 mix-blend-multiply"
                      />
@@ -119,7 +119,7 @@ const BusinessLanding: React.FC<BusinessLandingProps> = ({ user, onGetStarted, o
                   {/* Naivas Supermarkets */}
                   <div className="group flex flex-col items-center justify-center">
                      <img
-                        src="https://storage.googleapis.com/tumafast/naivas.png"
+                        src="https://storage.googleapis.com/AXON/naivas.png"
                         alt="NAIVAS"
                         className="h-20 w-auto object-contain transition-transform duration-300 hover:scale-105"
                      />
@@ -128,7 +128,7 @@ const BusinessLanding: React.FC<BusinessLandingProps> = ({ user, onGetStarted, o
                   {/* Copia Kenya */}
                   <div className="group flex flex-col items-center justify-center">
                      <img
-                        src="https://storage.googleapis.com/tumafast/copia.png"
+                        src="https://storage.googleapis.com/AXON/copia.png"
                         alt="COPIA"
                         className="h-16 w-auto object-contain transition-transform duration-300 hover:scale-105"
                      />
@@ -137,7 +137,7 @@ const BusinessLanding: React.FC<BusinessLandingProps> = ({ user, onGetStarted, o
                   {/* Twiga Foods */}
                   <div className="group flex flex-col items-center justify-center">
                      <img
-                        src="https://storage.googleapis.com/tumafast/twiga.jpg"
+                        src="https://storage.googleapis.com/AXON/twiga.jpg"
                         alt="TWIGA"
                         className="h-16 w-auto object-contain transition-transform duration-300 hover:scale-105 mix-blend-multiply"
                      />
@@ -157,7 +157,7 @@ const BusinessLanding: React.FC<BusinessLandingProps> = ({ user, onGetStarted, o
                <div className="text-center mb-16">
                   <h2 className="text-4xl font-bold mb-4 tracking-tight">Smart Logistics Infrastructure</h2>
                   <p className="text-slate-400 max-w-2xl mx-auto text-lg">
-                     Move beyond basic delivery. TumaFast provides the intelligence layer for Africa's most complex supply chains.
+                     Move beyond basic delivery. AXON provides the intelligence layer for Africa's most complex supply chains.
                   </p>
                </div>
 
@@ -297,7 +297,7 @@ const BusinessLanding: React.FC<BusinessLandingProps> = ({ user, onGetStarted, o
                         <span className="text-brand-600">Manual Friction.</span>
                      </h2>
                      <p className="text-xl text-slate-600 leading-relaxed mb-8">
-                        Our AI layer handles the complexity of African urban logistics. TumaFast's proprietary fulfillment engine automates the entire lifecycle—from arrival to the final mile—without needing your team's intervention.
+                        Our AI layer handles the complexity of African urban logistics. AXON's proprietary fulfillment engine automates the entire lifecycle—from arrival to the final mile—without needing your team's intervention.
                      </p>
                      <ul className="space-y-4 mb-10">
                         <li className="flex items-center gap-3 font-bold text-slate-800">
@@ -472,7 +472,7 @@ const BusinessLanding: React.FC<BusinessLandingProps> = ({ user, onGetStarted, o
                         <span className="text-emerald-600">Zero Liquidity Lag.</span>
                      </h2>
                      <p className="text-xl text-slate-600 leading-relaxed mb-8">
-                        Bridge the gap between delivery and cash flow. TumaFast handles Cash-on-Delivery (COD) via mobile money and settles directly to your commercial account instantly upon fulfillment.
+                        Bridge the gap between delivery and cash flow. AXON handles Cash-on-Delivery (COD) via mobile money and settles directly to your commercial account instantly upon fulfillment.
                      </p>
                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div className="p-6 bg-white rounded-2xl border border-slate-100 shadow-sm">
@@ -557,7 +557,7 @@ const BusinessLanding: React.FC<BusinessLandingProps> = ({ user, onGetStarted, o
                         <span className="text-amber-600">Command & Control.</span>
                      </h2>
                      <p className="text-xl text-slate-600 leading-relaxed mb-8">
-                        Scale your physical assets with the same precision as your software. TumaFast provides full-stack telemetry and predictive maintenance for modern institutional fleets operating at scale.
+                        Scale your physical assets with the same precision as your software. AXON provides full-stack telemetry and predictive maintenance for modern institutional fleets operating at scale.
                      </p>
                      <div className="space-y-6">
                         {[
@@ -643,7 +643,7 @@ const BusinessLanding: React.FC<BusinessLandingProps> = ({ user, onGetStarted, o
                            <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
                            <div className="w-3 h-3 rounded-full bg-green-500"></div>
                         </div>
-                        <div className="text-blue-400">curl <span className="text-white">-X POST</span> <span className="text-green-400">https://api.tumafast.co.ke/v1/orders</span> \</div>
+                        <div className="text-blue-400">curl <span className="text-white">-X POST</span> <span className="text-green-400">https://api.AXON.co.ke/v1/orders</span> \</div>
                         <div className="text-white pl-4">-H <span className="text-yellow-300">"Authorization: Bearer YOUR_API_KEY"</span> \</div>
                         <div className="text-white pl-4">-d <span className="text-yellow-300">'{'{'}</span></div>
                         <div className="text-purple-300 pl-8">"pickup": <span className="text-white">"Nairobi CBD"</span>,</div>
@@ -699,7 +699,7 @@ const BusinessLanding: React.FC<BusinessLandingProps> = ({ user, onGetStarted, o
             <div className="max-w-7xl mx-auto px-4">
                <div className="text-center mb-20">
                   <h2 className="text-4xl font-black text-slate-900 mb-4 tracking-tight">Specialized Solutions for Every Sector.</h2>
-                  <p className="text-lg text-slate-500 font-medium max-w-2xl mx-auto">TumaFast's infrastructure is adaptive, providing specialized logistical flows for Kenya's most critical industries.</p>
+                  <p className="text-lg text-slate-500 font-medium max-w-2xl mx-auto">AXON's infrastructure is adaptive, providing specialized logistical flows for Kenya's most critical industries.</p>
                </div>
 
                <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">

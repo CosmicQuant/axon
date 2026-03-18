@@ -6,7 +6,7 @@ const FAQS = [
     {
         category: "Deliveries",
         questions: [
-            { q: "How fast is TumaFast?", a: "Most in-city deliveries are completed within 45 to 90 minutes. For enterprise bulk orders, timelines depend on the volume and specific requirements." },
+            { q: "How fast is AXON?", a: "Most in-city deliveries are completed within 45 to 90 minutes. For enterprise bulk orders, timelines depend on the volume and specific requirements." },
             { q: "Do you offer real-time tracking?", a: "Yes. Every order comes with a dynamic tracking link that shows the rider's exact GPS location, estimated time of arrival, and contact details." },
             { q: "What items can I send?", a: "We handle everything from documents and food to heavy furniture and industrial supplies. However, we do not transport illegal substances, hazardous materials, or unprotected fragile items without prior arrangement." }
         ]
@@ -22,9 +22,9 @@ const FAQS = [
     {
         category: "Business & Security",
         questions: [
-            { q: "Can I use TumaFast for my E-commerce store?", a: "Absolutely. We offer a robust API and a bulk upload feature specifically designed for high-growth e-commerce businesses." },
-            { q: "What happens if a package is damaged?", a: "All TumaFast deliveries are covered by our standard Goods in Transit (GIT) insurance. If an item is damaged or lost, our claims team will handle the reimbursement process within 48 hours." },
-            { q: "How are your drivers vetted?", a: "Every TumaFast partner goes through a rigorous vetting process involving criminal record checks, vehicle inspection, and training on professional handling." }
+            { q: "Can I use AXON for my E-commerce store?", a: "Absolutely. We offer a robust API and a bulk upload feature specifically designed for high-growth e-commerce businesses." },
+            { q: "What happens if a package is damaged?", a: "All AXON deliveries are covered by our standard Goods in Transit (GIT) insurance. If an item is damaged or lost, our claims team will handle the reimbursement process within 48 hours." },
+            { q: "How are your drivers vetted?", a: "Every AXON partner goes through a rigorous vetting process involving criminal record checks, vehicle inspection, and training on professional handling." }
         ]
     }
 ];
@@ -54,7 +54,7 @@ const FAQPage: React.FC = () => {
                         <HelpCircle className="w-4 h-4" /> Support Center
                     </div>
                     <h1 className="text-4xl md:text-6xl font-black text-white mb-6 tracking-tighter">Frequently Asked <span className="text-brand-500">Questions</span></h1>
-                    <p className="text-lg text-slate-400 font-medium max-w-2xl mx-auto">Everything you need to know about TumaFast's AI-driven logistics network.</p>
+                    <p className="text-lg text-slate-400 font-medium max-w-2xl mx-auto">Everything you need to know about AXON's AI-driven logistics network.</p>
                 </div>
 
                 {/* Search */}

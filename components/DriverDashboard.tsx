@@ -13,7 +13,7 @@ import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { usePrompt } from '../context/PromptContext';
 import { LOCATION_COORDINATES } from '../constants';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
    LayoutDashboard, LayoutGrid, Map, Package, Wallet, User as UserIcon, LogOut,
    ChevronRight, Star, TrendingUp, Clock, MapPin, Navigation, CheckCircle,
@@ -56,6 +56,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
    };
 
    const location = useLocation();
+   const navigate = useNavigate();
 
    useEffect(() => {
       if (propCurrentView) return; // Skip URL parsing if controlled
@@ -187,6 +188,8 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
             address: activeJob.pickup,
             type: 'pickup' as const,
             status: (activeJob.status === 'driver_assigned') ? 'pending' : 'completed',
+            lat: activeJob.pickupCoords?.lat || activeJobCoords.pickup?.lat || 0,
+            lng: activeJob.pickupCoords?.lng || activeJobCoords.pickup?.lng || 0,
             coords: activeJob.pickupCoords || activeJobCoords.pickup,
             label: 'Pickup',
             verificationCode: activeJob.verificationCode, // Main order code for pickup
@@ -207,6 +210,8 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
             address: activeJob.dropoff,
             type: 'dropoff' as const,
             status: (activeJob.status === 'delivered') ? 'completed' : 'pending',
+            lat: activeJob.dropoffCoords?.lat || activeJobCoords.dropoff?.lat || 0,
+            lng: activeJob.dropoffCoords?.lng || activeJobCoords.dropoff?.lng || 0,
             coords: activeJob.dropoffCoords || activeJobCoords.dropoff,
             label: 'Final Dropoff',
             verificationCode: activeJob.verificationCode,
@@ -711,11 +716,15 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
 
       setLoading(true);
       try {
-         if (updatePassword) {
-            await updatePassword(passwords.new);
+         const { getAuth, updatePassword } = await import('firebase/auth');
+         const auth = getAuth();
+         if (auth.currentUser) {
+            await updatePassword(auth.currentUser, passwords.new);
             showAlert("Password updated successfully!", 'success');
             setShowPasswordFields(false);
             setPasswords({ new: '', confirm: '' });
+         } else {
+             showAlert("You must be logged in to update your password.", 'error');
          }
       } catch (error: any) {
          showAlert(error.message || "Failed to update password", 'error');
@@ -728,7 +737,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
       if (!window.confirm('Are you sure you want to deactivate your driver account? You can reactivate anytime by logging back in.')) return;
 
       try {
-         await updateUser({ status: 'deactivated' });
+         await updateUser({ status: 'suspended' });
          showAlert('Account deactivated. Powering down...', 'info');
          logout();
          navigate('/');
@@ -859,7 +868,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                      <div className="bg-brand-600 p-1.5 rounded-lg mr-3">
                         <Truck className="text-white w-5 h-5" />
                      </div>
-                     <span className="text-xl font-bold text-gray-900 tracking-tight">Tuma<span className="text-brand-600">Drive</span></span>
+                     <span className="text-xl font-bold text-gray-900 tracking-tight">Axon</span>
                   </button>
                </div>
 

@@ -16,7 +16,7 @@ const AboutUs: React.FC<AboutUsProps> = ({ onOpenAuth }) => {
 
     const handleGetStarted = () => {
         if (!isAuthenticated) {
-            onOpenAuth?.('business', 'SIGNUP', 'Enterprise Deployment', 'Scale your logistics infrastructure with TumaFast.');
+            onOpenAuth?.('business', 'SIGNUP', 'Enterprise Deployment', 'Scale your logistics infrastructure with AXON.');
         } else {
             if (user?.role === 'driver') navigate('/driver');
             else if (user?.role === 'business') navigate('/business-dashboard');
@@ -54,7 +54,7 @@ const AboutUs: React.FC<AboutUsProps> = ({ onOpenAuth }) => {
                         transition={{ delay: 0.1 }}
                         className="text-xl md:text-2xl text-slate-400 max-w-3xl mx-auto font-medium leading-relaxed"
                     >
-                        TumaFast is the technology layer building the most resilient smart logistics infrastructure for the continent's high-growth enterprises.
+                        AXON is the technology layer building the most resilient smart logistics infrastructure for the continent's high-growth enterprises.
                     </motion.p>
                 </div>
             </section>
@@ -107,7 +107,7 @@ const AboutUs: React.FC<AboutUsProps> = ({ onOpenAuth }) => {
                         </div>
                         <h2 className="text-4xl md:text-6xl font-black text-white mb-8 tracking-tight leading-tight">Intelligence in <br /> Every Movement.</h2>
                         <p className="text-xl text-slate-400 mb-12 leading-relaxed font-medium">
-                            Founded on the principle that logistics should be invisible, Tumafast leverages advanced neural models to optimize pathfinding and ensure every dispatch movement is executed with surgical precision.
+                            Founded on the principle that logistics should be invisible, AXON leverages advanced neural models to optimize pathfinding and ensure every dispatch movement is executed with surgical precision.
                         </p>
                         <div className="space-y-10">
                             {[
@@ -177,7 +177,7 @@ const AboutUs: React.FC<AboutUsProps> = ({ onOpenAuth }) => {
             {/* CTA Section */}
             <section className="py-32 max-w-5xl mx-auto px-4 text-center">
                 <h2 className="text-5xl md:text-6xl font-black text-white mb-8 tracking-tight leading-tight">Ready to integrate <br /> smart logistics?</h2>
-                <p className="text-xl text-slate-400 mb-16 font-medium max-w-2xl mx-auto">Join the enterprises building their future with TumaFast.</p>
+                <p className="text-xl text-slate-400 mb-16 font-medium max-w-2xl mx-auto">Join the enterprises building their future with AXON.</p>
                 <div className="flex flex-col sm:flex-row gap-6 justify-center">
                     <button
                         onClick={handleGetStarted}

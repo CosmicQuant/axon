@@ -26,7 +26,7 @@ export const analyzeDeliveryRequest = async (
 
   try {
     const prompt = `
-      You are an expert logistics coordinator for TumaFast in Kenya.
+      You are an expert logistics coordinator for Axon in Kenya.
       Analyze this delivery request:
       Pickup: ${pickup}
       Dropoff: ${dropoff}
@@ -127,7 +127,7 @@ export const chatWithLogisticsAssistant = async (history: { role: string, parts:
       model: 'gemini-2.5-flash',
       history: history,
       config: {
-        systemInstruction: `You are 'Kifaru', a helpful, witty Kenyan logistics assistant for the app TumaFast. 
+        systemInstruction: `You are 'Kifaru', a helpful, witty Kenyan logistics assistant for the app Axon. 
         
         PRICING RULES (in KES):
         - Boda Boda: Base 100 + 40 per km

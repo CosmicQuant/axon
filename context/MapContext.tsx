@@ -85,7 +85,8 @@ export const MapProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const { isLoaded } = useJsApiLoader({
         id: 'google-map-script',
         googleMapsApiKey: APP_CONFIG.GOOGLE_MAPS_API_KEY,
-        libraries: GOOGLE_MAPS_LIBRARIES
+        libraries: GOOGLE_MAPS_LIBRARIES,
+        version: "beta"
     });
 
     const [orderState, setOrderState] = useState<MapOrderState>('IDLE');
@@ -215,7 +216,7 @@ export const MapProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setUserLocation(coords);
             setMapCenterInternal(coords);
             return coords;
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error getting location:", error);
             return null;
         }

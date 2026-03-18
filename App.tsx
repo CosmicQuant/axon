@@ -135,31 +135,31 @@ const App = () => {
   // Dynamic Browser Titles
   useEffect(() => {
     const routeTitles: Record<string, string> = {
-      '/': 'TumaFast - Send anything, Fast & Reliable',
-      '/about': 'Institutional Mission | Tuma Fast',
-      '/business': 'Enterprise Fulfillment | Tuma Fast',
-      '/fulfillment': 'Autonomous Fulfillment | Tuma Fast',
-      '/intelligence': 'Logistics Intelligence | Tuma Fast',
-      '/payments': 'Smart Settlement | Tuma Fast',
-      '/fleet': 'Fleet Management | Tuma Fast',
-      '/security': 'System Integrity & Security | Tuma Fast',
-      '/contact': 'Enterprise Desk | Tuma Fast',
-      '/book': 'Book a Delivery | Tuma Fast',
-      '/track': 'Track Order | Tuma Fast',
-      '/driver': 'Driver App | Tuma Fast',
-      '/customer-dashboard': 'My Dashboard | Tuma Fast',
-      '/business-dashboard': 'Business Dashboard | Tuma Fast',
-      '/privacy': 'Privacy Policy | Tuma Fast',
-      '/terms': 'Service Terms | Tuma Fast',
-      '/blog': 'Industry Blog | Tuma Fast',
-      '/faq': 'Help & FAQ | Tuma Fast'
+      '/': 'Axon - Send anything, Fast & Reliable',
+      '/about': 'Institutional Mission | Axon',
+      '/business': 'Enterprise Fulfillment | Axon',
+      '/fulfillment': 'Autonomous Fulfillment | Axon',
+      '/intelligence': 'Logistics Intelligence | Axon',
+      '/payments': 'Smart Settlement | Axon',
+      '/fleet': 'Fleet Management | Axon',
+      '/security': 'System Integrity & Security | Axon',
+      '/contact': 'Enterprise Desk | Axon',
+      '/book': 'Book a Delivery | Axon',
+      '/track': 'Track Order | Axon',
+      '/driver': 'Driver App | Axon',
+      '/customer-dashboard': 'My Dashboard | Axon',
+      '/business-dashboard': 'Business Dashboard | Axon',
+      '/privacy': 'Privacy Policy | Axon',
+      '/terms': 'Service Terms | Axon',
+      '/blog': 'Industry Blog | Axon',
+      '/faq': 'Help & FAQ | Axon'
     };
 
     const matchingKey = Object.keys(routeTitles)
       .sort((a, b) => b.length - a.length)
       .find(key => location.pathname === key || (key !== '/' && location.pathname.startsWith(key)));
 
-    document.title = matchingKey ? routeTitles[matchingKey] : 'Tuma Fast Kenya';
+    document.title = matchingKey ? routeTitles[matchingKey] : 'Axon Kenya';
   }, [location.pathname]);
 
   // Redirect Drivers away from Home Landing Page
@@ -306,7 +306,7 @@ const App = () => {
                       setAuthModalRole('business');
                       setAuthModalView('SIGNUP');
                       setAuthModalTitle('Enterprise Deployment');
-                      setAuthModalDesc('Scale your logistics infrastructure with TumaFast.');
+                      setAuthModalDesc('Scale your logistics infrastructure with Axon.');
                       setShowAuthModal(true);
                     }}
                     onLogin={() => {
@@ -422,7 +422,7 @@ const App = () => {
               <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 gap-12">
                 <div className="flex flex-col items-center md:items-start text-center md:text-left">
                   <div className="flex items-center space-x-2 mb-4">
-                    <span className="text-2xl font-black text-white tracking-tight">Tuma<span className="text-brand-500">Fast</span></span>
+                    <span className="text-2xl font-black text-white tracking-tight">Axon</span>
                   </div>
                   <p className="max-w-sm text-gray-400 font-medium text-sm leading-relaxed mb-8">
                     The most reliable smart logistics infrastructure for high-growth businesses and individuals in Kenya. Moving anything, anywhere, instantly.
@@ -449,13 +449,13 @@ const App = () => {
                     <h4 className="text-white font-black text-xs uppercase tracking-widest mb-6">Service</h4>
                     <ul className="space-y-4 text-sm font-medium text-gray-400">
                       <li><button onClick={() => navigate('/book')} className="hover:text-brand-400 transition-colors text-left">Book Delivery</button></li>
-                      <li><button onClick={() => navigate('/business')} className="hover:text-brand-400 transition-colors text-left uppercase tracking-tighter">TumaFast for Enterprise</button></li>
+                      <li><button onClick={() => navigate('/business')} className="hover:text-brand-400 transition-colors text-left uppercase tracking-tighter">Axon for Enterprise</button></li>
                       <li>
                         <button
                           onClick={() => {
                             setAuthModalRole('driver');
                             setAuthModalView('SIGNUP');
-                            setAuthModalTitle('Earn with TumaFast');
+                            setAuthModalTitle('Earn with Axon');
                             setAuthModalDesc('Sign up to start receiving delivery requests and earning money.');
                             setShowAuthModal(true);
                           }}
@@ -487,7 +487,7 @@ const App = () => {
                 </div>
               </div>
               <div className="max-w-7xl mx-auto px-6 mt-16 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center text-xs font-bold text-gray-500 uppercase tracking-tighter">
-                <span>© {new Date().getFullYear()} TumaFast Kenya Ltd. All rights reserved.</span>
+                <span>© {new Date().getFullYear()} Axon Kenya Ltd. All rights reserved.</span>
                 <div className="flex space-x-4 mt-4 md:mt-0">
                   <a href="#" className="hover:text-white">Twitter</a>
                   <a href="#" className="hover:text-white">Facebook</a>

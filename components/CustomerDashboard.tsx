@@ -198,8 +198,8 @@ const CustomerDashboard: React.FC = () => {
 
             // Create URI for QR Code
             const totp = new OTPAuth.TOTP({
-                issuer: 'TumaFast',
-                label: user?.email || 'TumaFast User',
+                issuer: 'AXON',
+                label: user?.email || 'AXON User',
                 algorithm: 'SHA1',
                 digits: 6,
                 period: 30,
@@ -238,8 +238,8 @@ const CustomerDashboard: React.FC = () => {
         try {
             // Verify Code using otpauth
             const totp = new OTPAuth.TOTP({
-                issuer: 'TumaFast',
-                label: user?.email || 'TumaFast User',
+                issuer: 'AXON',
+                label: user?.email || 'AXON User',
                 algorithm: 'SHA1',
                 digits: 6,
                 period: 30,
@@ -329,7 +329,7 @@ const CustomerDashboard: React.FC = () => {
                             <div className="bg-emerald-600 p-1.5 rounded-lg mr-3">
                                 <Package className="text-white w-5 h-5" />
                             </div>
-                            <span className="text-xl font-bold text-gray-900 tracking-tight">Tuma<span className="text-emerald-600">Fast</span></span>
+                            <span className="text-xl font-bold text-gray-900 tracking-tight">Axon</span>
                         </button>
                     </div>
 
@@ -910,7 +910,7 @@ const CustomerDashboard: React.FC = () => {
                                                     <div>
                                                         <h4 className="font-bold text-slate-900 mb-2">How we use your data</h4>
                                                         <p className="text-xs text-gray-500 leading-relaxed mb-4">
-                                                            Tumafast collects your location for accurate delivery tracking and personal info for order verification.
+                                                            AXON collects your location for accurate delivery tracking and personal info for order verification.
                                                             We never sell your data to third parties. All communication is encrypted.
                                                         </p>
                                                         <div className="flex flex-wrap gap-4">

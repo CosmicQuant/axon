@@ -23,7 +23,7 @@ const SecurityPage: React.FC = () => {
                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 to-blue-400">Security Protocols.</span>
                     </h1>
                     <p className="text-xl text-slate-400 max-w-2xl mx-auto font-medium leading-relaxed">
-                        Security is the bedrock of TumaFast. We protect your data, your earnings, and your goods with multi-layered encryption and biometric verification.
+                        Security is the bedrock of AXON. We protect your data, your earnings, and your goods with multi-layered encryption and biometric verification.
                     </p>
                 </div>
 

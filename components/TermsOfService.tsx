@@ -50,7 +50,7 @@ const TermsOfService: React.FC = () => {
                                         <Info className="w-5 h-5" /> Executive Summary
                                     </h3>
                                     <p className="text-slate-300 leading-relaxed font-medium text-lg">
-                                        By utilizing the TumaFast infrastructure, you agree to adhere to the operational protocols of our logistics network. We provide the technology layer connecting you with dedicated fulfillment partners. You retain full liability for the legality and description of items dispatched.
+                                        By utilizing the AXON infrastructure, you agree to adhere to the operational protocols of our logistics network. We provide the technology layer connecting you with dedicated fulfillment partners. You retain full liability for the legality and description of items dispatched.
                                     </p>
                                 </div>
 
@@ -60,7 +60,7 @@ const TermsOfService: React.FC = () => {
                                         Acceptance of Protocol
                                     </h3>
                                     <p className="text-slate-400 leading-relaxed font-medium pl-11">
-                                        Accessing or interfacing with the TumaFast API or platform constitutes formal acceptance of these terms. These provisions represent an institutional-grade binding agreement between the user and TumaFast Kenya.
+                                        Accessing or interfacing with the AXON API or platform constitutes formal acceptance of these terms. These provisions represent an institutional-grade binding agreement between the user and AXON Kenya.
                                     </p>
                                 </section>
 
@@ -82,7 +82,7 @@ const TermsOfService: React.FC = () => {
                                         Prohibited Goods & Sanctions
                                     </h3>
                                     <p className="text-slate-400 leading-relaxed mb-8 pl-11 font-medium">
-                                        The TumaFast network maintains a zero-tolerance policy for the transport of illicit materials. Prohibited items include:
+                                        The AXON network maintains a zero-tolerance policy for the transport of illicit materials. Prohibited items include:
                                     </p>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pl-11">
                                         {[
@@ -115,7 +115,7 @@ const TermsOfService: React.FC = () => {
                                     </h3>
                                     <div className="p-8 bg-slate-800/40 border border-white/5 rounded-[2rem] pl-11 border-l-4 border-l-brand-500">
                                         <p className="text-slate-300 leading-relaxed italic font-medium">
-                                            TumaFast's enterprise liability for logistical failure or asset damage is structurally capped at KES 50,000 per dispatch node, unless institutional insurance riders are applied during booking. We assume no liability for latency induced by regional infrastructure failures, environmental conditions, or regulatory interventions.
+                                            AXON's enterprise liability for logistical failure or asset damage is structurally capped at KES 50,000 per dispatch node, unless institutional insurance riders are applied during booking. We assume no liability for latency induced by regional infrastructure failures, environmental conditions, or regulatory interventions.
                                         </p>
                                     </div>
                                 </section>
