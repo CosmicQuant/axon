@@ -293,10 +293,25 @@ export const mapService = {
 
                     const indices = route.optimizedIntermediateWaypointIndices;
 
+                    // The Routes API JS SDK actually returns a duration string '120s' or duration object.
+                    // Sometimes duration is missing if durationMillis is used but not provided.
+                    let durationSecs = 0;
+                    if (route.durationMillis) {
+                        durationSecs = Math.round(route.durationMillis / 1000);
+                    } else if (route.duration) {
+                        if (typeof route.duration === 'string') {
+                            durationSecs = parseInt(route.duration.replace('s', ''), 10);
+                        } else if (typeof route.duration.seconds === 'number') {
+                            durationSecs = route.duration.seconds;
+                        } else if (typeof route.duration === 'number') {
+                            durationSecs = route.duration;
+                        }
+                    }
+
                     return {
                         geometry: pathArray, // MapLayer handles Array<{lat, lng}> format
                         distance: route.distanceMeters || 0,
-                        duration: Math.round((route.durationMillis || 0) / 1000), // Convert ms to seconds
+                        duration: durationSecs, // Convert ms to seconds
                         waypoint_order: (indices && indices.length > 0) ? indices : waypoints.map((_, i) => i)
                     };
                 }

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import type { DeliveryOrder, Driver } from '../types';
 import { VehicleType, ServiceType } from '../types';
@@ -508,11 +507,11 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
   return (
     <div className="absolute inset-x-0 bottom-0 pointer-events-none">
 
-      <div className="pointer-events-auto w-full max-w-2xl mx-auto">
+      <div className="pointer-events-auto w-full max-w-2xl mx-auto md:px-6">
 
         {/* Main Collapsible Card - Professional Bottom Sheet (75% max when expanded) */}
         <div
-          className={`bg-white backdrop-blur-2xl rounded-t-[2rem] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] border-t border-x border-gray-200 overflow-hidden transition-all duration-500 transform pb-[env(safe-area-inset-bottom,0px)] ${isCollapsed ? (isMapSelecting ? 'max-h-[160px]' : 'max-h-[120px]') : 'max-h-[75vh] overflow-y-auto no-scrollbar'}`}
+          className={`bg-white/95 backdrop-blur-xl rounded-t-[2.5rem] md:rounded-t-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] md:shadow-2xl border-t md:border border-gray-200 overflow-hidden transition-all duration-500 transform pb-[env(safe-area-inset-bottom,0px)] ${isCollapsed ? 'max-h-[140px]' : 'max-h-[75vh] overflow-y-auto no-scrollbar'}`}
         >
           {/* Drawer Handle / Drag Zone */}
           <div
@@ -1433,7 +1432,7 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
                         order.stops.map((stop: any, idx: number) => (
                           <div key={stop.id || idx} className="flex justify-between items-center border-b border-amber-200/50 pb-2 last:border-0 last:pb-0">
                             <div className="min-w-0 flex-1 mr-2">
-                              <p className="text-[9px] font-black text-amber-700 uppercase truncate">
+                              <p className="text-[9px] font-bold text-amber-700 uppercase truncate">
                                 {stop.type === 'dropoff' ? 'Final Destination' : `Stop ${idx + 1}`}
                               </p>
                               <p className="text-[10px] text-amber-900/60 truncate font-bold">{stop.address}</p>
@@ -1452,7 +1451,7 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
                       ) : (
                         <div className="flex justify-between items-center">
                           <div className="min-w-0 flex-1 mr-2">
-                            <p className="text-[9px] font-black text-amber-700 uppercase truncate">Final Destination</p>
+                            <p className="text-[9px] font-bold text-amber-700 uppercase truncate">Final Destination</p>
                             <p className="text-[10px] text-amber-900/60 truncate font-bold">{order.dropoff}</p>
                           </div>
                           <p className="text-xl font-black text-amber-900 tracking-widest">{order.verificationCode || '----'}</p>

@@ -288,9 +288,9 @@ const TrackingPageContent: React.FC = () => {
                 <MapLayer
                     driverLabel={
                         order?.status === 'driver_assigned'
-                            ? (order.remainingDuration ? `Picking up in ${order.remainingDuration} mins` : 'Heading to Pickup')
+                            ? (order.remainingDuration ? `Picking up in ${Math.ceil(order.remainingDuration / 60)} mins` : 'Heading to Pickup')
                             : (order?.status === 'in_transit'
-                                ? (order.remainingDuration ? `Delivering in ${order.remainingDuration} mins` : 'Delivering')
+                                ? (order.remainingDuration ? `Delivering in ${Math.ceil(order.remainingDuration / 60)} mins` : 'Delivering')
                                 : (order?.status === 'delivered' ? 'Arrived' : undefined))
                     }
                 />

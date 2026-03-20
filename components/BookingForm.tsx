@@ -1237,7 +1237,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ prefillData, onOrderComplete,
 
     return (
         <div className="absolute inset-x-0 bottom-0 pointer-events-none">
-            <div className="pointer-events-auto w-full max-w-2xl mx-auto px-4 sm:px-6">
+            <div className="pointer-events-auto w-full max-w-2xl mx-auto md:px-6">
 
                 {/* Step Indicator - Removed for One-Click Flow */}
                 {/* {!isCollapsed && (

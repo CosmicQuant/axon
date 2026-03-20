@@ -41,7 +41,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
    const { isLoaded, setPickupCoords, setDropoffCoords, setWaypointCoords, setOrderState, fitBounds, setDriverCoords, setDriverBearing, setDriverVehicleType, setRoutePolyline, requestUserLocation, driverCoords } = useMapState();
 
    // Internal state if not controlled
-   const [internalView, setInternalView] = useState<DashboardView>('OVERVIEW');
+   const [internalView, setInternalView] = useState<DashboardView>('JOBS');
 
    // Use prop if available, otherwise internal state
    const currentView = propCurrentView || internalView;
@@ -131,7 +131,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
    const [activeJobCoords, setActiveJobCoords] = useState<{ pickup: { lat: number, lng: number } | null, dropoff: { lat: number, lng: number } | null }>({ pickup: null, dropoff: null });
    const [routeDuration, setRouteDuration] = useState<number | null>(null);
    const [routeDistance, setRouteDistance] = useState<number | null>(null);
-   const [isDrawerCollapsed, setIsDrawerCollapsed] = useState(false);
+   const [isDrawerCollapsed, setIsDrawerCollapsed] = useState(true);
    const lastValidCoordsRef = React.useRef<{ lat: number, lng: number } | null>(null);
 
    // Track Driver Online Status & Time
@@ -2029,9 +2029,11 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
 
             {/* Active Job Overlay (Map View) */}
             {currentView === 'JOBS' && (
-               <div className="absolute inset-0 z-10 pointer-events-none">
+               <div className="absolute inset-x-0 bottom-0 z-10 pointer-events-none pb-[env(safe-area-inset-bottom)] md:pb-6">
                   {hasActiveJob ? (
-                     <div className={`absolute left-4 right-4 md:left-auto md:right-8 md:w-96 bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-gray-200 transition-all duration-300 pointer-events-auto ${Capacitor.isNativePlatform() ? 'bottom-28' : 'bottom-8'} ${isDrawerCollapsed ? 'p-4' : 'p-6'}`}>
+                     <div className={`w-full md:absolute md:left-auto md:right-8 md:w-96 bg-white/95 backdrop-blur-xl rounded-t-[2.5rem] md:rounded-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] md:shadow-2xl border-t md:border border-gray-200 transition-all duration-300 pointer-events-auto ${Capacitor.isNativePlatform() ? 'mb-[5rem] md:mb-0 md:bottom-28' : 'mb-16 md:mb-0 md:bottom-8'} ${isDrawerCollapsed ? 'p-4' : 'p-6 pt-4'}`}>
+                        {/* Mobile Drag Handle */}
+                        <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-4 md:hidden" />
                         <div className="flex items-center justify-between mb-4">
                            <div className="flex items-center space-x-2">
                               <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border shadow-sm ${activeJob.status === 'in_transit'
@@ -2065,13 +2067,13 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                                  <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100">
                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Distance & Time</p>
                                     <p className="text-sm font-bold text-gray-900">
-                                       {(activeJob.remainingDistance ? (activeJob.remainingDistance / 1000) : 0).toLocaleString(undefined, { maximumFractionDigits: 1 })} km • {Math.ceil((activeJob.remainingDistance || 0) / 1000 * 2)} mins
+                                       {(routeDistance !== null ? routeDistance : (activeJob.remainingDistance || 0)).toLocaleString(undefined, { maximumFractionDigits: 1 })} km • {routeDuration !== null ? routeDuration : (activeJob.remainingDuration || 0)} mins
                                     </p>
                                  </div>
                                  <div className="bg-emerald-50 p-3 rounded-2xl border border-emerald-100">
                                     <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Your Earnings</p>
                                     <p className="text-sm font-black text-emerald-700">
-                                       KES {activeJob.total?.toLocaleString()}
+                                       KES {((activeJob.price || 0) * 0.8).toLocaleString()}
                                     </p>
                                  </div>
                               </div>
@@ -2183,18 +2185,20 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                         )}
                      </div>
                   ) : (
-                     <div className={`p-8 pointer-events-auto ${Capacitor.isNativePlatform() ? 'pb-32' : ''}`}>
-                        <div className="bg-white/95 backdrop-blur-xl rounded-2xl p-12 text-center border border-gray-200 shadow-sm max-w-md mx-auto">
-                           <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                              <Package className="w-8 h-8 text-gray-400" />
+                     <div className={`w-full md:absolute md:left-auto md:right-8 md:w-96 bg-white/95 backdrop-blur-xl rounded-t-[2.5rem] md:rounded-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] md:shadow-2xl border-t md:border border-gray-200 transition-all duration-300 pointer-events-auto ${Capacitor.isNativePlatform() ? 'mb-[5rem] md:mb-0 md:bottom-28' : 'mb-16 md:mb-0 md:bottom-8'} p-6`}>
+                        <div className="flex flex-col items-center justify-center text-center">
+                           <div className="w-16 h-16 bg-brand-50 rounded-full flex items-center justify-center mb-3">
+                              <div className="w-12 h-12 bg-brand-100 rounded-full flex items-center justify-center animate-ping absolute" />
+                              <MapPin className="w-8 h-8 text-brand-600 relative z-10" />
                            </div>
-                           <h3 className="font-bold text-gray-900 text-lg">No Active Jobs</h3>
-                           <p className="text-gray-500 mt-2">Go to the Marketplace to find new delivery requests.</p>
+                           <h3 className="font-black text-gray-900 text-lg mb-1">You're Online</h3>
+                           <p className="text-gray-500 text-sm font-medium mb-4">Finding deliveries near your location...</p>
                            <button
                               onClick={() => setCurrentView('MARKET')}
-                              className="mt-6 px-6 py-3 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-colors"
+                              className="w-full py-3.5 bg-gray-900 text-white rounded-xl font-bold hover:bg-black active:scale-95 transition-all shadow-lg flex items-center justify-center space-x-2"
                            >
-                              Browse Marketplace
+                              <Search className="w-5 h-5 text-gray-400" />
+                              <span>Browse Marketplace</span>
                            </button>
                         </div>
                      </div>
@@ -2378,7 +2382,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
 };
 
 const DriverDashboard: React.FC<DriverDashboardProps> = (props) => {
-   const [currentView, setCurrentView] = useState<DashboardView>('OVERVIEW');
+   const [currentView, setCurrentView] = useState<DashboardView>('JOBS');
 
    // Navigation Handler
    const navigateToView = (view: DashboardView) => {
