@@ -5,69 +5,71 @@ import { useChat } from '../context/ChatContext';
 const BLOG_POSTS = [
     {
         id: 1,
-        title: "The Future of AI in Kenyan Logistics",
-        excerpt: "How machine learning is solving the last-mile problem in Nairobi and beyond. We explore the algorithms behind the fastest deliveries in the city.",
+        title: "The 2024 Green Logistics Pivot in Kenya",
+        excerpt: "Nairobi is leading Africa's transition to EV fleets. We explore how AXON is integrating electric bodabodas into the grid to lower operational costs by 40%.",
         content: `
-            <p className="mb-6">The logistics landscape in Kenya is undergoing a radical shift, driven by the integration of Artificial Intelligence and Machine Learning. For decades, the "last-mile" problem—the final leg of a journey where a package reaches its destination—has been the most expensive and complex part of the supply chain, especially in sprawling urban centers like Nairobi.</p>
+            <p className="mb-6">The transition to green energy in East Africa is no longer a future concept—it is the operational standard for 2024. As global fuel prices remain volatile, the shift to Electric Vehicles (EVs) has become a survival strategy for logistics providers. Nairobi, in particular, has become the continental hub for electric mobility innovation.</p>
             
-            <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">Solving the "Unmapped" Challenge</h3>
-            <p className="mb-6">In many parts of Nairobi, traditional address systems are inconsistent. AI is helping us bridge this gap through sophisticated geocoding that learns from every successful delivery. Our system maps informal routes and entry points that Google Maps might miss, creating a proprietary "logic map" of the city.</p>
+            <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">Lowering the Barrier to Entry</h3>
+            <p className="mb-6">For the average delivery rider, fuel and maintenance account for nearly 45% of daily earnings. By transitioning our top-tier riders to EV bikes through partnerships with local manufacturers like Roam and Spiro, we are seeing a dramatic 40% reduction in total cost of ownership (TCO). These savings are passed directly to our enterprise clients, making professional logistics more accessible than ever in 2024.</p>
             
             <blockquote className="border-l-4 border-brand-600 pl-6 py-2 mb-8 italic text-slate-600 font-medium">
-                "We aren't just moving boxes; we are processing data points. Every delivery makes the next one 0.1% more efficient."
+                "Sustainability in logistics isn't just about carbon credits; it's about the bottom line. Electric fleets are cheaper, quieter, and more reliable."
             </blockquote>
 
-            <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">Predictive Logistics</h3>
-            <p className="mb-6">By analyzing years of traffic patterns, AXON's AI can predict traffic surges in Westlands or Industrial Area before they happen. This allows our dispatch system to pre-allocate drivers to zones before orders are even placed, slashingwait times to under 30 minutes for most city deliveries.</p>
+            <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">Battery Swapping Infrastructure</h3>
+            <p className="mb-6">One of the primary challenges has been downtime for charging. In 2024, AXON is leveraging its warehouse network to host ultra-fast battery swapping stations. Our AI system tracks vehicle battery levels in real-time, routing riders to the nearest swap station before they run low, ensuring zero downtime for deliveries.</p>
             
-            <p>As we move into 2026, the focus shifts toward autonomous delivery pilots and drone coordination, ensuring Kenya remains at the forefront of the global logistics revolution.</p>
+            <p>As we look toward 2025, AXON aims to have 20% of its last-mile fleet fully electrified, setting a new benchmark for sustainable urban logistics in sub-Saharan Africa.</p>
         `,
-        category: "Technology",
+        category: "Sustainability",
         author: "Dr. Kamau Njeru",
-        date: "Feb 10, 2026",
+        date: "March 15, 2024",
         readTime: "5 min read",
-        image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&q=80&w=800"
+        image: "https://plus.unsplash.com/premium_photo-1661601005720-726e6f990526?auto=format&fit=crop&q=80&w=800"
     },
     {
         id: 2,
-        title: "Scaling Your Business with AXON Fleet",
-        excerpt: "Why enterprise businesses are choosing AXON as their primary logistics partner for long-term growth and operational efficiency.",
+        title: "Revolutionizing Middle-Mile Logistics (2025)",
+        excerpt: "Why enterprise businesses are choosing AXON's shared trucking model to reduce inter-county shipping costs by 60% compared to traditional dedicated fleets.",
         content: `
-            <p className="mb-6">For SMEs and large enterprises in East Africa, managing its own delivery fleet is often a distraction from core business activities. Maintenance, fuel costs, and driver management create overhead that saps potential for growth.</p>
+            <p className="mb-6">For SMEs and large enterprises in East Africa, shipping goods between major hubs like Mombasa, Nairobi, and Kisumu has historically been a massive expense. In 2025, the focus has shifted from "owning the asset" to "owning the logistics layer."</p>
             
-            <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">Elastic Infrastructure</h3>
-            <p className="mb-6">The primary advantage of AXON for Business is elasticity. During peak seasons like Christmas or Valentine's Day, businesses can scale their delivery capacity by 500% instantly without hiring a single employee. You only pay for the deliveries you make, turning a fixed cost into a variable one.</p>
+            <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">The Power of Pooled Logistics</h3>
+            <p className="mb-6">The primary innovation driving down costs in 2025 is middle-mile pooling. Traditional logistics required businesses to hire a full truck even for a small shipment. AXON's new Economy service uses AI-driven batching to consolidate shipments from hundreds of small businesses into high-capacity trailers. This "Shared Trucking" model has lowered the cost of sending a document or small parcel from Mombasa to Nairobi to just ~300 KES.</p>
             
-            <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">API Integration</h3>
-            <p className="mb-6">Modern businesses need automated workflows. Our enterprise API allows platforms to trigger delivery requests automatically when a customer checks out. This seamless integration ensures that the delivery process starts the second a payment is confirmed.</p>
+            <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">Dynamic Capacity Management</h3>
+            <p className="mb-6">Our 2025 infrastructure allows for real-time capacity bidding. When a trailer has unused space, our system automatically discounts the "Economy" rate for small businesses along that route. This ensures every vehicle runs at 100% capacity, eliminating the waste that usually plagues African supply chains.</p>
             
-            <p>From e-commerce giants to local bakeries, the ability to outsource logistics to a tech-first partner is becoming the standard for operational excellence in Kenya's digital economy.</p>
+            <p>By democratizing access to heavy-duty logistics, we are enabling local manufacturers to scale nationally without the burden of prohibitive shipping costs.</p>
         `,
         category: "Enterprise",
         author: "Sarah Wanjiku",
-        date: "Jan 28, 2026",
-        readTime: "8 min read",
-        image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80&w=800"
+        date: "February 22, 2025",
+        readTime: "7 min read",
+        image: "https://images.unsplash.com/photo-1519003722824-194d4455a60c?auto=format&fit=crop&q=80&w=800"
     },
     {
         id: 3,
-        title: "Security and Transparency in Micro-Deliveries",
-        excerpt: "Inside the protocols that keep your packages safe. From M-Pesa escrow logic to real-time driver vetting and tracking.",
+        title: "Seamless Fintech Settlement in 2024",
+        excerpt: "A deep dive into how AXON's automated M-PESA escrow and payout logic is unlocking liquidity for thousands of Kenyan SMEs.",
         content: `
-            <p className="mb-6">Trust is the currency of the logistics industry. When a customer hands over a high-value item—be it a laptop or sensitive documents—they need absolute certainty it will reach the destination safely.</p>
+            <p className="mb-6">Logistics and Payments are the two sides of the same coin in the digital economy. In 2024, the "Liquidity Trap"—where money is tied up in transit for days—remains the biggest growth bottleneck for small businesses in Kenya.</p>
             
-            <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">The Three Pillars of Safety</h3>
-            <p className="mb-4"><strong>1. Real-time Vetting:</strong> Every AXON driver undergoes a multi-stage background check, including identity verification and personal references. Our digital "Driver Score" updates after every trip based on speed, safety, and customer feedback.</p>
-            <p className="mb-4"><strong>2. Digital Escrow:</strong> Through our deep integration with M-Pesa, payments can be held in escrow until the recipient confirms delivery via a secure OTP (One Time Password).</p>
-            <p className="mb-6"><strong>3. Live Telemetry:</strong> Customers don't just see a dot on a map; they see the driver's progress with sub-5-meter accuracy, along with estimated time of arrival that updates every 10 seconds.</p>
+            <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">Automated Escrow & Trust</h3>
+            <p className="mb-4">Trust is the currency of the logistics industry. Our 2024 fintech update introduces automated escrow via Safaricom's M-PESA for Business. When a delivery is initiated, the payment is secured. Only upon digital verification of the drop-off is the payment released instantly to the vendor’s commercial till.</p>
+            <p className="mb-6"><strong>Real-time Settlement:</strong> Unlike traditional logistics companies that settle weekly, AXON now offers instant settlement. As soon as the customer confirms receipt on their smartphone, the funds are disbursed. This immediate liquidity allows vendors to restock faster and scale their operations with confidence.</p>
             
-            <p>By making every step of the delivery journey transparent, we are building a logistics network that Kenyans can rely on without hesitation.</p>
+            <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">Fraud Prevention & Driver Vetting</h3>
+            <p className="mb-6">By integrating digital identity verification into our settlement flow, we've reduced delivery-related fraud by 85% in the first quarter of 2024. Every transaction leaves an immutable digital trail, ensuring high-fidelity oversight for both the sender and the receiver.</p>
+            
+            <p>Our commitment to bridging the gap between physical movement and financial flow is what makes AXON the operating system for modern business in Africa.</p>
         `,
-        category: "Security",
+        category: "Fintech",
         author: "Logistics Team",
-        date: "Jan 15, 2026",
+        date: "January 10, 2024",
         readTime: "4 min read",
-        image: "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&q=80&w=800"
+        image: "https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&fit=crop&q=80&w=800"
     }
 ];
 
