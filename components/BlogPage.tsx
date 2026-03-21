@@ -26,7 +26,7 @@ const BLOG_POSTS = [
         author: "Dr. Kamau Njeru",
         date: "March 15, 2024",
         readTime: "5 min read",
-        image: "https://plus.unsplash.com/premium_photo-1661601005720-726e6f990526?auto=format&fit=crop&q=80&w=800"
+        image: "https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800"
     },
     {
         id: 2,
