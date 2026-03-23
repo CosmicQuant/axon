@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { mapService } from '../../services/mapService';
 import { useMapState } from '@/context/MapContext';
-import { MapPin, Map, Box, Truck, User, ArrowRight, ArrowLeft, Check, Camera, Zap, Clock, Bike, Car, Plus, Navigation, LocateFixed, Smartphone, Banknote, X } from 'lucide-react';
+import { MapPin, Map, Box, Truck, User, ArrowRight, ArrowLeft, Check, Camera, Zap, Clock, Bike, Car, Plus, Navigation, LocateFixed, Smartphone, Banknote, X, FileText, Package, PackageOpen, Archive, Ruler } from 'lucide-react';
 
 // --- Types & Constants ---
 type Category = 'A' | 'B' | 'C';
@@ -10,6 +10,7 @@ type ServiceType = 'Express' | 'Standard';
 type PaymentMethod = 'M-Pesa' | 'Cash';
 
 interface BookingState {
+    activeTab?: "pickup" | "dropoff";
     pickup: string;
     dropoff: string;
     waypoints: string[];
@@ -27,10 +28,11 @@ interface BookingState {
     receiverId: string;
     paymentMethod: PaymentMethod;
     paymentPhone: string;
+    isSearchingText?: boolean;
 }
 
 const INITIAL_STATE: BookingState = {
-    pickup: 'Current Location', dropoff: '', waypoints: [], distanceKm: 0,
+    pickup: '', dropoff: '', waypoints: [], distanceKm: 0, activeTab: 'pickup',
     category: 'A', subCategory: '', dimensions: { length: '', width: '', height: '', weight: '' }, imageUploaded: false,
     vehicle: '', serviceType: 'Express',
     receiverName: '', receiverPhone: '', receiverId: '',
@@ -38,12 +40,12 @@ const INITIAL_STATE: BookingState = {
 };
 
 const VEHICLES = [
-    { id: 'boda', label: 'Motorbike', maxDist: 65, maxWeight: 100, allowedCats: ['A'], pricePerKm: 30, icon: Bike },
-    { id: 'tuktuk', label: 'Tuk-Tuk', maxDist: 65, maxWeight: 500, allowedCats: ['A'], pricePerKm: 50, icon: Car },
-    { id: 'probox', label: 'Probox', maxDist: 9999, maxWeight: 800, allowedCats: ['A', 'B'], pricePerKm: 70, icon: Car },
-    { id: 'van', label: 'Cargo Van', maxDist: 9999, maxWeight: 1500, allowedCats: ['B'], pricePerKm: 90, icon: Truck },
-    { id: 'pickup', label: 'Pick-up', maxDist: 9999, maxWeight: 2000, allowedCats: ['B', 'C'], pricePerKm: 100, icon: Truck },
-    { id: 'truck', label: 'Trucks', maxDist: 9999, maxWeight: 5000, allowedCats: ['C'], pricePerKm: 200, icon: Truck }
+    { id: 'boda', label: 'Motorbike', maxDist: 65, maxWeight: 100, allowedCats: ['A'], pricePerKm: 30, icon: Bike, color: 'text-orange-500', bgColor: 'bg-orange-500', bgLight: 'bg-orange-50' },
+    { id: 'tuktuk', label: 'Tuk-Tuk', maxDist: 65, maxWeight: 500, allowedCats: ['A'], pricePerKm: 50, icon: Car, color: 'text-yellow-500', bgColor: 'bg-yellow-500', bgLight: 'bg-yellow-50' },
+    { id: 'probox', label: 'Probox', maxDist: 9999, maxWeight: 800, allowedCats: ['A', 'B'], pricePerKm: 70, icon: Car, color: 'text-blue-500', bgColor: 'bg-blue-500', bgLight: 'bg-blue-50' },
+    { id: 'van', label: 'Cargo Van', maxDist: 9999, maxWeight: 1500, allowedCats: ['B'], pricePerKm: 90, icon: Truck, color: 'text-indigo-500', bgColor: 'bg-indigo-500', bgLight: 'bg-indigo-50' },
+    { id: 'pickup', label: 'Pick-up', maxDist: 9999, maxWeight: 2000, allowedCats: ['B', 'C'], pricePerKm: 100, icon: Truck, color: 'text-emerald-500', bgColor: 'bg-emerald-500', bgLight: 'bg-emerald-50' },
+    { id: 'truck', label: 'Trucks', maxDist: 9999, maxWeight: 5000, allowedCats: ['C'], pricePerKm: 200, icon: Truck, color: 'text-slate-700', bgColor: 'bg-slate-700', bgLight: 'bg-slate-50' }
 ];
 
 // --- Animation Variants ---
@@ -71,18 +73,40 @@ export default function BookingWizard({ prefillData, onOrderComplete, onCollapse
 
     const handleUpdate = (updates: Partial<BookingState>) => setData(prev => ({ ...prev, ...updates }));
 
-    const { pickupCoords, dropoffCoords, waypointCoords, setRoutePolyline, setIsMapSelecting, setActiveInput, setPickupCoords, setWaypointCoords, setDropoffCoords, userLocation } = useMapState();
+    const { pickupCoords, dropoffCoords, waypointCoords, setRoutePolyline, setIsMapSelecting, setActiveInput, setPickupCoords, setWaypointCoords, setDropoffCoords, userLocation, requestUserLocation, isMapSelecting, activeInput, mapCenter, fitBounds } = useMapState();
 
     useEffect(() => {
-        if (data.pickup === 'Current Location' && userLocation) {
-            // Reverse geocode the user's location on boot
-            mapService.reverseGeocode(userLocation.lat, userLocation.lng).then(address => {
-                if (address) {
-                    handleUpdate({ pickup: address });
-                }
-            }).catch(console.error);
+        // Request accurate user location on load
+        requestUserLocation().then(loc => {
+            if (loc && !data.pickup && !pickupCoords && !isMapSelecting) {
+                setActiveInput('pickup');
+                setIsMapSelecting(true);
+                fitBounds([loc]);
+                mapService.reverseGeocode(loc.lat, loc.lng).then(address => {
+                    if (address) handleUpdate({ pickup: address });
+                }).catch(console.error);
+            }
+        });
+    }, []); // Run only once on mount
+
+    // Live Reverse Geocode when dragging the map (Debounced)
+    useEffect(() => {
+        if (isMapSelecting && mapCenter) {
+            const timer = setTimeout(async () => {
+                try {
+                    const address = await mapService.reverseGeocode(mapCenter.lat, mapCenter.lng);
+                    if (address) {
+                        if (activeInput === 'pickup') {
+                            handleUpdate({ pickup: address });
+                        } else if (activeInput === 'dropoff') {
+                            handleUpdate({ dropoff: address });
+                        }
+                    }
+                } catch (e) { }
+            }, 600); // 600ms debounce prevents spamming geocode API
+            return () => clearTimeout(timer);
         }
-    }, [userLocation, data.pickup]);
+    }, [mapCenter, isMapSelecting, activeInput]);
 
     useEffect(() => {
         const calculateRoute = async () => {
@@ -106,6 +130,7 @@ export default function BookingWizard({ prefillData, onOrderComplete, onCollapse
                     const route = await mapService.getFullyOptimizedRoute(pickupCoords, allStops, data.vehicle || 'Boda Boda');
                     if (route) {
                         setRoutePolyline(route.geometry);
+                        fitBounds([pickupCoords, ...allStops]);
                         const distKm = route.distance / 1000;
                         const now = new Date();
                         now.setSeconds(now.getSeconds() + route.duration);
@@ -113,23 +138,24 @@ export default function BookingWizard({ prefillData, onOrderComplete, onCollapse
 
                         if (route.full_optimized_order && stopInfo.length === route.full_optimized_order.length) {
                             const optimizedStops = route.full_optimized_order.map((optimizedIndex: number) => stopInfo[optimizedIndex]);
-                            const finalDropoffInfo = optimizedStops[optimizedStops.length - 1];
-                            const newWaypointsInfo = optimizedStops.slice(0, optimizedStops.length - 1);
+                            if (optimizedStops.length > 0) {
+                                handleUpdate({
+                                    waypoints: optimizedStops.map((info: any) => info.name),
+                                    distanceKm: distKm,
+                                    etaTime: timeStr,
+                                    calculatingRoute: false
+                                });
 
-                            if (finalDropoffInfo) {
-                                const orderChanged = route.full_optimized_order.some((origIdx: number, optimizedIdx: number) => origIdx !== optimizedIdx);
-                                if (orderChanged) {
-                                    handleUpdate({
-                                        waypoints: newWaypointsInfo.map((info: any) => info.name),
-                                        dropoff: finalDropoffInfo.name,
-                                        distanceKm: distKm,
-                                        etaTime: timeStr,
-                                        calculatingRoute: false
-                                    });
-                                    setWaypointCoords(newWaypointsInfo.map((info: any) => info.coord));
-                                    setDropoffCoords(finalDropoffInfo.coord);
-                                    return;
+                                const newWpCoords = optimizedStops.map((info: any) => info.coord);
+
+                                // Prevent infinite loops by only updating context if value really changed
+                                if (JSON.stringify(newWpCoords) !== JSON.stringify(waypointCoords)) {
+                                    setWaypointCoords(newWpCoords);
                                 }
+                                if (dropoffCoords) {
+                                    setDropoffCoords(null);
+                                }
+                                return;
                             }
                         }
                         handleUpdate({ distanceKm: distKm, etaTime: timeStr, calculatingRoute: false });
@@ -157,7 +183,7 @@ export default function BookingWizard({ prefillData, onOrderComplete, onCollapse
     });
     const activeVehicle = VEHICLES.find(v => v.id === data.vehicle) || eligibleVehicles[0];
     const liveBasePrice = activeVehicle ? (activeVehicle.pricePerKm * data.distanceKm) : 0;
-    const currentQuote = data.serviceType === 'Express' ? liveBasePrice * 1.5 : liveBasePrice;
+    const currentQuote = Math.round(Math.max(150, data.serviceType === 'Express' ? liveBasePrice * 1.5 : liveBasePrice) / 10) * 10;
 
     const submitBooking = () => {
         const newOrder = {
@@ -173,7 +199,7 @@ export default function BookingWizard({ prefillData, onOrderComplete, onCollapse
                 fragile: false,
                 value: 0
             },
-            price: Math.max(150, currentQuote),
+            price: currentQuote,
             driverRate: Math.max(100, currentQuote * 0.8),
             status: 'pending',
             estimatedDuration: '45 mins',
@@ -205,10 +231,11 @@ export default function BookingWizard({ prefillData, onOrderComplete, onCollapse
 
     return (
         <div className="fixed bottom-0 inset-x-0 pointer-events-none z-[100] flex flex-col justify-end mx-auto max-w-lg">
+
             {/* Sheet Background adhering exactly to the bottom */}
             <motion.div
                 layout
-                className="w-full bg-white shadow-[0_-15px_40px_rgba(0,0,0,0.12)] rounded-t-[2.5rem] overflow-hidden pointer-events-auto border-t border-gray-100 flex flex-col pb-[env(safe-area-inset-bottom,0)] pb-1 max-h-[90vh]"
+                className={`w-full bg-white shadow-[0_-15px_40px_rgba(0,0,0,0.12)] rounded-t-[2.5rem] overflow-hidden pointer-events-auto border-t border-gray-100 flex flex-col pb-[env(safe-area-inset-bottom,0)] pb-1 transition-all duration-300 ${data.isSearchingText ? 'h-[90vh]' : 'max-h-[90vh]'}`}
                 transition={{ duration: 0.3, type: 'tween', ease: 'easeOut' }}
             >
                 {/* Minimal Header Indicator */}
@@ -226,7 +253,7 @@ export default function BookingWizard({ prefillData, onOrderComplete, onCollapse
                             const ActiveStepIcon = STEP_INFO[step].icon;
                             return (
                                 <span className="flex items-center gap-1.5 text-[10px] font-black text-brand-600 uppercase tracking-widest bg-brand-50/50 px-2 py-1 rounded-md mb-2 mt-[-4px]">
-                                    <ActiveStepIcon size={12} strokeWidth={3} /> {STEP_INFO[step].title} ({step + 1}/5)
+                                    <ActiveStepIcon size={12} strokeWidth={3} /> {step === 0 ? (data.activeTab === "pickup" ? "Pickup Point" : (data.waypoints.length > 0 ? "Drop offs" : "Drop off")) : STEP_INFO[step].title} ({step + 1}/5)
                                 </span>
                             );
                         })()}
@@ -251,7 +278,7 @@ export default function BookingWizard({ prefillData, onOrderComplete, onCollapse
                                                 </div>
                                                 <div className="w-[3px] h-[3px] bg-brand-200 rounded-full ml-1" />
                                                 <span className="text-[11px] font-black text-gray-900 leading-none ml-1">
-                                                    KES {Math.max(150, currentQuote).toLocaleString()}
+                                                    KES {currentQuote.toLocaleString()}
                                                 </span>
                                             </>
                                         )}
@@ -268,13 +295,13 @@ export default function BookingWizard({ prefillData, onOrderComplete, onCollapse
                 </div>
 
                 {/* Steps Container */}
-                <div className="relative px-5 pb-1 w-full overflow-y-auto no-scrollbar">
+                <div className="relative px-5 pb-1 w-full flex-1 overflow-y-auto no-scrollbar" style={{ paddingBottom: "0.25rem" }}>
                     <AnimatePresence mode="popLayout" custom={direction} initial={false}>
                         <motion.div
                             key={step} custom={direction} variants={slideVariants}
                             initial="enter" animate="center" exit="exit"
                             transition={{ type: 'spring', stiffness: 500, damping: 40 }}
-                            className="w-full"
+                            className="w-full h-full"
                         >
                             {step === 0 && <Step1Where data={data} update={handleUpdate} next={nextStep} />}
                             {step === 1 && <Step2What data={data} update={handleUpdate} next={nextStep} prev={prevStep} />}
@@ -291,13 +318,14 @@ export default function BookingWizard({ prefillData, onOrderComplete, onCollapse
 
 // --- Step 1: WHERE ---
 const Step1Where = ({ data, update, next }: any) => {
-    const [activeTab, setActiveTab] = useState<'pickup' | 'dropoff'>('pickup');
+    const activeTab = data.activeTab || 'pickup';
+    const setActiveTab = (tab: 'pickup' | 'dropoff') => update({ activeTab: tab });
     const maxDropoffsReached = data.waypoints.length >= 5;
 
     const [pickupSuggestions, setPickupSuggestions] = useState<any[]>([]);
     const [dropoffSuggestions, setDropoffSuggestions] = useState<any[]>([]);
 
-    const { setPickupCoords, setWaypointCoords, waypointCoords, setIsMapSelecting, setActiveInput, isMapSelecting, activeInput, mapCenter } = useMapState();
+    const { setPickupCoords, setWaypointCoords, waypointCoords, setDropoffCoords, setIsMapSelecting, setActiveInput, isMapSelecting, activeInput, mapCenter, setMapCenter, fitBounds, requestUserLocation } = useMapState();
 
     const handlePickupChange = async (val: string) => {
         update({ pickup: val });
@@ -315,6 +343,7 @@ const Step1Where = ({ data, update, next }: any) => {
         const resolved = await mapService.geocodeAddress(sug.label);
         if (resolved) {
             setPickupCoords({ lat: resolved.lat, lng: resolved.lng });
+            fitBounds([{ lat: resolved.lat, lng: resolved.lng }]);
             setActiveTab('dropoff');
         }
     };
@@ -349,11 +378,11 @@ const Step1Where = ({ data, update, next }: any) => {
     const SuggestionsList = ({ suggestions, onSelect }: any) => {
         if (!suggestions || suggestions.length === 0) return null;
         return (
-            <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-xl shadow-lg border border-gray-100 z-[150] overflow-hidden max-h-48 overflow-y-auto">
+            <div className="mt-2 w-full bg-white rounded-xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] border border-gray-100 overflow-hidden max-h-[60vh] overflow-y-auto">
                 {suggestions.map((sug: any, i: number) => (
-                    <div key={i} onClick={() => onSelect(sug)} className="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-none flex items-center gap-3">
-                        <MapPin className="w-4 h-4 text-gray-400" />
-                        <p className="text-xs font-semibold text-gray-700 truncate">{sug.label}</p>
+                    <div key={i} onClick={() => onSelect(sug)} className="p-4 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-none flex items-center gap-3 transition-colors">
+                        <MapPin className="w-5 h-5 text-gray-400" />
+                        <p className="text-sm font-semibold text-gray-700 truncate">{sug.label}</p>
                     </div>
                 ))}
             </div>
@@ -362,46 +391,23 @@ const Step1Where = ({ data, update, next }: any) => {
 
     return (
         <div className="space-y-3 relative">
-
-
-
-            {isMapSelecting && (
-                <div className="absolute top-[0%] -translate-y-[130%] left-0 right-0 z-[120] flex justify-center">
-                    <button
-                        onClick={async () => {
-                            setIsMapSelecting(false);
-                            if (mapCenter) {
-                                const lat = mapCenter.lat;
-                                const lng = mapCenter.lng;
-                                const address = await mapService.reverseGeocode(lat, lng) || "Selected Location";
-
-                                if (activeInput === "pickup") {
-                                    update({ pickup: address });
-                                    setPickupCoords({ lat, lng });
-                                    setActiveTab("dropoff");
-                                } else {
-                                    const newWp = [...data.waypoints, address];
-                                    const newCoords = [...waypointCoords, { lat, lng }];
-                                    update({ waypoints: newWp, dropoff: "" });
-                                    setWaypointCoords(newCoords);
-                                }
-                            }
-                        }}
-                        className="px-6 py-3 bg-brand-600 text-white rounded-full font-bold shadow-xl border-4 border-white flex items-center gap-2 hover:scale-105 transition-transform"
-                    >
-                        <Check size={18} /> Confirm {activeInput === "pickup" ? "Pickup" : "Dropoff"} Here
-                    </button>
-                </div>
-            )}
             <AnimatePresence mode="wait">
                 {activeTab === 'pickup' ? (
                     <motion.div key="pickup" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} transition={{ duration: 0.15 }} className="space-y-3">
                         <div className="relative">
-                            <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 text-green-500" size={18} />
+                            <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-green-500" size={24} />
                             <input
-                                autoFocus type="text" placeholder="Search Pickup Location"
-                                className="w-full pl-10 pr-20 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:ring-2 focus:ring-green-500 focus:bg-white text-gray-900 text-sm font-bold transition-all"
+                                type="text" placeholder="Search Pickup Location"
+                                className="w-full pl-12 pr-20 py-4 rounded-xl bg-gray-50 border border-gray-200 focus:ring-2 focus:ring-green-500 focus:bg-white text-gray-900 text-base font-bold transition-all min-h-[56px]"
                                 value={data.pickup}
+                                onFocus={() => {
+                                    setIsMapSelecting(false);
+                                    setActiveInput('pickup');
+                                    update({ isSearchingText: true });
+                                }}
+                                onBlur={() => {
+                                    setTimeout(() => update({ isSearchingText: false }), 200);
+                                }}
                                 onChange={e => handlePickupChange(e.target.value)}
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter') {
@@ -415,7 +421,31 @@ const Step1Where = ({ data, update, next }: any) => {
                                 }}
                             />
                             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                                <button onClick={() => update({ pickup: 'Current Location' })} title="Current Location" className="p-1.5 bg-white rounded-md shadow-sm border border-gray-100 hover:bg-green-50">
+                                <button
+                                    onClick={async () => {
+                                        update({ pickup: 'Locating...' });
+                                        try {
+                                            const loc = await requestUserLocation();
+                                            if (loc) {
+                                                setMapCenter(loc.lat, loc.lng);
+                                                fitBounds([loc]);
+                                                setIsMapSelecting(true);
+                                                setActiveInput('pickup');
+                                                const address = await mapService.reverseGeocode(loc.lat, loc.lng);
+                                                if (address) {
+                                                    update({ pickup: address });
+                                                }
+                                            } else {
+                                                update({ pickup: '' });
+                                            }
+                                        } catch (err) {
+                                            update({ pickup: '' });
+                                            console.error("Locating failed", err);
+                                        }
+                                    }}
+                                    title="Current Location"
+                                    className="p-1.5 bg-white rounded-md shadow-sm border border-gray-100 hover:bg-green-50"
+                                >
                                     <LocateFixed className="text-brand-600" size={16} />
                                 </button>
                                 <button onClick={() => manualSelectMap('pickup')} title="Pin on Map" className="p-1.5 bg-white rounded-md shadow-sm border border-gray-100 hover:bg-blue-50">
@@ -424,44 +454,86 @@ const Step1Where = ({ data, update, next }: any) => {
                             </div>
                             <SuggestionsList suggestions={pickupSuggestions} onSelect={handlePickupSelect} />
                         </div>
+                        <div className="w-full mt-4">
+                            <button
+                                onClick={() => {
+                                    if (data.pickup) {
+                                        if (isMapSelecting && mapCenter) {
+                                            setIsMapSelecting(false);
+                                            setPickupCoords({ lat: mapCenter.lat, lng: mapCenter.lng });
+                                            fitBounds([{ lat: mapCenter.lat, lng: mapCenter.lng }]);
+                                        }
+                                        setActiveTab('dropoff');
+                                    }
+                                }}
+                                disabled={!data.pickup}
+                                className={`w-full py-3 text-sm font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors ${data.pickup ? 'bg-gray-900 text-white hover:bg-gray-800 shadow-lg' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+                            >
+                                {isMapSelecting ? 'Confirm Pickup Here' : 'Confirm Pickup'} <ArrowRight size={16} />
+                            </button>
+                        </div>
                     </motion.div>
                 ) : (
                     <motion.div key="dropoff" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} transition={{ duration: 0.15 }} className="space-y-3">
-                        {data.waypoints.length > 0 && (
+                        <button onClick={() => setActiveTab('pickup')} className="flex items-center gap-2 text-sm text-gray-500 font-bold hover:text-gray-900 mb-2 transition-colors">
+                            <ArrowLeft size={16} /> Back to Pickup
+                        </button>
+                        {(data.waypoints.length > 0 || data.dropoff) && (
                             <div className="py-1 mb-1 w-full">
                                 <div className="flex items-start overflow-x-auto no-scrollbar pb-2 pt-2 px-1 snap-x mt-2">
                                     <div className="flex flex-col items-center flex-shrink-0 snap-start w-[80px]">
                                         <div className="w-4 h-4 bg-green-500 rounded-full border-[3px] border-white shadow-sm z-10" />
-                                        <span className="text-[11px] font-bold text-gray-900 truncate w-full text-center px-1 mt-1" title={data.pickup || 'Current Location'}>{data.pickup || 'Current Location'}</span>
+                                        <span className="text-[11px] font-bold text-gray-900 truncate w-full text-center px-1 mt-1" title={data.pickup || 'Locating...'}>{data.pickup || 'Locating...'}</span>
                                     </div>
                                     <AnimatePresence>
-                                        {data.waypoints.map((wp: string, idx: number) => (
-                                            <motion.div key={idx} initial={{ opacity: 0, width: 0, scale: 0.8 }} animate={{ opacity: 1, width: 'auto', scale: 1 }} exit={{ opacity: 0, width: 0, scale: 0.8 }} className="flex items-start flex-shrink-0 snap-start">
-                                                <div className="w-8 md:w-16 h-[2px] bg-gray-200 mt-[7px]" />
-                                                <div className="flex flex-col items-center relative group w-[80px]">
-                                                    <div className={`w-4 h-4 ${['bg-orange-500', 'bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-teal-500'][idx % 5]} rounded-full border-[3px] border-white shadow-sm z-10`} />
-                                                    <span className="text-[11px] font-bold text-gray-900 truncate w-full text-center px-1 mt-1" title={wp}>{wp.split(',')[0]}</span>
-                                                    <button onClick={() => {
-                                                        const newWp = data.waypoints.filter((_: any, i: number) => i !== idx);
-                                                        const newCoords = waypointCoords.filter((_: any, i: number) => i !== idx);
-                                                        update({ waypoints: newWp });
-                                                        setWaypointCoords(newCoords);
-                                                    }} className="absolute -top-1 -right-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-red-50 hover:bg-red-100 p-1 rounded-full z-20 shadow-sm border border-red-100 cursor-pointer">
-                                                        <X size={10} className="text-red-500" />
-                                                    </button>
-                                                </div>
-                                            </motion.div>
-                                        ))}
+                                        {(data.waypoints.length > 0 || data.dropoff) && (() => {
+                                            const allStops = [...data.waypoints];
+                                            if (data.dropoff) allStops.push((data as any).dropoff);
+                                            return allStops.map((wp: string, idx: number) => {
+                                                const isFinalDropoff = idx === allStops.length - 1 && data.dropoff;
+                                                const isLastStop = idx === allStops.length - 1;
+                                                return (
+                                                    <motion.div key={idx} initial={{ opacity: 0, width: 0, scale: 0.8 }} animate={{ opacity: 1, width: 'auto', scale: 1 }} exit={{ opacity: 0, width: 0, scale: 0.8 }} className="flex items-start flex-shrink-0 snap-start">
+                                                        <div className="w-8 md:w-16 h-[2px] bg-gray-200 mt-[7px]" />
+                                                        <div className="flex flex-col items-center relative group w-[80px]">
+                                                            <div className={`w-4 h-4 ${isLastStop ? 'bg-red-500' : ['bg-orange-500', 'bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-teal-500'][idx % 5]} rounded-full border-[3px] border-white shadow-sm z-10`} />
+                                                            <span className="text-[11px] font-bold text-gray-900 truncate w-full text-center px-1 mt-1" title={wp}>{wp.split(',')[0]}</span>
+                                                            <button onClick={() => {
+                                                                if (isFinalDropoff) {
+                                                                    update({ dropoff: '' });
+                                                                    setDropoffCoords(null);
+                                                                } else {
+                                                                    const newWp = data.waypoints.filter((_: any, i: number) => i !== idx);
+                                                                    const newCoords = waypointCoords.filter((_: any, i: number) => i !== idx);
+                                                                    update({ waypoints: newWp });
+                                                                    setWaypointCoords(newCoords);
+                                                                }
+                                                            }} className="absolute -top-1 -right-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-red-50 hover:bg-red-100 p-1 rounded-full z-20 shadow-sm border border-red-100 cursor-pointer">
+                                                                <X size={10} className="text-red-500" />
+                                                            </button>
+                                                        </div>
+                                                    </motion.div>
+                                                )
+                                            });
+                                        })()}
                                     </AnimatePresence>
                                 </div>
                             </div>
                         )}
                         <div className="relative">
-                            <MapPin className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${maxDropoffsReached ? 'text-gray-400' : 'text-brand-600'}`} size={18} />
+                            <MapPin className={`absolute left-4 top-1/2 -translate-y-1/2 ${maxDropoffsReached ? 'text-gray-400' : 'text-brand-600'}`} size={24} />
                             <input
                                 autoFocus type="text" placeholder={maxDropoffsReached ? "Max dropoffs reached (5)" : (data.waypoints.length > 0 ? "Search another dropoff" : "Search Dropoff Location")}
-                                className="w-full pl-10 pr-20 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:ring-2 focus:ring-brand-500 focus:bg-white text-gray-900 text-sm font-bold transition-all disabled:opacity-50"
+                                className="w-full pl-12 pr-20 py-4 rounded-xl bg-gray-50 border border-gray-200 focus:ring-2 focus:ring-brand-500 focus:bg-white text-gray-900 text-base font-bold transition-all disabled:opacity-50 min-h-[56px]"
                                 value={data.dropoff}
+                                onFocus={() => {
+                                    setIsMapSelecting(false);
+                                    setActiveInput('dropoff');
+                                    update({ isSearchingText: true });
+                                }}
+                                onBlur={() => {
+                                    setTimeout(() => update({ isSearchingText: false }), 200);
+                                }}
                                 onChange={e => handleDropoffChange(e.target.value)}
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter') {
@@ -474,6 +546,21 @@ const Step1Where = ({ data, update, next }: any) => {
                                 disabled={maxDropoffsReached}
                             />
                             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                <button
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        if (dropoffSuggestions && dropoffSuggestions.length > 0) {
+                                            handleDropoffSelect(dropoffSuggestions[0]);
+                                        } else if (data.dropoff) {
+                                            handleDropoffSelect({ label: data.dropoff });
+                                        }
+                                    }}
+                                    title="Add down as stop"
+                                    disabled={!data.dropoff || maxDropoffsReached}
+                                    className="p-1.5 bg-white rounded-md shadow-sm border border-gray-100 hover:bg-brand-50 disabled:opacity-50"
+                                >
+                                    <Plus className="text-brand-600" size={16} />
+                                </button>
                                 <button onClick={() => manualSelectMap('dropoff')} title="Pin on Map" className="p-1.5 bg-white rounded-md shadow-sm border border-gray-100 hover:bg-blue-50">
                                     <Map className="text-blue-500" size={16} />
                                 </button>
@@ -483,10 +570,23 @@ const Step1Where = ({ data, update, next }: any) => {
                         <div className="flex gap-2 mt-4">
                             <button onClick={() => setActiveTab('pickup')} className="w-12 bg-gray-100 text-gray-700 rounded-xl flex items-center justify-center hover:bg-gray-200"><ArrowLeft size={16} /></button>
                             <button
-                                onClick={next}
-                                disabled={data.waypoints.length === 0}
+                                onClick={() => {
+                                    if (data.dropoff && isMapSelecting && mapCenter && activeInput === 'dropoff') {
+                                        setIsMapSelecting(false);
+                                        const address = data.dropoff;
+                                        const newWp = [...data.waypoints, address];
+                                        const newCoords = [...waypointCoords, { lat: mapCenter.lat, lng: mapCenter.lng }];
+                                        update({ waypoints: newWp, dropoff: "" });
+                                        setWaypointCoords(newCoords);
+                                    } else {
+                                        next();
+                                    }
+                                }}
+                                disabled={(data.waypoints.length === 0 && !data.dropoff) || (isMapSelecting && !data.dropoff)}
                                 className="flex-1 py-3 bg-gray-900 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 disabled:opacity-50"
-                            >Confirm Route <Check size={16} /></button>
+                            >
+                                {isMapSelecting ? "Confirm Dropoff Here" : "Confirm Route"} <Check size={16} />
+                            </button>
                         </div>
                     </motion.div>
                 )}
@@ -506,12 +606,12 @@ const Step2What = ({ data, update, next, prev }: any) => {
 
     const subcategories = {
         'A': [
-            { id: 'Document', label: 'Document', desc: 'Max 0.5kg' },
-            { id: 'Small Box', label: 'Small Box', desc: 'Max 2kg' },
-            { id: 'Medium Box', label: 'Medium Box', desc: 'Max 5kg' },
-            { id: 'Large Box', label: 'Large Box', desc: 'Max 15kg' },
-            { id: 'Jumbo Box', label: 'Jumbo Box', desc: 'Max 30kg' },
-            { id: 'Custom Dimensions', label: 'Custom Dimensions', desc: 'Enter sizes below' }
+            { id: 'Document', label: 'Document', desc: 'Max 0.5kg', examples: 'e.g. passports, keys, envelopes', icon: FileText },
+            { id: 'Small Box', label: 'Small Box', desc: 'Max 2kg', examples: 'e.g. phones, clothes, books', icon: Package },
+            { id: 'Medium Box', label: 'Medium Box', desc: 'Max 5kg', examples: 'e.g. shoes, laptops, toasters', icon: Box },
+            { id: 'Large Box', label: 'Large Box', desc: 'Max 15kg', examples: 'e.g. microwaves, desktop pcs', icon: PackageOpen },
+            { id: 'Jumbo Box', label: 'Jumbo Box', desc: 'Max 30kg', examples: 'e.g. mini-fridges, seating', icon: Archive },
+            { id: 'Custom Dimensions', label: 'Custom', desc: 'Custom', examples: 'enter sizes below', icon: Ruler }
         ],
         'B': [
             { id: 'TVs', label: 'TVs (All Sizes)', desc: 'Secure transit' },
@@ -562,19 +662,31 @@ const Step2What = ({ data, update, next, prev }: any) => {
                         transition={{ duration: 0.2 }}
                         className="grid grid-cols-2 gap-3 max-h-[45vh] overflow-y-auto no-scrollbar p-1 pb-4"
                     >
-                        {activeItems.map((item) => {
+                        {activeItems.map((item: any) => {
                             const isSelected = data.subCategory === item.id;
+                            const isA = data.category === 'A';
                             return (
                                 <button
                                     key={item.id}
                                     onClick={() => update({ subCategory: item.id })}
-                                    className={`text-left p-3 rounded-xl border transition-all ${isSelected
-                                        ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500 shadow-sm scale-[1.02]'
+                                    className={`relative text-left p-2.5 rounded-xl border transition-all flex flex-col ${isSelected
+                                        ? 'border-brand-500 bg-brand-50 shadow-sm scale-[1.02] ring-1 ring-brand-500'
                                         : 'border-gray-200 bg-white hover:border-brand-200 hover:bg-gray-50'
-                                        }`}
+                                        } ${isA ? 'min-h-[85px] justify-start gap-1' : ''}`}
                                 >
-                                    <div className={`text-sm font-bold ${isSelected ? 'text-brand-900' : 'text-gray-900'}`}>{item.label}</div>
-                                    <div className={`text-xs mt-0.5 ${isSelected ? 'text-brand-600' : 'text-gray-500'}`}>{item.desc}</div>
+                                    {isA && item.icon && <item.icon className={`w-5 h-5 ${isSelected ? 'text-brand-600' : 'text-gray-400'}`} />}
+
+                                    <div className="w-full">
+                                        <div className={`text-[13px] font-bold ${isA ? 'pr-12' : ''} ${isSelected ? 'text-brand-900' : 'text-gray-900'}`}>{item.label}</div>
+                                        {!isA && <div className={`text-xs mt-0.5 ${isSelected ? 'text-brand-600' : 'text-gray-500'}`}>{item.desc}</div>}
+                                    </div>
+
+                                    {isA && (
+                                        <div className="w-full mt-auto flex flex-col">
+                                            {item.desc !== 'Custom' && <span className={`absolute top-2.5 right-2.5 text-[9px] font-bold px-1.5 py-0.5 rounded ${isSelected ? 'bg-brand-100 text-brand-700' : 'bg-gray-100 text-gray-500'}`}>{item.desc.replace('Max ', 'MAX ')}</span>}
+                                            <span className={`text-[10px] lowercase leading-tight block ${isSelected ? 'text-brand-600' : 'text-gray-500'}`}>{item.examples}</span>
+                                        </div>
+                                    )}
                                 </button>
                             );
                         })}
@@ -637,7 +749,8 @@ const Step3How = ({ data, update, next, prev }: any) => {
 
     const activeVehicle = VEHICLES.find(v => v.id === data.vehicle) || eligibleVehicles[0];
     const basePrice = activeVehicle ? (activeVehicle.pricePerKm * data.distanceKm) : 0;
-    const finalPrice = Math.max(150, data.serviceType === 'Express' ? basePrice * 1.5 : basePrice);
+    const finalPriceRaw = Math.max(150, data.serviceType === 'Express' ? basePrice * 1.5 : basePrice);
+    const finalPrice = Math.round(finalPriceRaw / 10) * 10;
 
     useEffect(() => {
         if (eligibleVehicles.length > 0 && !eligibleVehicles.find(v => v.id === data.vehicle)) {
@@ -667,17 +780,17 @@ const Step3How = ({ data, update, next, prev }: any) => {
                 })}
             </div>
 
-            <div className="flex gap-2 pb-2 pt-0.5 px-0.5 justify-start sm:justify-center mx-auto w-full max-w-full overflow-x-auto no-scrollbar snap-x">
+            <div className="flex gap-2 pb-2 pt-0.5 px-0.5 justify-center w-full max-w-full overflow-x-auto no-scrollbar snap-x">
                 {eligibleVehicles.length === 0 ? (
                     <div className="w-full p-3 bg-red-50 text-red-600 rounded-xl text-xs font-medium border border-red-100">No vehicles support these limits.</div>
                 ) : (
                     eligibleVehicles.map(v => (
                         <button
                             key={v.id} onClick={() => update({ vehicle: v.id })}
-                            className={`flex-shrink-0 w-[85px] snap-center p-2.5 rounded-[1rem] border flex flex-col items-center text-center transition-all duration-200 ${data.vehicle === v.id ? 'border-brand-500 bg-brand-50 shadow-sm ring-1 ring-brand-500 scale-[1.02]' : 'border-gray-200 bg-white hover:border-gray-300 scale-100'}`}
+                            className={`flex-shrink-0 w-[85px] snap-center p-2.5 rounded-[1rem] border flex flex-col items-center text-center transition-all duration-200 ${data.vehicle === v.id ? `border-gray-300 ${v.bgLight} shadow-sm ring-1 ring-gray-300 scale-[1.02]` : 'border-gray-200 bg-white hover:border-gray-300 scale-100'}`}
                         >
                             <div className={`p-1.5 rounded-full mb-2 ${data.vehicle === v.id ? 'bg-white shadow-sm' : 'bg-gray-50'}`}>
-                                <v.icon size={18} className={data.vehicle === v.id ? 'text-brand-600' : 'text-gray-400'} />
+                                <v.icon size={18} className={data.vehicle === v.id ? v.color : 'text-gray-400'} />
                             </div>
                             <div className="font-bold text-[11px] leading-tight text-gray-900 line-clamp-1">{v.label}</div>
                             <div className="text-[9px] font-medium text-gray-500 mt-0.5">≤ {v.maxWeight}kg</div>
@@ -686,15 +799,11 @@ const Step3How = ({ data, update, next, prev }: any) => {
                 )}
             </div>
 
-            <div className="flex items-center justify-between p-3.5 bg-gray-900 rounded-xl shadow-lg shadow-gray-900/10 mb-0">
-                <div className="flex flex-col">
-                    <span className="text-[9px] uppercase tracking-widest text-gray-400 font-bold">Total Price</span>
-                    <span className="text-xl font-black text-white leading-none mt-0.5">KES {finalPrice.toLocaleString()}</span>
-                </div>
-                <div className="flex gap-2">
-                    <button onClick={prev} className="px-3 bg-white/10 text-white rounded-lg flex items-center justify-center hover:bg-white/20"><ArrowLeft size={16} /></button>
-                    <button onClick={next} disabled={!data.vehicle} className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-bold flex items-center gap-1.5 hover:bg-gray-800 disabled:opacity-50">
-                        Confirm <ArrowRight size={14} />
+            <div className="flex items-center justify-end pt-2">
+                <div className="flex gap-2 w-full">
+                    <button onClick={prev} className="px-3 bg-gray-100 text-gray-700 rounded-xl flex items-center justify-center hover:bg-gray-200"><ArrowLeft size={16} /></button>
+                    <button onClick={next} disabled={!data.vehicle} className="flex-1 py-3.5 bg-gray-900 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 shadow-lg shadow-gray-900/20 disabled:opacity-50">
+                        Continue to Details <ArrowRight size={16} />
                     </button>
                 </div>
             </div>
@@ -703,35 +812,56 @@ const Step3How = ({ data, update, next, prev }: any) => {
 };
 
 // --- Step 4: WHO ---
-const Step4Who = ({ data, update, next, prev }: any) => (
-    <div className="space-y-3">
+const Step4Who = ({ data, update, next, prev }: any) => {
+    const recentReceivers = [
+        { name: 'Jane Doe', phone: '0712345678', id: '12345678' },
+        { name: 'John Smith', phone: '0722000111', id: '87654321' }
+    ];
 
-        <div className="space-y-2">
-            <input
-                type="text" placeholder="Receiver Name"
-                className="w-full px-3.5 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:bg-white focus:ring-2 focus:ring-brand-500 text-sm font-bold transition-all"
-                value={data.receiverName} onChange={e => update({ receiverName: e.target.value })}
-            />
-            <input
-                type="tel" placeholder="Phone Number"
-                className="w-full px-3.5 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:bg-white focus:ring-2 focus:ring-brand-500 text-sm font-bold transition-all"
-                value={data.receiverPhone} onChange={e => update({ receiverPhone: e.target.value })}
-            />
-            <input
-                type="text" placeholder="Recipient ID Number"
-                className="w-full px-3.5 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:bg-white focus:ring-2 focus:ring-brand-500 text-sm font-bold transition-all"
-                value={data.receiverId} onChange={e => update({ receiverId: e.target.value })}
-            />
-        </div>
+    return (
+        <div className="space-y-3">
+            <div className="mb-3">
+                <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Recent Receivers</label>
+                <div className="flex gap-2 mt-1.5 overflow-x-auto no-scrollbar pb-1 px-1 snap-x">
+                    {recentReceivers.map((r, i) => (
+                        <button
+                            key={i}
+                            onClick={() => update({ receiverName: r.name, receiverPhone: r.phone, receiverId: r.id })}
+                            className="flex-shrink-0 snap-start bg-white border border-gray-200 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-700 hover:border-brand-500 hover:text-brand-600 transition-colors shadow-sm"
+                        >
+                            {r.name}
+                        </button>
+                    ))}
+                </div>
+            </div>
 
-        <div className="flex gap-2 pt-1">
-            <button onClick={prev} className="px-4 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200"><ArrowLeft size={16} /></button>
-            <button onClick={next} disabled={!data.receiverName || !data.receiverPhone || !data.receiverId} className="flex-1 py-3 bg-gray-900 text-white rounded-xl text-sm font-bold flex flex-center gap-1.5 justify-center disabled:opacity-50">
-                Payment <ArrowRight size={16} />
-            </button>
+            <div className="space-y-2">
+                <input
+                    type="text" placeholder="Receiver Name"
+                    className="w-full px-3.5 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:bg-white focus:ring-2 focus:ring-brand-500 text-sm font-bold transition-all"
+                    value={data.receiverName} onChange={e => update({ receiverName: e.target.value })}
+                />
+                <input
+                    type="tel" placeholder="Phone Number"
+                    className="w-full px-3.5 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:bg-white focus:ring-2 focus:ring-brand-500 text-sm font-bold transition-all"
+                    value={data.receiverPhone} onChange={e => update({ receiverPhone: e.target.value })}
+                />
+                <input
+                    type="text" placeholder="Recipient ID Number"
+                    className="w-full px-3.5 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:bg-white focus:ring-2 focus:ring-brand-500 text-sm font-bold transition-all"
+                    value={data.receiverId} onChange={e => update({ receiverId: e.target.value })}
+                />
+            </div>
+
+            <div className="flex gap-2 pt-1">
+                <button onClick={prev} className="px-4 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200"><ArrowLeft size={16} /></button>
+                <button onClick={next} disabled={!data.receiverName || !data.receiverPhone || !data.receiverId} className="flex-1 py-3 bg-gray-900 text-white rounded-xl text-sm font-bold flex flex-center gap-1.5 justify-center disabled:opacity-50">
+                    Payment <ArrowRight size={16} />
+                </button>
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 // --- Step 5: PAYMENT ---
 const Step5Payment = ({ data, update, submit, prev }: any) => (
@@ -741,14 +871,16 @@ const Step5Payment = ({ data, update, submit, prev }: any) => (
         <div className="grid grid-cols-2 gap-2 pt-2 pb-1 px-1">
             <button
                 onClick={() => update({ paymentMethod: 'M-Pesa' })}
-                className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all ${data.paymentMethod === 'M-Pesa' ? 'border-green-500 bg-green-50 text-green-700 ring-1 ring-green-500 scale-[1.02]' : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'}`}
+                className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${data.paymentMethod === 'M-Pesa' ? 'border-green-500 bg-green-50 text-green-700 ring-1 ring-green-500 scale-[1.02]' : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'}`}
             >
-                <Smartphone size={24} className={data.paymentMethod === 'M-Pesa' ? 'text-green-600' : ''} />
-                <span className="font-bold text-sm">M-Pesa</span>
+                <div className="flex items-center justify-center h-8 mb-1">
+                    <img src="/assets/mpesa.png" alt="M-Pesa" className={`h-8 w-auto object-contain ${data.paymentMethod === 'M-Pesa' ? '' : 'grayscale opacity-60'}`} />
+                </div>
+                <span className="font-bold text-xs uppercase tracking-wider">Digital</span>
             </button>
             <button
                 onClick={() => update({ paymentMethod: 'Cash' })}
-                className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all ${data.paymentMethod === 'Cash' ? 'border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-500 scale-[1.02]' : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'}`}
+                className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all ${data.paymentMethod === 'Cash' ? 'border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-500 scale-[1.02]' : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'}`}
             >
                 <Banknote size={24} className={data.paymentMethod === 'Cash' ? 'text-brand-600' : ''} />
                 <span className="font-bold text-sm">Cash on Delivery</span>

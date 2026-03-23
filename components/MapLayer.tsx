@@ -150,12 +150,23 @@ const MapLayer: React.FC<MapLayerProps> = ({ driverLabel }) => {
     useEffect(() => {
         if (map && boundsToFit && boundsToFit.length > 0) {
             if (boundsToFit.length === 1) {
-                map.setCenter(boundsToFit[0]);
-                map.setZoom(13); // Reduced from 14
+                map.panTo(boundsToFit[0]);
+                let currentZoom = map.getZoom() || 13;
+                let targetZoom = 18;
+                if (currentZoom < targetZoom) {
+                    const zoomIn = setInterval(() => {
+                        currentZoom += 1;
+                        map.setZoom(currentZoom);
+                        if (currentZoom >= targetZoom) clearInterval(zoomIn);
+                    }, 100); // 100ms interval for seamless smooth zoom effect
+                } else {
+                    map.setZoom(targetZoom);
+                }
             } else {
                 const bounds = new google.maps.LatLngBounds();
                 boundsToFit.forEach(coord => bounds.extend(coord));
-                map.fitBounds(bounds, { top: 100, bottom: 100, left: 100, right: 100 }); // Increased padding from 50
+                // Add large bottom padding (300px) to keep the route completely visible above the bottom sheet!
+                map.fitBounds(bounds, { top: 70, bottom: 300, left: 70, right: 70 });
             }
             resetBoundsTrigger();
         }
@@ -200,7 +211,7 @@ const MapLayer: React.FC<MapLayerProps> = ({ driverLabel }) => {
                     styles: []
                 }}
             >
-                {userLocation && !pickupCoords && (
+                {userLocation && !pickupCoords && !isMapSelecting && (
                     <OverlayView
                         position={userLocation}
                         mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
@@ -443,7 +454,7 @@ const MapLayer: React.FC<MapLayerProps> = ({ driverLabel }) => {
                         onClick={() => {
                             if (userLocation && map) {
                                 map.panTo(userLocation);
-                                map.setZoom(15);
+                                map.setZoom(17);
                             } else {
                                 // Fallback if userLocation is not yet available in context
                                 if (navigator.geolocation) {
@@ -454,7 +465,7 @@ const MapLayer: React.FC<MapLayerProps> = ({ driverLabel }) => {
                                                 lng: position.coords.longitude,
                                             };
                                             map?.panTo(pos);
-                                            map?.setZoom(15);
+                                            map?.setZoom(17);
                                         },
                                         () => {
                                             // Handle error

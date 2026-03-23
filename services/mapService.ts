@@ -589,7 +589,7 @@ export const mapService = {
         // Try each stop as the final destination
         const routePromises = allStops.map(async (potentialEnd, index) => {
             const intermediates = allStops.filter((_, i) => i !== index);
-            const route = await mapService.getRoute(start, potentialEnd, intermediates, vehicleType, true);
+            const route = await mapService.getRoute(start, potentialEnd, intermediates, vehicleType, intermediates.length > 1);
             if (route) {
                 return { ...route, endStopIndex: index, originalIntermediates: intermediates };
             }
