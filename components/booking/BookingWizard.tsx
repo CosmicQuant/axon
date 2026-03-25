@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { mapService } from '../../services/mapService';
 import { useMapState } from '@/context/MapContext';
@@ -131,7 +131,10 @@ export default function BookingWizard({ prefillData, onOrderComplete, onCollapse
                     const route = await mapService.getFullyOptimizedRoute(pickupCoords, allStops, data.vehicle || 'Boda Boda');
                     if (route) {
                         setRoutePolyline(route.geometry);
-                        fitBounds([pickupCoords, ...allStops]);
+                        // Only fit bounds if we have stops, otherwise it zooms strangely.
+                        if (allStops.length > 0) {
+                            fitBounds([pickupCoords, ...allStops]);
+                        }
                         const distKm = route.distance / 1000;
                         const now = new Date();
                         now.setSeconds(now.getSeconds() + route.duration);
@@ -326,7 +329,20 @@ const Step1Where = ({ data, update, next }: any) => {
     const [pickupSuggestions, setPickupSuggestions] = useState<any[]>([]);
     const [dropoffSuggestions, setDropoffSuggestions] = useState<any[]>([]);
 
-    const { setPickupCoords, setWaypointCoords, waypointCoords, setDropoffCoords, setIsMapSelecting, setActiveInput, isMapSelecting, activeInput, mapCenter, setMapCenter, fitBounds, requestUserLocation } = useMapState();
+    // Reference for Dropoff input to handle auto-focus optionally
+    const dropoffInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (activeTab === 'dropoff' && !data.dropoff && data.waypoints.length === 0) {
+            const timer = setTimeout(() => {
+                update({ isSearchingText: true });
+                dropoffInputRef.current?.focus();
+            }, 250); // wait slightly longer than the 200ms onBlur timeout from Pickup to avoid race conditions
+            return () => clearTimeout(timer);
+        }
+    }, [activeTab]);
+
+    const { pickupCoords, dropoffCoords, setPickupCoords, setWaypointCoords, waypointCoords, setDropoffCoords, setIsMapSelecting, setActiveInput, isMapSelecting, activeInput, mapCenter, setMapCenter, fitBounds, requestUserLocation } = useMapState();
 
     const handlePickupChange = async (val: string) => {
         update({ pickup: val });
@@ -368,6 +384,8 @@ const Step1Where = ({ data, update, next }: any) => {
             const newCoords = [...waypointCoords, { lat: resolved.lat, lng: resolved.lng }];
             update({ waypoints: newWp, dropoff: '' });
             setWaypointCoords(newCoords);
+            // Removing fitBounds here so we don't have a jarring double-animation
+            // when calculateRoute triggers its own fitBounds 800ms later.
         }
     };
 
@@ -496,12 +514,13 @@ const Step1Where = ({ data, update, next }: any) => {
                                                         <div className="flex flex-col items-center relative group w-[80px]">
                                                             <div className={`w-4 h-4 ${isLastStop ? 'bg-red-500' : ['bg-orange-500', 'bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-teal-500'][idx % 5]} rounded-full border-[3px] border-white shadow-sm z-10`} />
                                                             <span className={`text-[11px] font-bold ${isLastStop ? 'text-red-500' : 'text-gray-900'} truncate w-full text-center px-1 mt-1`} title={wp}>
-                                                                {isLastStop ? 'Final Dropoff' : wp.split(',')[0]}
+                                                                {wp.split(',')[0]}
                                                             </span>
                                                             <button onClick={() => {
                                                                 if (isFinalDropoff) {
                                                                     update({ dropoff: '' });
                                                                     setDropoffCoords(null);
+                                                                    if (pickupCoords) { setTimeout(() => { if (typeof fitBounds === 'function') fitBounds([pickupCoords, ...waypointCoords].filter(Boolean) as any); }, 150); }
                                                                 } else {
                                                                     const newWp = data.waypoints.filter((_: any, i: number) => i !== idx);
                                                                     const newCoords = waypointCoords.filter((_: any, i: number) => i !== idx);
@@ -522,8 +541,7 @@ const Step1Where = ({ data, update, next }: any) => {
                         )}
                         <div className="relative">
                             <MapPin className={`absolute left-4 top-1/2 -translate-y-1/2 ${maxDropoffsReached ? 'text-gray-400' : 'text-brand-600'}`} size={24} />
-                            <input
-                                type="text" placeholder={maxDropoffsReached ? "Max dropoffs reached (5)" : (data.waypoints.length > 0 ? "Search another dropoff" : "Search Dropoff Location")}
+                            <input ref={dropoffInputRef} type="text" placeholder={maxDropoffsReached ? "Max dropoffs reached (5)" : (data.waypoints.length > 0 ? "Search another dropoff" : "Search Dropoff Location")}
                                 className="w-full pl-12 pr-20 py-4 rounded-xl bg-gray-50 border border-gray-200 focus:ring-2 focus:ring-brand-500 focus:bg-white text-gray-900 text-base font-bold transition-all disabled:opacity-50 min-h-[56px]"
                                 value={data.dropoff}
                                 onFocus={() => {
@@ -578,6 +596,7 @@ const Step1Where = ({ data, update, next }: any) => {
                                         const newCoords = [...waypointCoords, { lat: mapCenter.lat, lng: mapCenter.lng }];
                                         update({ waypoints: newWp, dropoff: "" });
                                         setWaypointCoords(newCoords);
+                                        if (pickupCoords) { setTimeout(() => { if (typeof fitBounds === 'function') fitBounds([pickupCoords, ...newCoords, data.dropoff ? dropoffCoords : null].filter(Boolean) as any); }, 150); }
                                     } else {
                                         next();
                                     }
@@ -906,3 +925,10 @@ const Step5Payment = ({ data, update, submit, prev }: any) => (
         </div>
     </div>
 );
+
+
+
+
+
+
+
