@@ -4,10 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import {
    ArrowRight, Box, ShieldCheck, Zap, MapPin, Truck, Clock, Smartphone,
    ChevronRight, CheckCircle2, Building2, Star, Navigation, Package,
-   Users, Map, Bike, Car, Search, Home, Rocket, Shield, Briefcase,
+   Users, Map, Bike, Car, Home, Rocket, Shield, Briefcase,
    Brain, Eye, LayoutGrid, Globe, ShieldAlert, CreditCard
 } from 'lucide-react';
-import { parseNaturalLanguageOrder } from '../services/geminiService';
+
 import { mapService } from '../services/mapService';
 import { useAuth } from '../context/AuthContext';
 import { usePrompt } from '../context/PromptContext';
@@ -21,14 +21,6 @@ interface HeroProps {
    onDriverClick?: () => void;
 }
 
-const PLACEHOLDERS = [
-   "e.g. Laptop from Westlands to CBD...",
-   "e.g. Containers from Mombasa port to warehouse in Nairobi Industrial Area...",
-   "e.g. 20 90kg sacks of potatoes from Meru to Muthurwa...",
-   "e.g. Dawa from Chemist to South B...",
-   "e.g. Pick docs Upperhill drop Karen..."
-];
-
 const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick, onDriverClick }) => {
    const { user, logout } = useAuth();
    const { showConfirm } = usePrompt();
@@ -36,6 +28,9 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick, onDriverCl
    const [quickInput, setQuickInput] = useState('');
    const [isAnalyzing, setIsAnalyzing] = useState(false);
    const [historyDestinations, setHistoryDestinations] = useState<any[]>([]);
+   const [suggestions, setSuggestions] = useState<Array<{ label: string, lat: number, lng: number }>>([]);
+   const [showSuggestions, setShowSuggestions] = useState(false);
+   const suggestionsRef = useRef<HTMLDivElement>(null);
 
    // Fetch User History for Quick Destinations
    useEffect(() => {
@@ -63,13 +58,6 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick, onDriverCl
       fetchHistory();
    }, [user]);
 
-   // Placeholder Typing Effect State
-   const [placeholder, setPlaceholder] = useState('');
-   const [isDeleting, setIsDeleting] = useState(false);
-   const [loopNum, setLoopNum] = useState(0);
-
-   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
    const requestUserLocation = (): Promise<{ lat: number, lng: number } | null> => {
       return new Promise((resolve) => {
          if (!navigator.geolocation) {
@@ -93,100 +81,88 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick, onDriverCl
       });
    };
 
+
+
+   // Google Places suggestions for dropoff
    useEffect(() => {
-      let timer: ReturnType<typeof setTimeout>;
-      const i = loopNum % PLACEHOLDERS.length;
-      const fullText = PLACEHOLDERS[i];
-
-      if (isDeleting) {
-         // Deleting Speed
-         timer = setTimeout(() => {
-            setPlaceholder(prev => prev.slice(0, -1));
-            if (placeholder.length <= 1) {
-               setIsDeleting(false);
-               setLoopNum(l => l + 1);
-            }
-         }, 10);
-      } else {
-         // Typing Speed
-         if (placeholder.length < fullText.length) {
-            timer = setTimeout(() => {
-               setPlaceholder(fullText.slice(0, placeholder.length + 1));
-            }, 20);
-         } else {
-            // Pause at end before deleting
-            timer = setTimeout(() => {
-               setIsDeleting(true);
-            }, 1500);
-         }
-      }
-      return () => clearTimeout(timer);
-   }, [placeholder, isDeleting, loopNum]);
-
-   // Auto-grow effect
-   useEffect(() => {
-      if (textareaRef.current) {
-         textareaRef.current.style.height = 'auto';
-         textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-      }
-   }, [quickInput]);
-
-   const performSearch = async (input: string) => {
-      if (!input.trim()) {
-         if (onStartBooking) {
-            onStartBooking();
-         } else {
-            navigate('/book');
-         }
+      if (!quickInput || quickInput.length < 2) {
+         setSuggestions([]);
          return;
       }
+      const timer = setTimeout(async () => {
+         try {
+            const results = await mapService.getSuggestions(quickInput);
+            setSuggestions(results);
+            setShowSuggestions(results.length > 0);
+         } catch (e) {
+            console.error('Suggestions error:', e);
+         }
+      }, 300);
+      return () => clearTimeout(timer);
+   }, [quickInput]);
 
+   // Close suggestions on outside click
+   useEffect(() => {
+      const handleClickOutside = (e: MouseEvent) => {
+         if (suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node)) {
+            setShowSuggestions(false);
+         }
+      };
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+   }, []);
+
+   const handleDropoffSelect = async (destination: string) => {
+      if (checkDriverRole()) return;
+      setQuickInput(destination);
+      setShowSuggestions(false);
       setIsAnalyzing(true);
-      const result = await parseNaturalLanguageOrder(input);
 
-      if (result) {
-         // Professionalize locations using Google Maps
-         const prefill: any = { ...result };
-
-         // If no pickup specified, try to get current location
-         if (!result.pickup || result.pickup.toLowerCase().includes('current location')) {
-            const coords = await requestUserLocation();
-            if (coords) {
-               const address = await mapService.reverseGeocode(coords.lat, coords.lng);
-               if (address) prefill.pickup = address;
-            }
-         } else {
-            const geo = await mapService.geocodeAddress(result.pickup);
-            if (geo) prefill.pickup = geo.formattedAddress;
+      try {
+         // Get current location as pickup
+         const coords = await requestUserLocation();
+         let pickupAddress = '';
+         let pickupCoordsData: { lat: number, lng: number } | null = null;
+         if (coords) {
+            pickupCoordsData = coords;
+            const address = await mapService.reverseGeocode(coords.lat, coords.lng);
+            if (address) pickupAddress = address;
          }
 
-         if (result.dropoff) {
-            const geo = await mapService.geocodeAddress(result.dropoff);
-            if (geo) prefill.dropoff = geo.formattedAddress;
+         // Geocode the dropoff
+         const dropoffGeo = await mapService.geocodeAddress(destination);
+         let dropoffAddress = destination;
+         let dropoffCoordsData: { lat: number, lng: number } | null = null;
+         if (dropoffGeo) {
+            dropoffAddress = dropoffGeo.formattedAddress || destination;
+            dropoffCoordsData = { lat: dropoffGeo.lat, lng: dropoffGeo.lng };
          }
+
+         const prefill: any = {
+            pickup: pickupAddress,
+            dropoff: dropoffAddress,
+            pickupCoords: pickupCoordsData,
+            dropoffCoords: dropoffCoordsData,
+            activeTab: 'dropoff',
+            itemDescription: 'Package'
+         };
 
          setIsAnalyzing(false);
+         setQuickInput('');
          if (onStartBooking) {
             onStartBooking(prefill);
          } else {
             navigate('/book', { state: { prefill } });
          }
-      } else {
+      } catch (e) {
+         console.error('Dropoff select error:', e);
          setIsAnalyzing(false);
-         // Fallback if AI fails or returns empty: Use the raw input as the item description
-         // Also try to get current location for fallback
-         const coords = await requestUserLocation();
-         let pickup = '';
-         if (coords) {
-            const address = await mapService.reverseGeocode(coords.lat, coords.lng);
-            if (address) pickup = address;
-         }
-
-         const fallbackPrefill = { itemDescription: input, pickup };
+         // Fallback: navigate with just the dropoff
+         const prefill = { dropoff: destination, itemDescription: 'Package' };
          if (onStartBooking) {
-            onStartBooking(fallbackPrefill);
+            onStartBooking(prefill);
          } else {
-            navigate('/book', { state: { prefill: fallbackPrefill } });
+            navigate('/book', { state: { prefill } });
          }
       }
    };
@@ -194,11 +170,14 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick, onDriverCl
    const handleQuickSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (checkDriverRole()) return;
-      performSearch(quickInput);
+      if (quickInput.trim()) {
+         handleDropoffSelect(quickInput.trim());
+      }
    };
 
-   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       setQuickInput(e.target.value);
+      if (e.target.value.length >= 2) setShowSuggestions(true);
    };
 
    // Helper to check if user is a driver and block booking
@@ -236,8 +215,8 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick, onDriverCl
 
       const prefill = {
          vehicle: vehicleType,
-         itemDescription: vehicleType === VehicleType.BODA ? "Boda Boda Delivery" : 
-                          vehicleType === VehicleType.TUKTUK ? "Tuktuk Small Load" : "Vehicle Delivery"
+         itemDescription: vehicleType === VehicleType.BODA ? "Boda Boda Delivery" :
+            vehicleType === VehicleType.TUKTUK ? "Tuktuk Small Load" : "Vehicle Delivery"
       };
 
       if (onStartBooking) {
@@ -249,17 +228,7 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick, onDriverCl
 
    const handleQuickTap = (destination: string) => {
       if (checkDriverRole()) return;
-
-      const prefill = {
-         dropoff: destination,
-         itemDescription: 'Package'
-      };
-
-      if (onStartBooking) {
-         onStartBooking(prefill);
-      } else {
-         navigate('/book', { state: { prefill } });
-      }
+      handleDropoffSelect(destination);
    };
 
    const handleBusinessClick = () => {
@@ -473,7 +442,7 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick, onDriverCl
                   ) : user && user.role !== 'driver' ? (
                      /* LOGGED IN VIEW: Customer (2 Rows: Service Types + Vehicles) */
                      <>
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-2 gap-3">
                            {/* Express */}
                            <div onClick={() => onStartBooking?.({ serviceType: ServiceType.EXPRESS })} className="bg-brand-600 p-3 rounded-[1.5rem] shadow-xl border border-brand-500 flex flex-col justify-between h-28 cursor-pointer hover:bg-brand-700 hover:-translate-y-1 transition-all group">
                               <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center text-white backdrop-blur-sm group-hover:bg-white/30 transition-colors">
@@ -492,16 +461,6 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick, onDriverCl
                               <div>
                                  <h3 className="text-xs sm:text-sm font-black text-white leading-tight mb-1">Standard<br />Parcel</h3>
                                  <p className="text-[8px] sm:text-[9px] text-blue-100 font-bold uppercase tracking-tight leading-tight">Same Day Delivery</p>
-                              </div>
-                           </div>
-                           {/* Economy */}
-                           <div onClick={() => onStartBooking?.({ serviceType: ServiceType.ECONOMY })} className="bg-slate-900 p-3 rounded-[1.5rem] shadow-xl border border-slate-700 flex flex-col justify-between h-28 cursor-pointer hover:bg-slate-800 hover:-translate-y-1 transition-all group">
-                              <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center text-white backdrop-blur-sm group-hover:bg-white/30 transition-colors">
-                                 <ShieldCheck className="w-4 h-4" />
-                              </div>
-                              <div>
-                                 <h3 className="text-xs sm:text-sm font-black text-white leading-tight mb-1">Economy<br />Saver</h3>
-                                 <p className="text-[8px] sm:text-[9px] text-slate-400 font-bold uppercase tracking-tight leading-tight">Next Day Delivery</p>
                               </div>
                            </div>
                         </div>
@@ -590,35 +549,47 @@ const Hero: React.FC<HeroProps> = ({ onStartBooking, onBusinessClick, onDriverCl
                   )}
                </div>
 
-               {/* Smart Input - Bolt Style */}
-               <div className="max-w-2xl mx-auto w-full pt-1 mb-4">
+               {/* Dropoff Location Picker */}
+               <div className="max-w-2xl mx-auto w-full pt-1 mb-4" ref={suggestionsRef}>
                   <form onSubmit={handleQuickSubmit} className="relative group">
                      <div className="absolute -inset-1 bg-gradient-to-r from-brand-400 to-green-300 rounded-2xl blur opacity-10 group-hover:opacity-20 transition duration-1000"></div>
 
                      <div className="relative bg-white rounded-2xl shadow-xl p-1.5 flex items-center gap-2 border border-gray-100 focus-within:ring-2 focus-within:ring-brand-500/30 transition-all duration-300">
                         <div className="pl-3 self-center">
-                           <Search className="w-5 h-5 text-gray-400" />
+                           <MapPin className="w-5 h-5 text-brand-500" />
                         </div>
-                        <textarea
-                           ref={textareaRef}
-                           rows={2}
-                           className="flex-1 min-w-0 bg-transparent border-none focus:ring-0 text-gray-900 placeholder-slate-400 text-sm sm:text-lg font-medium py-2 sm:py-3 resize-none overflow-y-auto leading-relaxed h-[60px] sm:h-[80px]"
-                           placeholder={placeholder || "Where to?"}
+                        <input
+                           type="text"
+                           className="flex-1 min-w-0 bg-transparent border-none focus:ring-0 text-gray-900 placeholder-slate-400 text-sm sm:text-lg font-medium py-3 sm:py-4"
+                           placeholder="Where are you sending to?"
                            value={quickInput}
-                           onChange={handleTextareaChange}
+                           onChange={handleInputChange}
+                           onFocus={() => quickInput.length >= 2 && suggestions.length > 0 && setShowSuggestions(true)}
+                           autoComplete="off"
                         />
-                        <button
-                           type="submit"
-                           disabled={isAnalyzing || !quickInput.trim()}
-                           className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 sm:px-5 rounded-xl transition-all font-bold text-xs sm:text-sm mr-1 shadow-md disabled:opacity-50"
-                        >
-                           {isAnalyzing ? (
-                              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                           ) : (
-                              <ArrowRight className="w-4 h-4" />
-                           )}
-                        </button>
+                        {isAnalyzing && (
+                           <div className="pr-3">
+                              <div className="w-5 h-5 border-2 border-brand-300 border-t-brand-600 rounded-full animate-spin" />
+                           </div>
+                        )}
                      </div>
+
+                     {/* Suggestions Dropdown */}
+                     {showSuggestions && suggestions.length > 0 && (
+                        <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50 max-h-[240px] overflow-y-auto">
+                           {suggestions.map((s, i) => (
+                              <button
+                                 key={i}
+                                 type="button"
+                                 onClick={() => handleDropoffSelect(s.label)}
+                                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-brand-50 transition-colors text-left border-b border-gray-50 last:border-0"
+                              >
+                                 <MapPin className="w-4 h-4 text-brand-500 flex-shrink-0" />
+                                 <span className="text-sm text-gray-800 font-medium truncate">{s.label}</span>
+                              </button>
+                           ))}
+                        </div>
+                     )}
                   </form>
 
                   {/* Quick Tap Destinations */}

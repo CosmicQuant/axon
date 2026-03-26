@@ -29,6 +29,8 @@ interface BookingState {
     receiverId: string;
     paymentMethod: PaymentMethod;
     paymentPhone: string;
+    isScheduled: boolean;
+    pickupTime: string;
     isSearchingText?: boolean;
 }
 
@@ -37,7 +39,8 @@ const INITIAL_STATE: BookingState = {
     category: 'A', subCategory: '', dimensions: { length: '', width: '', height: '', weight: '' }, imageUploaded: false,
     vehicle: '', serviceType: 'Express',
     receiverName: '', receiverPhone: '', receiverId: '',
-    paymentMethod: 'M-Pesa', paymentPhone: '0712345678'
+    paymentMethod: 'M-Pesa', paymentPhone: '0712345678',
+    isScheduled: false, pickupTime: ''
 };
 
 const VEHICLES = [
@@ -48,6 +51,15 @@ const VEHICLES = [
     { id: 'pickup', label: 'Pick-up', maxDist: 9999, maxWeight: 2000, allowedCats: ['B', 'C'], pricePerKm: 100, icon: Truck, color: 'text-emerald-500', bgColor: 'bg-emerald-500', bgLight: 'bg-emerald-50' },
     { id: 'truck', label: 'Trucks', maxDist: 9999, maxWeight: 5000, allowedCats: ['C'], pricePerKm: 200, icon: Truck, color: 'text-slate-700', bgColor: 'bg-slate-700', bgLight: 'bg-slate-50' }
 ];
+
+// Map Dedicated subcategories to vehicle IDs
+const DEDICATED_VEHICLE_MAP: Record<string, string> = {
+    'Cargo Tuk-Tuk': 'tuktuk',
+    'Station Wagon': 'probox',
+    '1-Ton Pick-up': 'pickup',
+    '3-Ton Canter': 'truck',
+    '10-Ton Lorry': 'truck'
+};
 
 // --- Animation Variants ---
 const slideVariants = {
@@ -69,15 +81,43 @@ export default function BookingWizard({ prefillData, onOrderComplete, onCollapse
     const [direction, setDirection] = useState(0);
     const [data, setData] = useState<BookingState>(INITIAL_STATE);
 
-    const nextStep = () => { if (step < 4) { setDirection(1); setStep(s => s + 1); } };
-    const prevStep = () => { if (step > 0) { setDirection(-1); setStep(s => s - 1); } };
+    const nextStep = (skipTo?: number) => {
+        const target = typeof skipTo === 'number' ? skipTo : step + 1;
+        if (target <= 4) { setDirection(1); setStep(target); }
+    };
+    const prevStep = (skipTo?: number) => {
+        const target = typeof skipTo === 'number' ? skipTo : step - 1;
+        if (target >= 0) { setDirection(-1); setStep(target); }
+    };
 
     const handleUpdate = (updates: Partial<BookingState>) => setData(prev => ({ ...prev, ...updates }));
 
     const { pickupCoords, dropoffCoords, waypointCoords, setRoutePolyline, setIsMapSelecting, setActiveInput, setPickupCoords, setWaypointCoords, setDropoffCoords, userLocation, requestUserLocation, isMapSelecting, activeInput, mapCenter, fitBounds } = useMapState();
 
+    // Consume prefillData on mount
     useEffect(() => {
-        // Request accurate user location on load
+        if (prefillData) {
+            const updates: Partial<BookingState> = {};
+            if (prefillData.pickup) updates.pickup = prefillData.pickup;
+            if (prefillData.dropoff) updates.dropoff = prefillData.dropoff;
+            if (prefillData.serviceType) updates.serviceType = prefillData.serviceType;
+            if (prefillData.vehicle) updates.vehicle = prefillData.vehicle;
+            if (prefillData.activeTab) updates.activeTab = prefillData.activeTab;
+            if (Object.keys(updates).length > 0) handleUpdate(updates);
+
+            if (prefillData.pickupCoords) setPickupCoords(prefillData.pickupCoords);
+            if (prefillData.dropoffCoords) setDropoffCoords(prefillData.dropoffCoords);
+
+            // If both coords are provided, fit bounds to show the route
+            if (prefillData.pickupCoords && prefillData.dropoffCoords) {
+                fitBounds([prefillData.pickupCoords, prefillData.dropoffCoords]);
+            }
+        }
+    }, []); // Run only once on mount
+
+    useEffect(() => {
+        // Request accurate user location on load (skip if prefill already has pickup)
+        if (prefillData?.pickup || prefillData?.pickupCoords) return;
         requestUserLocation().then(loc => {
             if (loc && !data.pickup && !pickupCoords && !isMapSelecting) {
                 setActiveInput('pickup');
@@ -172,11 +212,15 @@ export default function BookingWizard({ prefillData, onOrderComplete, onCollapse
             } else {
                 setRoutePolyline(null);
                 handleUpdate({ distanceKm: 0, etaTime: '' });
+                // No stops left — zoom back in to pickup location
+                if (pickupCoords) {
+                    fitBounds([pickupCoords]);
+                }
             }
         };
         const timer = setTimeout(calculateRoute, 800);
         return () => clearTimeout(timer);
-    }, [pickupCoords, waypointCoords, dropoffCoords, data.vehicle]);
+    }, [pickupCoords, waypointCoords, dropoffCoords]);
 
     const weightVal = parseFloat(data.dimensions.weight) || 0;
     const eligibleVehicles = VEHICLES.filter(v => {
@@ -190,12 +234,30 @@ export default function BookingWizard({ prefillData, onOrderComplete, onCollapse
     const currentQuote = Math.round(Math.max(150, data.serviceType === 'Express' ? liveBasePrice * 1.5 : liveBasePrice) / 10) * 10;
 
     const submitBooking = () => {
+        // Resolve the final destination: if dropoff is empty (all destinations pushed to waypoints),
+        // use the last waypoint as the actual dropoff and the rest as intermediate stops
+        let finalDropoffAddress = data.dropoff;
+        let finalDropoffCoords = dropoffCoords;
+        let intermediateWaypoints = [...data.waypoints];
+        let intermediateCoords = [...waypointCoords];
+
+        if (!finalDropoffAddress && intermediateWaypoints.length > 0) {
+            finalDropoffAddress = intermediateWaypoints[intermediateWaypoints.length - 1];
+            finalDropoffCoords = intermediateCoords[intermediateCoords.length - 1] || null;
+            intermediateWaypoints = intermediateWaypoints.slice(0, -1);
+            intermediateCoords = intermediateCoords.slice(0, -1);
+        }
+
+        const generateCode = () => Math.floor(1000 + Math.random() * 9000).toString();
+        const dropoffCode = generateCode();
+
         const newOrder = {
             id: `ORD-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
             pickup: data.pickup,
-            dropoff: data.dropoff,
+            dropoff: finalDropoffAddress,
             pickupCoords: pickupCoords || { lat: 0, lng: 0 },
-            dropoffCoords: dropoffCoords || { lat: 0, lng: 0 },
+            dropoffCoords: finalDropoffCoords || { lat: 0, lng: 0 },
+            pickupTime: data.isScheduled ? data.pickupTime : 'ASAP',
             vehicle: data.vehicle,
             items: {
                 itemDesc: `${data.category} - ${data.subCategory}`,
@@ -211,18 +273,30 @@ export default function BookingWizard({ prefillData, onOrderComplete, onCollapse
             sender: { name: 'Customer', phone: '' },
             recipient: { name: data.receiverName || 'Receiver', phone: data.receiverPhone || '' },
             paymentMethod: data.paymentMethod || 'MPESA',
-            verificationCode: Math.floor(1000 + Math.random() * 9000).toString(),
+            verificationCode: dropoffCode,
             serviceType: data.serviceType || 'Standard (Same Day)',
-            stops: data.waypoints.map((addr, idx) => ({
-                id: `wp-${idx}`,
-                address: addr,
-                lat: waypointCoords[idx]?.lat || 0,
-                lng: waypointCoords[idx]?.lng || 0,
-                type: 'waypoint',
-                status: 'pending',
-                verificationCode: Math.floor(1000 + Math.random() * 9000).toString(),
-                sequenceOrder: idx + 1
-            }))
+            stops: [
+                ...intermediateWaypoints.map((addr, idx) => ({
+                    id: `wp-${idx}`,
+                    address: addr,
+                    lat: intermediateCoords[idx]?.lat || 0,
+                    lng: intermediateCoords[idx]?.lng || 0,
+                    type: 'waypoint' as const,
+                    status: 'pending' as const,
+                    verificationCode: generateCode(),
+                    sequenceOrder: idx + 1
+                })),
+                {
+                    id: 'dropoff-end',
+                    address: finalDropoffAddress,
+                    lat: finalDropoffCoords?.lat || 0,
+                    lng: finalDropoffCoords?.lng || 0,
+                    type: 'dropoff' as const,
+                    status: 'pending' as const,
+                    verificationCode: dropoffCode,
+                    sequenceOrder: intermediateWaypoints.length + 1
+                }
+            ]
         };
 
         if (onOrderComplete) {
@@ -247,6 +321,7 @@ export default function BookingWizard({ prefillData, onOrderComplete, onCollapse
                     <div className="w-12 h-1 bg-gray-200 rounded-full mb-3" />
                     <div className="w-full flex justify-between mt-1 items-end">
                         {(() => {
+                            const isDedicated = data.category === 'C';
                             const STEP_INFO = [
                                 { title: 'Route', icon: Navigation },
                                 { title: 'Cargo Type', icon: Box },
@@ -255,15 +330,18 @@ export default function BookingWizard({ prefillData, onOrderComplete, onCollapse
                                 { title: 'Payment Option', icon: Banknote }
                             ];
                             const ActiveStepIcon = STEP_INFO[step].icon;
+                            const displayStep = isDedicated && step > 2 ? step : step + 1;
+                            const totalSteps = isDedicated ? 4 : 5;
+                            const displayStepNum = isDedicated ? (step <= 1 ? step + 1 : step) : step + 1;
                             return (
                                 <span className="flex items-center gap-1.5 text-[10px] font-black text-brand-600 uppercase tracking-widest bg-brand-50/50 px-2 py-1 rounded-md mb-2 mt-[-4px]">
-                                    <ActiveStepIcon size={12} strokeWidth={3} /> {step === 0 ? (data.activeTab === "pickup" ? "Pickup Point" : (data.waypoints.length > 0 ? "Drop offs" : "Drop off")) : STEP_INFO[step].title} ({step + 1}/5)
+                                    <ActiveStepIcon size={12} strokeWidth={3} /> {step === 0 ? (data.activeTab === "pickup" ? "Pickup Point" : (data.waypoints.length > 0 ? "Drop offs" : "Drop off")) : STEP_INFO[step].title} ({displayStepNum}/{totalSteps})
                                 </span>
                             );
                         })()}
                         <div className="flex flex-col items-end gap-1.5 mt-[-4px]">
                             <AnimatePresence>
-                                {(data.distanceKm > 0 || data.calculatingRoute) && (
+                                {step >= 2 && (data.distanceKm > 0 || data.calculatingRoute) && (
                                     <motion.div
                                         initial={{ opacity: 0, y: 5 }}
                                         animate={{ opacity: 1, y: 0 }}
@@ -309,8 +387,8 @@ export default function BookingWizard({ prefillData, onOrderComplete, onCollapse
                         >
                             {step === 0 && <Step1Where data={data} update={handleUpdate} next={nextStep} />}
                             {step === 1 && <Step2What data={data} update={handleUpdate} next={nextStep} prev={prevStep} />}
-                            {step === 2 && <Step3How data={data} update={handleUpdate} next={nextStep} prev={prevStep} />}
-                            {step === 3 && <Step4Who data={data} update={handleUpdate} next={nextStep} prev={prevStep} />}
+                            {step === 2 && <Step3How data={data} update={handleUpdate} next={nextStep} prev={prevStep} isDedicated={data.category === 'C'} />}
+                            {step === 3 && <Step4Who data={data} update={handleUpdate} next={nextStep} prev={prevStep} isDedicated={data.category === 'C'} />}
                             {step === 4 && <Step5Payment data={data} update={handleUpdate} submit={submitBooking} prev={prevStep} />}
                         </motion.div>
                     </AnimatePresence>
@@ -526,6 +604,11 @@ const Step1Where = ({ data, update, next }: any) => {
                                                                     const newCoords = waypointCoords.filter((_: any, i: number) => i !== idx);
                                                                     update({ waypoints: newWp });
                                                                     setWaypointCoords(newCoords);
+                                                                    // Smoothly re-frame the map around remaining points
+                                                                    if (pickupCoords) {
+                                                                        const remaining = [pickupCoords, ...newCoords].filter(Boolean);
+                                                                        setTimeout(() => fitBounds(remaining as any), 150);
+                                                                    }
                                                                 }
                                                             }} className="absolute -top-1 -right-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-red-50 hover:bg-red-100 p-1 rounded-full z-20 shadow-sm border border-red-100 cursor-pointer">
                                                                 <X size={10} className="text-red-500" />
@@ -585,23 +668,71 @@ const Step1Where = ({ data, update, next }: any) => {
                             </div>
                             <SuggestionsList suggestions={dropoffSuggestions} onSelect={handleDropoffSelect} />
                         </div>
+                        {/* Schedule Delivery Toggle */}
+                        {(data.waypoints.length > 0 || data.dropoff) && !isMapSelecting && (
+                            <div className="space-y-2">
+                                <div className="flex bg-gray-100 p-1 rounded-xl">
+                                    <button
+                                        onClick={() => update({ isScheduled: false, pickupTime: '' })}
+                                        className={`flex-1 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${!data.isScheduled ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}
+                                    >
+                                        <Zap size={14} className={!data.isScheduled ? 'text-brand-600' : 'text-gray-400'} /> Send Now
+                                    </button>
+                                    <button
+                                        onClick={() => update({ isScheduled: true })}
+                                        className={`flex-1 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${data.isScheduled ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}
+                                    >
+                                        <Clock size={14} className={data.isScheduled ? 'text-brand-600' : 'text-gray-400'} /> Schedule
+                                    </button>
+                                </div>
+                                <AnimatePresence>
+                                    {data.isScheduled && (
+                                        <motion.div
+                                            initial={{ opacity: 0, height: 0 }}
+                                            animate={{ opacity: 1, height: 'auto' }}
+                                            exit={{ opacity: 0, height: 0 }}
+                                            className="overflow-hidden"
+                                        >
+                                            <input
+                                                type="datetime-local"
+                                                value={data.pickupTime}
+                                                onChange={e => update({ pickupTime: e.target.value })}
+                                                min={new Date().toISOString().slice(0, 16)}
+                                                className="w-full px-3.5 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:bg-white focus:ring-2 focus:ring-brand-500 text-sm font-bold text-gray-900 transition-all"
+                                            />
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        )}
                         <div className="flex gap-2 mt-4">
                             <button onClick={() => setActiveTab('pickup')} className="w-12 bg-gray-100 text-gray-700 rounded-xl flex items-center justify-center hover:bg-gray-200"><ArrowLeft size={16} /></button>
                             <button
-                                onClick={() => {
-                                    if (data.dropoff && isMapSelecting && mapCenter && activeInput === 'dropoff') {
+                                onClick={async () => {
+                                    if (isMapSelecting && mapCenter && activeInput === 'dropoff') {
+                                        // Capture the pin coordinates at click time
+                                        const pinnedCoords = { lat: mapCenter.lat, lng: mapCenter.lng };
                                         setIsMapSelecting(false);
-                                        const address = data.dropoff;
-                                        const newWp = [...data.waypoints, address];
-                                        const newCoords = [...waypointCoords, { lat: mapCenter.lat, lng: mapCenter.lng }];
-                                        update({ waypoints: newWp, dropoff: "" });
-                                        setWaypointCoords(newCoords);
-                                        if (pickupCoords) { setTimeout(() => { if (typeof fitBounds === 'function') fitBounds([pickupCoords, ...newCoords, data.dropoff ? dropoffCoords : null].filter(Boolean) as any); }, 150); }
+                                        // Resolve address from the pinned coordinates
+                                        let address = data.dropoff;
+                                        if (!address || address === 'Locating...') {
+                                            try {
+                                                const resolved = await mapService.reverseGeocode(pinnedCoords.lat, pinnedCoords.lng);
+                                                if (resolved) address = resolved;
+                                            } catch (e) { /* use existing */ }
+                                        }
+                                        if (address) {
+                                            const newWp = [...data.waypoints, address];
+                                            const newCoords = [...waypointCoords, pinnedCoords];
+                                            update({ waypoints: newWp, dropoff: '' });
+                                            setWaypointCoords(newCoords);
+                                            if (pickupCoords) { setTimeout(() => { if (typeof fitBounds === 'function') fitBounds([pickupCoords, ...newCoords].filter(Boolean) as any); }, 150); }
+                                        }
                                     } else {
                                         next();
                                     }
                                 }}
-                                disabled={(data.waypoints.length === 0 && !data.dropoff) || (isMapSelecting && !data.dropoff)}
+                                disabled={(data.waypoints.length === 0 && !data.dropoff) && !isMapSelecting}
                                 className="flex-1 py-3 bg-gray-900 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 disabled:opacity-50"
                             >
                                 {isMapSelecting ? "Confirm Dropoff Here" : "Confirm Route"} <Check size={16} />
@@ -745,18 +876,27 @@ const Step2What = ({ data, update, next, prev }: any) => {
             <div className="flex gap-2 pt-2">
                 <button onClick={prev} className="w-12 bg-gray-100 text-gray-700 rounded-xl flex items-center justify-center hover:bg-gray-200"><ArrowLeft size={16} /></button>
                 <button
-                    onClick={next}
+                    onClick={() => {
+                        if (data.category === 'C' && data.subCategory) {
+                            // Dedicated: auto-set vehicle from subcategory and skip Step 3
+                            const vehicleId = DEDICATED_VEHICLE_MAP[data.subCategory] || 'pickup';
+                            update({ vehicle: vehicleId, serviceType: 'Express' as ServiceType });
+                            next(3); // Skip step 2 (vehicle selection), go directly to step 3 (receiver details)
+                        } else {
+                            next();
+                        }
+                    }}
                     disabled={!data.subCategory}
                     className="flex-1 py-3 bg-brand-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 disabled:opacity-50 transition-all"
                 >
-                    Next: Select Vehicle <ArrowRight size={16} />
+                    {data.category === 'C' ? 'Next: Receiver Details' : 'Next: Select Vehicle'} <ArrowRight size={16} />
                 </button>
             </div>
         </div>
     );
 }
 
-const Step3How = ({ data, update, next, prev }: any) => {
+const Step3How = ({ data, update, next, prev, isDedicated }: any) => {
     const weightVal = parseFloat(data.dimensions.weight) || 0;
 
     const eligibleVehicles = VEHICLES.filter(v => {
@@ -831,7 +971,7 @@ const Step3How = ({ data, update, next, prev }: any) => {
 };
 
 // --- Step 4: WHO ---
-const Step4Who = ({ data, update, next, prev }: any) => {
+const Step4Who = ({ data, update, next, prev, isDedicated }: any) => {
     const recentReceivers = [
         { name: 'Jane Doe', phone: '0712345678', id: '12345678' },
         { name: 'John Smith', phone: '0722000111', id: '87654321' }
@@ -872,7 +1012,7 @@ const Step4Who = ({ data, update, next, prev }: any) => {
             </div>
 
             <div className="flex gap-2 pt-1">
-                <button onClick={prev} className="px-4 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200"><ArrowLeft size={16} /></button>
+                <button onClick={() => isDedicated ? prev(1) : prev()} className="px-4 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200"><ArrowLeft size={16} /></button>
                 <button onClick={next} disabled={!data.receiverName || !data.receiverPhone || !data.receiverId} className="flex-1 py-3 bg-gray-900 text-white rounded-xl text-sm font-bold flex flex-center gap-1.5 justify-center disabled:opacity-50">
                     Payment <ArrowRight size={16} />
                 </button>

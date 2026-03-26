@@ -146,35 +146,62 @@ const MapLayer: React.FC<MapLayerProps> = ({ driverLabel }) => {
         setMap(null);
     }, []);
 
-    // Handle Fit Bounds
+    // Handle Fit Bounds — Uber/Bolt-style smooth camera transitions
     useEffect(() => {
         if (map && boundsToFit && boundsToFit.length > 0) {
+            const PADDING = { top: 70, bottom: 300, left: 70, right: 70 };
+
             if (boundsToFit.length === 1) {
-                map.panTo(boundsToFit[0]);
+                // Single point: smooth zoom in (e.g. pickup selected, or all dropoffs removed)
+                const target = boundsToFit[0];
+                map.panTo(target);
                 let currentZoom = map.getZoom() || 13;
-                let targetZoom = 18;
+                const targetZoom = 16;
                 if (currentZoom < targetZoom) {
-                    const zoomIn = setInterval(() => {
+                    const step = setInterval(() => {
                         currentZoom += 1;
                         map.setZoom(currentZoom);
-                        if (currentZoom >= targetZoom) clearInterval(zoomIn);
-                    }, 100); // 100ms interval for seamless smooth zoom effect
-                } else {
-                    map.setZoom(targetZoom);
+                        if (currentZoom >= targetZoom) clearInterval(step);
+                    }, 80);
+                } else if (currentZoom > targetZoom) {
+                    // Zoom OUT smoothly back to pickup (e.g. dropoffs removed)
+                    const step = setInterval(() => {
+                        currentZoom -= 1;
+                        map.setZoom(currentZoom);
+                        if (currentZoom <= targetZoom) clearInterval(step);
+                    }, 80);
                 }
             } else {
+                // Multi-point: smooth step-zoom to fit all markers (industry-grade)
                 const bounds = new google.maps.LatLngBounds();
                 boundsToFit.forEach(coord => bounds.extend(coord));
-                
-                // Ensure we start from the pickup (first coordinate) to keep the animation anchored
-                if (boundsToFit.length > 1) {
-                    map.panTo(boundsToFit[0]);
-                }
-                
-                // Small delay to allow the pan to settle before zooming out gracefully
-                setTimeout(() => {
-                    map.fitBounds(bounds, { top: 70, bottom: 300, left: 70, right: 70 });
-                }, 100);
+                const targetCenter = bounds.getCenter();
+
+                // Pan to the midpoint of the route first
+                map.panTo(targetCenter);
+
+                // Step-zoom out until all markers are visible, then fine-tune with fitBounds
+                let currentZoom = map.getZoom() || 14;
+                const stepZoom = setInterval(() => {
+                    const mapBounds = map.getBounds();
+                    if (mapBounds) {
+                        const ne = bounds.getNorthEast();
+                        const sw = bounds.getSouthWest();
+                        if (mapBounds.contains(ne) && mapBounds.contains(sw)) {
+                            clearInterval(stepZoom);
+                            // Final precise fit with padding
+                            map.fitBounds(bounds, PADDING);
+                            return;
+                        }
+                    }
+                    currentZoom -= 0.5;
+                    if (currentZoom < 3) {
+                        clearInterval(stepZoom);
+                        map.fitBounds(bounds, PADDING);
+                        return;
+                    }
+                    map.setZoom(currentZoom);
+                }, 50);
             }
             resetBoundsTrigger();
         }
@@ -293,41 +320,47 @@ const MapLayer: React.FC<MapLayerProps> = ({ driverLabel }) => {
                     </>
                 )}
 
-                {/* Waypoint Markers */}
-                {waypointCoords.map((coords, idx) => (
-                    (!isMapSelecting || activeInput !== `waypoint-${idx}`) && (
-                        <React.Fragment key={`wp-${idx}`}>
-                            <OverlayView
-                                position={coords}
-                                mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-                            >
-                                <div
-                                    onClick={() => {
-                                        if (orderState === 'DRAFTING' || allowMarkerClick) {
-                                            setActiveInput(`waypoint-${idx}`);
-                                            setIsMapSelecting(true);
-                                            setMapCenter(coords.lat, coords.lng);
-                                        }
-                                    }}
-                                    className="w-5 h-5 bg-purple-500 rounded-full border-4 border-white shadow-xl -translate-x-1/2 -translate-y-1/2 cursor-pointer hover:scale-110 transition-transform flex items-center justify-center"
+                {/* Waypoint Markers — last waypoint is always red (Final Destination) */}
+                {waypointCoords.map((coords, idx) => {
+                    const isLast = idx === waypointCoords.length - 1 && !dropoffCoords;
+                    const dotColor = isLast ? 'bg-red-500' : ['bg-orange-500', 'bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-teal-500'][idx % 5];
+                    const labelBg = isLast ? 'bg-red-600' : 'bg-purple-600';
+                    const labelText = isLast ? 'Final Drop-off' : `Stop ${idx + 1}`;
+                    return (
+                        (!isMapSelecting || activeInput !== `waypoint-${idx}`) && (
+                            <React.Fragment key={`wp-${idx}`}>
+                                <OverlayView
+                                    position={coords}
+                                    mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                                 >
-                                    <div className="w-1 h-1 bg-white rounded-full" />
-                                </div>
-                            </OverlayView>
-                            <OverlayView
-                                position={coords}
-                                mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-                            >
-                                <div className="absolute -translate-x-1/2 -translate-y-12 flex flex-col items-center z-[9997] pointer-events-none">
-                                    <div className="bg-purple-600 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg border border-white/20">
-                                        Stop {idx + 1}
+                                    <div
+                                        onClick={() => {
+                                            if (orderState === 'DRAFTING' || allowMarkerClick) {
+                                                setActiveInput(`waypoint-${idx}`);
+                                                setIsMapSelecting(true);
+                                                setMapCenter(coords.lat, coords.lng);
+                                            }
+                                        }}
+                                        className={`${isLast ? 'w-6 h-6' : 'w-5 h-5'} ${dotColor} rounded-full border-4 border-white shadow-xl -translate-x-1/2 -translate-y-1/2 cursor-pointer hover:scale-110 transition-transform flex items-center justify-center`}
+                                    >
+                                        <div className={`${isLast ? 'w-1.5 h-1.5' : 'w-1 h-1'} bg-white rounded-full`} />
                                     </div>
-                                    <div className="w-2 h-2 bg-purple-600 rotate-45 -mt-1 shadow-sm"></div>
-                                </div>
-                            </OverlayView>
-                        </React.Fragment>
-                    )
-                ))}
+                                </OverlayView>
+                                <OverlayView
+                                    position={coords}
+                                    mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                                >
+                                    <div className="absolute -translate-x-1/2 -translate-y-12 flex flex-col items-center z-[9997] pointer-events-none">
+                                        <div className={`${labelBg} text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg border border-white/20`}>
+                                            {labelText}
+                                        </div>
+                                        <div className={`w-2 h-2 ${labelBg} rotate-45 -mt-1 shadow-sm`}></div>
+                                    </div>
+                                </OverlayView>
+                            </React.Fragment>
+                        )
+                    );
+                })}
 
                 {driverCoords && (
                     <>
@@ -459,39 +492,7 @@ const MapLayer: React.FC<MapLayerProps> = ({ driverLabel }) => {
                 </>
             )}
 
-            {/* Current Location Button */}
-            {!isMapSelecting && (
-                <div className="absolute top-24 right-4 z-10">
-                    <button
-                        onClick={() => {
-                            if (userLocation && map) {
-                                map.panTo(userLocation);
-                                map.setZoom(17);
-                            } else {
-                                // Fallback if userLocation is not yet available in context
-                                if (navigator.geolocation) {
-                                    navigator.geolocation.getCurrentPosition(
-                                        (position) => {
-                                            const pos = {
-                                                lat: position.coords.latitude,
-                                                lng: position.coords.longitude,
-                                            };
-                                            map?.panTo(pos);
-                                            map?.setZoom(17);
-                                        },
-                                        () => {
-                                            // Handle error
-                                        }
-                                    );
-                                }
-                            }
-                        }}
-                        className="w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center text-gray-700 hover:text-brand-600 hover:bg-gray-50 active:scale-95 transition-all border border-gray-100"
-                    >
-                        <Navigation className="w-6 h-6" />
-                    </button>
-                </div>
-            )}
+
         </div>
     );
 };
