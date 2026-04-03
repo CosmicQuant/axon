@@ -169,12 +169,15 @@ const CustomerDashboard: React.FC = () => {
         }
     };
 
-    const handleSelectAddress = (suggestion: any) => {
+    const handleSelectAddress = async (suggestion: any) => {
+        const resolved = await mapService.geocodeAddress(suggestion.label);
         const newAddr = {
             id: Date.now().toString(),
             label: 'Other',
             address: suggestion.label,
-            icon: MapPin
+            icon: MapPin,
+            lat: resolved?.lat,
+            lng: resolved?.lng
         };
         const updated = [...savedAddresses, newAddr];
         setSavedAddresses(updated);

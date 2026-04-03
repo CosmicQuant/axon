@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "build:apk": "npm run build && npx cap sync && cd android && gradlew.bat assembleDebug"
+    "build:apk": "npm run build && npx cap sync && cd android && gradlew.bat assembleDebug",
+    "deploy:preview": "npm run build && npx firebase hosting:channel:deploy preview --non-interactive",
+    "deploy:live": "npm run build && npx firebase deploy --only hosting --non-interactive",
+    "list:channels": "npx firebase hosting:channel:list --non-interactive > channels.txt"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.1",
@@ -25,14 +28,16 @@
     "date-fns": "^4.1.0",
     "express": "^5.2.1",
     "firebase": "^11.1.0",
-    "framer-motion": "^12.24.3",
+    "framer-motion": "^11.1.0",
     "lucide-react": "^0.555.0",
     "otpauth": "^9.4.1",
+    "path-to-regexp": "8.2.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-hot-toast": "^2.6.0",
     "react-router-dom": "^7.10.1",
+    "path-to-regexp": "8.2.0",
     "zod": "^4.2.1"
   },
   "devDependencies": {
@@ -40,7 +45,7 @@
     "@types/node": "^22.14.0",
     "@types/react": "^19.2.8",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.0.0",
+    "@vitejs/plugin-react": "^5.2.0",
     "autoprefixer": "^10.4.23",
     "clsx": "^2.1.1",
     "postcss": "^8.5.6",
@@ -48,6 +53,6 @@
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^3.4.17",
     "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "vite": "^6.4.1"
   }
 }

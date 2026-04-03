@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import BookingWizard from './booking/BookingWizard';
+import BookingWizard from './booking/BookingWizardModular';
 import HeroOverlay from './HeroOverlay';
 import MapLayer from './MapLayer';
 import { useAuth } from '../context/AuthContext';
