@@ -31,11 +31,13 @@
     "framer-motion": "^11.1.0",
     "lucide-react": "^0.555.0",
     "otpauth": "^9.4.1",
+    "path-to-regexp": "8.2.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-hot-toast": "^2.6.0",
     "react-router-dom": "^7.10.1",
+    "path-to-regexp": "8.2.0",
     "zod": "^4.2.1"
   },
   "devDependencies": {
