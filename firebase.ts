@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore, initializeFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getFunctions } from 'firebase/functions';
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -14,9 +15,18 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
+console.log("Firebase Config Loaded:", firebaseConfig);
+
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 export const db = initializeFirestore(app, {
     experimentalForceLongPolling: true,
 });
 export const storage = getStorage(app);
+let functionsInstance;
+try {
+    functionsInstance = getFunctions(app, 'us-central1');
+} catch (e) {
+    console.error("Functions init failed:", e);
+}
+export const functions = functionsInstance;
