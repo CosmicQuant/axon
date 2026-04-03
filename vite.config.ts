@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [react()],
     optimizeDeps: {
-      exclude: ['firebase/app', 'firebase/firestore', 'firebase/auth', 'firebase/storage']
+      exclude: ['firebase/app', 'firebase/firestore', 'firebase/auth', 'firebase/storage', 'firebase/functions']
     },
     define: {
       'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
@@ -28,7 +28,7 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks: {
             'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-            'vendor-firebase': ['firebase/app', 'firebase/firestore', 'firebase/auth', 'firebase/storage'],
+            'vendor-firebase': ['firebase/app', 'firebase/firestore', 'firebase/auth', 'firebase/storage', 'firebase/functions'],
             'vendor-maps': ['@react-google-maps/api'],
             'vendor-ui': ['lucide-react', 'react-hot-toast', 'qrcode.react'],
             'vendor-query': ['@tanstack/react-query'],

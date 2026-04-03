@@ -21,6 +21,7 @@ import {
    Activity, MessageSquare, ChevronDown, ChevronUp, List, Copy, Check, Image, Camera,
    Lock, ShieldCheck, Key, QrCode, RefreshCw, Power, Smartphone, ShieldAlert, FileCheck, Eye, EyeOff, Flag
 } from 'lucide-react';
+import { MarketplaceJobCard } from './driver/MarketplaceJobCard';
 
 interface DriverDashboardProps {
    user: User;
@@ -1547,98 +1548,15 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                            </button>
                         </div>
                      ) : (
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                           {filteredOrders.map(order => {
-                              const Icon = getVehicleIcon(order.vehicle);
-                              return (
-                                 <div key={order.id} className={`bg-white rounded-xl p-5 border transition-all group shadow-sm ${hasActiveJob ? 'border-gray-100 opacity-50' : 'border-gray-100 hover:border-brand-200 hover:shadow-md'}`}>
-                                    <div className="flex justify-between items-start mb-4">
-                                       <div>
-                                          <div className="flex items-center space-x-2 mb-1">
-                                             <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold bg-brand-50 text-brand-600 border border-brand-100">
-                                                NEW
-                                             </span>
-                                             <button
-                                                onClick={(e) => {
-                                                   e.stopPropagation();
-                                                   handleCopyId(order.id);
-                                                }}
-                                                className="flex items-center space-x-1 px-1.5 py-0.5 bg-gray-50 text-gray-400 rounded font-mono text-[10px] hover:text-brand-600 transition-colors"
-                                                title="Copy Tracking ID"
-                                             >
-                                                <span>ID: {order.id}</span>
-                                                {copiedId === order.id ? <Check className="w-2.5 h-2.5 text-emerald-500" /> : <Copy className="w-2.5 h-2.5 opacity-40" />}
-                                             </button>
-                                          </div>
-                                          <h4 className="font-bold text-gray-900 line-clamp-1">{order.items.itemDesc}</h4>
-                                       </div>
-                                       <div className="text-right">
-                                          <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1">Total Payout (You Earn)</p>
-                                          <div className="font-bold text-xl text-brand-600">KES {(order.driverRate || Math.floor((order.price || 0) * 0.8)).toLocaleString()}</div>
-                                          <div className="text-xs text-gray-400 mt-1">{order.estimatedDuration}</div>
-                                       </div>
-                                    </div>
-                                    <div className="space-y-3 mb-5">
-                                       <div className="flex items-start">
-                                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-2 mr-2"></div>
-                                          <div className="flex-1 min-w-0">
-                                             <p className="text-xs text-gray-400 uppercase font-bold">Pickup</p>
-                                             <button
-                                                onClick={(e) => {
-                                                   e.stopPropagation();
-                                                   openGoogleMaps(order.pickup);
-                                                }}
-                                                className="text-sm text-gray-900 line-clamp-1 hover:text-brand-600 transition-colors text-left w-full"
-                                             >
-                                                {order.pickup}
-                                             </button>
-                                          </div>
-                                       </div>
-                                       <div className="flex items-start">
-                                          <div className="w-1.5 h-1.5 rounded-full bg-red-500 mt-2 mr-2"></div>
-                                          <div className="flex-1 min-w-0">
-                                             <p className="text-xs text-gray-400 uppercase font-bold">Dropoff</p>
-                                             <button
-                                                onClick={(e) => {
-                                                   e.stopPropagation();
-                                                   openGoogleMaps(order.dropoff);
-                                                }}
-                                                className="text-sm text-gray-900 line-clamp-1 hover:text-brand-600 transition-colors text-left w-full"
-                                             >
-                                                {order.dropoff}
-                                             </button>
-                                          </div>
-                                       </div>
-                                       <div className="flex items-start">
-                                          <Icon className="w-3.5 h-3.5 text-gray-400 mr-2 mt-0.5" />
-                                          <span className="text-sm text-gray-600">{order.vehicle}</span>
-                                       </div>
-                                    </div>
-                                    {(() => {
-                                       const vehicleMismatch = user.vehicleType && order.vehicle !== user.vehicleType;
-                                       const canAccept = !hasActiveJob && !vehicleMismatch;
-
-                                       return (
-                                          <button
-                                             onClick={() => handleAcceptJob(order)}
-                                             disabled={!canAccept}
-                                             className={`w-full py-3 rounded-lg font-bold transition-all ${!canAccept
-                                                ? 'bg-gray-50 text-gray-300 cursor-not-allowed border border-gray-100'
-                                                : 'bg-brand-600 text-white hover:bg-brand-700 shadow-lg shadow-brand-100'
-                                                }`}
-                                          >
-                                             {hasActiveJob
-                                                ? 'Finish current job first'
-                                                : vehicleMismatch
-                                                   ? `Requires ${order.vehicle}`
-                                                   : 'Accept Request'
-                                             }
-                                          </button>
-                                       );
-                                    })()}
-                                 </div>
-                              )
-                           })}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                           {filteredOrders.map(order => (
+                              <MarketplaceJobCard 
+                                 key={order.id} 
+                                 order={order} 
+                                 onAccept={handleAcceptJob}
+                                 disabled={hasActiveJob || (user.vehicleType && order.vehicle !== user.vehicleType)}
+                              />
+                           ))}
                         </div>
                      )}
                   </div>

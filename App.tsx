@@ -42,7 +42,7 @@ const ApiDocumentation = lazy(() => import('./components/ApiDocumentation'));
 const PaymentCollection = lazy(() => import('./components/PaymentCollection'));
 const FleetManagement = lazy(() => import('./components/FleetManagement'));
 // Temporary test component for the new wizard framework
-const TestBookingWizard = lazy(() => import('./components/booking/BookingWizard'));
+const TestBookingWizard = lazy(() => import('./components/booking/BookingWizardModular'));
 const SkeletonFallback = () => (
   <div className="flex h-screen w-full items-center justify-center bg-white">
     <div className="flex flex-col items-center gap-4 animate-pulse">
