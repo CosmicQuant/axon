@@ -70,6 +70,18 @@ const App = () => {
           if (status.location !== 'granted') {
             await Geolocation.requestPermissions();
           }
+          
+            if (Capacitor.getPlatform() === 'android') {
+              const cordova = (window as any).cordova;
+              if (cordova && cordova.plugins && cordova.plugins.locationAccuracy) {
+                // Bypass canRequest to force Google Play Services Native Prompt
+                cordova.plugins.locationAccuracy.request(
+                  cordova.plugins.locationAccuracy.REQUEST_PRIORITY_HIGH_ACCURACY,
+                  () => console.log('Location accuracy requested successfully'),
+                  (error: any) => console.warn('Error requesting location accuracy:', error)
+                );
+              }
+            }
         } catch (error) {
           console.warn('Error requesting location permissions:', error);
         }

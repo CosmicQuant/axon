@@ -22,6 +22,7 @@
     "@google/genai": "^1.30.0",
     "@react-google-maps/api": "^2.20.8",
     "@tanstack/react-query": "^5.90.12",
+    "cordova-plugin-request-location-accuracy": "^2.3.0",
     "date-fns": "^4.1.0",
     "express": "^5.2.1",
     "firebase": "^11.1.0",

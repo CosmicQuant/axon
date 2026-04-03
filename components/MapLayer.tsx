@@ -156,7 +156,7 @@ const MapLayer: React.FC<MapLayerProps> = ({ driverLabel }) => {
                 const target = boundsToFit[0];
                 map.panTo(target);
                 let currentZoom = map.getZoom() || 13;
-                const targetZoom = 16;
+                const targetZoom = 17;
                 if (currentZoom < targetZoom) {
                     const step = setInterval(() => {
                         currentZoom += 1;

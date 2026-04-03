@@ -1,6 +1,7 @@
 import { APP_CONFIG } from '../config';
 import { Geolocation } from '@capacitor/geolocation'; // Import Capacitor Geolocation
 import { Capacitor } from '@capacitor/core';
+import toast from 'react-hot-toast';
 
 interface Coordinates {
     lat: number;
@@ -179,6 +180,27 @@ export const mapService = {
                     }
                 }
 
+                if (Capacitor.getPlatform() === 'android') {
+                    try {
+                        await new Promise<void>((resolve, reject) => {
+                            const cordova = (window as any).cordova;
+                            if (cordova && cordova.plugins && cordova.plugins.locationAccuracy) {
+                                // Bypass canRequest and force the native Google dialog
+                                cordova.plugins.locationAccuracy.request(
+                                    cordova.plugins.locationAccuracy.REQUEST_PRIORITY_HIGH_ACCURACY,
+                                    () => resolve(),
+                                    (error: any) => reject(error)
+                                );
+                            } else {
+                                resolve();
+                            }
+                        });
+                    } catch (accuracyError) {
+                        console.warn("Failed to request high accuracy location:", accuracyError);
+                        // Do not throw here, let Geolocation.getCurrentPosition try anyway
+                    }
+                }
+
                 // Use Capacitor Geolocation
                 // enableHighAccuracy: true is KEY for the "Turn on precise location" prompt
                 const position = await Geolocation.getCurrentPosition({
@@ -209,6 +231,11 @@ export const mapService = {
             }
         } catch (error) {
             console.error("Error getting location", error);
+            if (!Capacitor.isNativePlatform()) {
+                toast.error("Please turn on your device's precise location (GPS) and grant location permissions to use the map accurately.", { duration: 6000 });
+            } else {
+                toast.error("Please enable precise location and GPS.", { duration: 5000 });
+            }
             // Default to null if failed
             return null;
         }
