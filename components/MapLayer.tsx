@@ -113,6 +113,8 @@ const MapLayer: React.FC = () => {
 
     const isMapAnimatingRef = useRef(false);
     const animationFrameRef = useRef<number | null>(null);
+    const prewarmDivRef = useRef<HTMLDivElement | null>(null);
+    const prewarmMapRef = useRef<google.maps.Map | null>(null);
     const [map, setMap] = useState<google.maps.Map | null>(null);
     const [decodedPath, setDecodedPath] = useState<google.maps.LatLngLiteral[]>([]);
 
@@ -149,11 +151,30 @@ const MapLayer: React.FC = () => {
         const markReady = () => { mapReadyRef.current = true; };
         google.maps.event.addListenerOnce(mapInstance, 'tilesloaded', markReady);
         setTimeout(markReady, 3000); // Desktop failsafe — tilesloaded can stall on slow connections
+
+        // Create hidden pre-warm map for tile cache warming
+        if (!prewarmDivRef.current) {
+            const div = document.createElement('div');
+            div.style.cssText = 'width:1px;height:1px;position:absolute;left:-9999px;top:-9999px;overflow:hidden;';
+            document.body.appendChild(div);
+            prewarmDivRef.current = div;
+            prewarmMapRef.current = new google.maps.Map(div, {
+                mapId: "DEMO_MAP_ID",
+                disableDefaultUI: true,
+            });
+        }
+
         setMap(mapInstance);
     }, [mapCenter, zoom, userLocation]);
 
     const onUnmount = useCallback(function callback(map: google.maps.Map) {
         setMap(null);
+        // Clean up pre-warm map
+        if (prewarmDivRef.current?.parentNode) {
+            prewarmDivRef.current.remove();
+            prewarmDivRef.current = null;
+            prewarmMapRef.current = null;
+        }
     }, []);
 
     // Handle Fit Bounds — Uber/Bolt-style smooth camera transitions
@@ -251,14 +272,27 @@ const MapLayer: React.FC = () => {
                         map.moveCamera({ center: startCenter, zoom: startZoom });
                     }
 
-                    // Choose easing based on direction:
-                    // Zoom-out → slow start (tiles stay sharp longer) + slow end (settle)
-                    // Zoom-in  → fast departure + gentle arrival
                     const isZoomingOut = targetZoom < startZoom;
                     const duration = isZoomingOut ? 2400 : 2200;
                     const ease = isZoomingOut ? easeInOutCubic : easeOutQuint;
 
-                    flyTo(target, targetZoom, duration, ease, () => resetBoundsTrigger());
+                    // Pre-warm tile cache: jump hidden map to target, wait for tiles, then animate
+                    const prewarm = prewarmMapRef.current;
+                    if (prewarm && isZoomingOut) {
+                        isMapAnimatingRef.current = true; // lock while pre-warming
+                        prewarm.fitBounds(bounds, dynamicPadding);
+                        let prewarmFired = false;
+                        const startAnim = () => {
+                            if (prewarmFired) return;
+                            prewarmFired = true;
+                            flyTo(target, targetZoom, duration, ease, () => resetBoundsTrigger());
+                        };
+                        google.maps.event.addListenerOnce(prewarm, 'tilesloaded', startAnim);
+                        // 1.2s max wait — don't hold animation forever on slow networks
+                        cameraTimeoutsRef.current.push(setTimeout(startAnim, 1200) as any);
+                    } else {
+                        flyTo(target, targetZoom, duration, ease, () => resetBoundsTrigger());
+                    }
                 }
             };
 
@@ -328,7 +362,6 @@ const MapLayer: React.FC = () => {
                     isFractionalZoomEnabled: true,
                     mapId: "DEMO_MAP_ID",
                     disableDefaultUI: true,
-                    backgroundColor: '#e8f4e8',
                     gestureHandling: 'greedy' // Enables one-finger panning on mobile
                 }}
             >
