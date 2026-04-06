@@ -243,7 +243,7 @@ const App = () => {
 
   return (
     <ChatProvider>
-      <div className={`min-h-screen bg-gray-50 flex flex-col font-sans text-gray-900 overflow-x-hidden ${shouldShowBottomNav ? 'pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-0' : 'pb-[env(safe-area-inset-bottom,0px)]'}`}>
+      <div className={`bg-gray-50 flex flex-col font-sans text-gray-900 overflow-x-hidden ${isMapPage || location.pathname.startsWith('/driver') ? 'h-[100dvh] h-screen overflow-hidden' : 'min-h-screen'} ${shouldShowBottomNav ? 'pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-0' : 'pb-[env(safe-area-inset-bottom,0px)]'}`}>
         <Toaster position="top-center" toastOptions={{ duration: 4000, style: { background: '#333', color: '#fff' } }} />
 
         <MapProvider>
@@ -285,7 +285,7 @@ const App = () => {
             <MapLayer />
           </div>
 
-          <main className={`flex-grow flex flex-col relative pb-16 md:pb-0 z-10 ${isMapPage || location.pathname.startsWith('/driver') ? 'pointer-events-none' : ''}`}>
+          <main className={`flex-grow flex flex-col relative z-10 ${isMapPage || location.pathname.startsWith('/driver') ? 'pointer-events-none' : 'pb-16 md:pb-0'}`}>
             <Suspense fallback={<SkeletonFallback />}>
               <Routes>
                 {/* Temporary Test Route */}

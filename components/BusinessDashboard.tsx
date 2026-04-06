@@ -972,7 +972,7 @@ const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user, onNewReques
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col lg:flex-row relative pb-[env(safe-area-inset-bottom)]">
+        <div className="h-screen h-[100dvh] bg-gray-50 flex flex-col lg:flex-row relative pb-[env(safe-area-inset-bottom)] overflow-hidden">
             {/* ... (Previous components: Toast, Dialog, Header, Sidebar) ... */}
             {/* Toast Notification */}
             {notification && (
@@ -1090,7 +1090,7 @@ const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user, onNewReques
                 </div>
             </aside>
 
-            <main className="flex-1 lg:ml-64 p-4 sm:p-8 w-full">
+            <main className="flex-1 lg:ml-64 p-4 sm:p-8 w-full overflow-y-auto">
 
                 {/* ... (Previous tabs content: OVERVIEW, DELIVERIES, FLEET, BULK, ADDRESSES) ... */}
                 {activeTab === 'OVERVIEW' && (

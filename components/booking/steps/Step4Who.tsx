@@ -14,9 +14,16 @@ export const Step4Who = () => {
         const unique = new Map();
         orders.forEach((o: any) => {
             if (o.recipient && o.recipient.name && o.recipient.phone) {
-                // Ignore the default "Customer" sender if it appears here
                 if (o.recipient.name !== 'Customer') {
-                    unique.set(o.recipient.phone, o.recipient);
+                    const entry = { ...o.recipient };
+                    // Check multiple possible locations for the ID
+                    if (!entry.id && o.receiverId) entry.id = o.receiverId;
+                    if (!entry.id && o.recipient.idNumber) entry.id = o.recipient.idNumber;
+                    // Only update the map entry if we have a better (non-empty) ID
+                    const existing = unique.get(entry.phone);
+                    if (!existing || (!existing.id && entry.id)) {
+                        unique.set(entry.phone, entry);
+                    }
                 }
             }
         });
@@ -59,10 +66,10 @@ export const Step4Who = () => {
                 />
             </div>
 
-            <div className="flex gap-2 pt-1 sticky bottom-0 bg-white z-10 pb-2">
-                <button onClick={() => prevStep()} className="px-4 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200"><ArrowLeft size={16} /></button>
-                <button onClick={() => nextStep()} disabled={!data.receiverName || !data.receiverPhone || !data.receiverId} className="flex-1 py-3 bg-gray-900 text-white rounded-xl text-sm font-bold flex flex-center gap-1.5 justify-center disabled:opacity-50">
-                    Payment <ArrowRight size={16} />
+            <div className="flex gap-2 sticky bottom-0 bg-white z-10">
+                <button onClick={() => prevStep()} className="w-12 h-[48px] bg-gray-100 text-gray-700 rounded-xl flex items-center justify-center hover:bg-gray-200"><ArrowLeft size={16} /></button>
+                <button onClick={() => nextStep()} disabled={!data.receiverName || !data.receiverPhone || !data.receiverId} className="flex-1 h-[48px] bg-gray-900 text-white rounded-xl text-sm font-bold flex items-center gap-1.5 justify-center disabled:opacity-50">
+                    Confirm Receiver <ArrowRight size={16} />
                 </button>
             </div>
         </div>

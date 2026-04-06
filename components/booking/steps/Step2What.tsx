@@ -218,14 +218,14 @@ export const Step2What = () => {
                 )}
             </AnimatePresence>
 
-            <div className="flex gap-2 pt-2 sticky bottom-0 bg-white z-10 pb-2">
-                <button onClick={() => prevStep()} className="w-12 bg-gray-100 text-gray-700 rounded-xl flex items-center justify-center hover:bg-gray-200"><ArrowLeft size={16} /></button>
+            <div className="flex gap-2 sticky bottom-0 bg-white z-10">
+                <button onClick={() => prevStep()} className="w-12 h-[48px] bg-gray-100 text-gray-700 rounded-xl flex items-center justify-center hover:bg-gray-200"><ArrowLeft size={16} /></button>
                 <button
                     onClick={() => nextStep()}
                     disabled={!data.subCategory}
-                    className="flex-1 py-3 bg-brand-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 disabled:opacity-50 transition-all"
+                    className="flex-1 h-[48px] bg-gray-900 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 disabled:opacity-50 transition-all"
                 >
-                    Next: Delivery Mode <ArrowRight size={16} />
+                    Confirm Cargo <ArrowRight size={16} />
                 </button>
             </div>
         </div>

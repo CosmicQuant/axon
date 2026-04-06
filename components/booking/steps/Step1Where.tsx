@@ -621,12 +621,11 @@ export const Step1Where = () => {
 
 
             {/* Continue Button */}
-            <div className="flex items-stretch gap-2 w-full mt-2 h-[48px] sticky bottom-0 bg-white z-10 py-2">
+            <div className="flex items-stretch gap-2 w-full mt-2 h-[48px] sticky bottom-0 bg-white z-10">
                 {pickupConfirmed && !isMapSelecting && (
                     <button
                         onClick={() => {
                             setPickupConfirmed(false);
-                            setIsMapSelecting(true);
                             setActiveInput('pickup');
                             if (pickupCoords) {
                                 setMapCenter(pickupCoords.lat, pickupCoords.lng);
@@ -641,9 +640,9 @@ export const Step1Where = () => {
                 <button
                     onClick={handleContinue}
                     disabled={!isReadyToContinue}
-                    className="flex-1 bg-gray-900 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                    className="flex-1 h-[48px] bg-gray-900 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
                 >
-                    {!pickupConfirmed ? 'Confirm Pickup' : (isMapSelecting ? 'Confirm Dropoff Details' : 'Continue to Package')}
+                    {!pickupConfirmed ? 'Confirm Pickup' : (isMapSelecting ? 'Confirm Pin' : 'Confirm Route')}
                     <Check size={16} />
                 </button>
             </div>

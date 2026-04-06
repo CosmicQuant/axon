@@ -379,7 +379,7 @@ const CustomerDashboard: React.FC = () => {
             )}
 
             {/* MAIN CONTENT */}
-            <main className="flex-1 lg:ml-64 flex flex-col min-h-screen transition-all relative">
+            <main className="flex-1 lg:ml-64 flex flex-col h-screen transition-all relative overflow-hidden">
                 {/* TOP HEADER */}
                 <header className="h-20 sticky top-0 z-20 px-4 sm:px-8 flex items-center justify-between pointer-events-auto bg-white/80 backdrop-blur-md border-b border-gray-100">
                     <div className="flex items-center">
@@ -411,7 +411,7 @@ const CustomerDashboard: React.FC = () => {
                 </header>
 
                 {/* VIEW CONTENT */}
-                <div className="p-4 sm:p-8 space-y-6 flex-1 w-full max-w-[100vw] overflow-x-hidden">
+                <div className="p-4 sm:p-8 space-y-6 flex-1 w-full max-w-[100vw] overflow-x-hidden overflow-y-auto">
                     {currentView === 'DELIVERIES' ? (
                         <>
                             {/* Tracking Card - Now at top of deliveries */}

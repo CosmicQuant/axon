@@ -185,8 +185,14 @@ const MapLayer: React.FC = () => {
 
     useEffect(() => {
         if (map && boundsToFit && boundsToFit.length > 0) {
-            const sheetPad = Math.max(120, (bottomSheetHeight || 300) + 24);
-            const dynamicPadding = { top: 56, bottom: sheetPad, left: 40, right: 40 };
+            // Cap bottom padding so at least 40% of the screen is usable map area
+            const screenH = window.innerHeight;
+            const isDesktop = window.innerWidth >= 768;
+            const maxBottomPad = Math.floor(screenH * 0.55); // never eat more than 55% of screen
+            const sheetPad = Math.min(maxBottomPad, Math.max(100, (bottomSheetHeight || 280) + 16));
+            const dynamicPadding = isDesktop
+                ? { top: 40, bottom: 40, left: 32, right: 440 }
+                : { top: 40, bottom: sheetPad, left: 32, right: 32 };
             const boundsKey = JSON.stringify(boundsToFit);
 
             if (boundsKey === lastBoundsRef.current) {
@@ -354,7 +360,12 @@ const MapLayer: React.FC = () => {
             const bounds = new google.maps.LatLngBounds();
             allPoints.forEach(p => bounds.extend(p));
 
-            const padding = { top: 56, bottom: bottomSheetHeight + 24, left: 40, right: 40 };
+            const maxBottomPad = Math.floor(screenH * 0.55);
+            const isDesktop = window.innerWidth >= 768;
+            const sheetPad = Math.min(maxBottomPad, Math.max(100, bottomSheetHeight + 16));
+            const padding = isDesktop
+                ? { top: 40, bottom: 40, left: 32, right: 440 }
+                : { top: 40, bottom: sheetPad, left: 32, right: 32 };
 
             // Compute target via fitBounds, snap back, animate
             const startCenter = map.getCenter();

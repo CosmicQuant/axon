@@ -2,7 +2,6 @@ import React, { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { mapService } from '../../services/mapService';
 import { useMapState } from '@/context/MapContext';
-import { Navigation, Box, Truck, User, Banknote } from 'lucide-react';
 import { BookingProvider, useBooking } from './BookingContext';
 import { VEHICLES } from './constants';
 
@@ -29,7 +28,18 @@ interface BookingWizardProps {
 
 const WizardContent: React.FC<BookingWizardProps> = ({ prefillData, onOrderComplete, onCollapseChange, startAtDashboard }) => {
     const { data, updateData, step, direction } = useBooking();
-    const { pickupCoords, dropoffCoords, waypointCoords, setRoutePolyline, setIsMapSelecting, setActiveInput, setPickupCoords, setWaypointCoords, setDropoffCoords, userLocation, requestUserLocation, isMapSelecting, activeInput, mapCenter, setMapCenter, fitBounds, setBottomSheetHeight } = useMapState();
+    const { pickupCoords, dropoffCoords, waypointCoords, setRoutePolyline, setIsMapSelecting, setActiveInput, setPickupCoords, setWaypointCoords, setDropoffCoords, userLocation, requestUserLocation, isMapSelecting, activeInput, mapCenter, setMapCenter, fitBounds, setBottomSheetHeight, setOrderState } = useMapState();
+
+    // Only allow map marker dragging on route-editing step (Step 0)
+    useEffect(() => {
+        if (step === 0) {
+            setOrderState('DRAFTING');
+        } else {
+            // Disable map marker interactions on non-route steps
+            setOrderState('MATCHING');
+            if (isMapSelecting) setIsMapSelecting(false);
+        }
+    }, [step]);
 
     useEffect(() => {
         if (prefillData) {
@@ -117,25 +127,42 @@ const WizardContent: React.FC<BookingWizardProps> = ({ prefillData, onOrderCompl
                         if (route.full_optimized_order && stopInfo.length === route.full_optimized_order.length) {
                             const optimizedStops = route.full_optimized_order.map((optimizedIndex: number) => stopInfo[optimizedIndex]);
                             if (optimizedStops.length > 0) {
-                                const newWaypoints = optimizedStops.filter((info: any) => info.type === 'waypoint');
-                                const newDropoff = optimizedStops.find((info: any) => info.type === 'dropoff');
+                                const hasDropoff = stopInfo.some((s: any) => s.type === 'dropoff');
 
-                                updateData({
-                                    dropoff: newDropoff ? newDropoff.name : '',
-                                    waypoints: newWaypoints.map((info: any) => info.name),
-                                    distanceKm: distKm,
-                                    etaTime: timeStr,
-                                    calculatingRoute: false
-                                });
+                                if (hasDropoff) {
+                                    // Last stop in optimized order becomes the dropoff, rest are waypoints
+                                    const newWaypoints = optimizedStops.slice(0, -1);
+                                    const newDropoff = optimizedStops[optimizedStops.length - 1];
 
-                                const newWpCoords = newWaypoints.map((info: any) => info.coord);
-                                if (JSON.stringify(newWpCoords) !== JSON.stringify(waypointCoords)) {
-                                    setWaypointCoords(newWpCoords);
-                                }
-                                if (newDropoff) {
-                                    setDropoffCoords(newDropoff.coord);
+                                    updateData({
+                                        dropoff: newDropoff.name,
+                                        waypoints: newWaypoints.map((info: any) => info.name),
+                                        distanceKm: distKm,
+                                        etaTime: timeStr,
+                                        calculatingRoute: false
+                                    });
+
+                                    const newWpCoords = newWaypoints.map((info: any) => info.coord);
+                                    if (JSON.stringify(newWpCoords) !== JSON.stringify(waypointCoords)) {
+                                        setWaypointCoords(newWpCoords);
+                                    }
+                                    const newDropCoord = newDropoff.coord;
+                                    if (!dropoffCoords || dropoffCoords.lat !== newDropCoord.lat || dropoffCoords.lng !== newDropCoord.lng) {
+                                        setDropoffCoords(newDropCoord);
+                                    }
                                 } else {
-                                    setDropoffCoords(null);
+                                    // No dropoff set — just reorder waypoints, don't promote any to dropoff
+                                    updateData({
+                                        waypoints: optimizedStops.map((info: any) => info.name),
+                                        distanceKm: distKm,
+                                        etaTime: timeStr,
+                                        calculatingRoute: false
+                                    });
+
+                                    const newWpCoords = optimizedStops.map((info: any) => info.coord);
+                                    if (JSON.stringify(newWpCoords) !== JSON.stringify(waypointCoords)) {
+                                        setWaypointCoords(newWpCoords);
+                                    }
                                 }
                                 return;
                             }
@@ -156,6 +183,25 @@ const WizardContent: React.FC<BookingWizardProps> = ({ prefillData, onOrderCompl
         const timer = setTimeout(calculateRoute, 800);
         return () => clearTimeout(timer);
     }, [pickupCoords, waypointCoords, dropoffCoords]);
+
+    // Invalidate cached price when route changes (so price recalculates)
+    const prevCoordsRef = useRef<string>('');
+    useEffect(() => {
+        const coordsKey = JSON.stringify({ p: pickupCoords, w: waypointCoords, d: dropoffCoords });
+        if (prevCoordsRef.current && prevCoordsRef.current !== coordsKey && data.price > 0) {
+            // Route changed after price was set — clear stale price to force re-quote
+            updateData({ price: 0, quoteId: null });
+        }
+        prevCoordsRef.current = coordsKey;
+    }, [pickupCoords, waypointCoords, dropoffCoords]);
+
+    // Re-fit map on final step so route is visible above the sheet
+    useEffect(() => {
+        if (step === 4 && pickupCoords && dropoffCoords) {
+            const pts = [pickupCoords, ...waypointCoords, dropoffCoords];
+            setTimeout(() => fitBounds(pts), 350);
+        }
+    }, [step]);
 
     const weightVal = parseFloat(data.dimensions.weight) || 0;
     const eligibleVehicles = VEHICLES.filter(v => {
@@ -207,7 +253,7 @@ const WizardContent: React.FC<BookingWizardProps> = ({ prefillData, onOrderCompl
             estimatedDuration: '45 mins',
             date: new Date().toISOString(),
             sender: { name: 'Customer', phone: '' },
-            recipient: { name: data.receiverName || 'Receiver', phone: data.receiverPhone || '' },
+            recipient: { name: data.receiverName || 'Receiver', phone: data.receiverPhone || '', id: data.receiverId || '' },
             paymentMethod: data.paymentMethod || 'MPESA',
             verificationCode: dropoffCode,
             serviceType: data.serviceType || 'Standard (Same Day)',
@@ -255,55 +301,35 @@ const WizardContent: React.FC<BookingWizardProps> = ({ prefillData, onOrderCompl
     }, [step, data.isSearchingText, setBottomSheetHeight]);
 
     return (
-        <div className="fixed bottom-0 inset-x-0 pointer-events-none z-[100] flex flex-col justify-end mx-auto max-w-lg">
+        <div className="fixed bottom-0 inset-x-0 md:inset-x-auto md:right-4 md:top-4 md:bottom-4 md:w-[400px] pointer-events-none z-[100] flex flex-col justify-end mx-auto max-w-lg md:max-w-none md:mx-0">
             <motion.div
                 ref={bottomSheetRef}
                 layout
-                className={`w-full bg-white shadow-[0_-15px_40px_rgba(0,0,0,0.12)] rounded-t-[2.5rem] overflow-hidden pointer-events-auto border-t border-gray-100 flex flex-col pb-[env(safe-area-inset-bottom,0)] pb-1 transition-all duration-300 ${data.isSearchingText ? 'h-[90vh]' : 'max-h-[90vh]'}`}
+                className={`w-full bg-white shadow-[0_-15px_40px_rgba(0,0,0,0.12)] md:shadow-2xl rounded-t-[2.5rem] md:rounded-2xl overflow-hidden pointer-events-auto border-t border-gray-100 md:border flex flex-col pb-[env(safe-area-inset-bottom,0)] pb-1 transition-all duration-300 ${data.isSearchingText ? 'h-[90vh]' : 'max-h-[90vh] md:max-h-[calc(100vh-2rem)]'}`}
                 transition={{ duration: 0.3, type: 'tween', ease: 'easeOut' }}
             >
-                <div className="px-5 pt-3 pb-2 flex flex-col items-center w-full z-10 bg-white flex-shrink-0">
-                    <div className="w-12 h-1 bg-gray-200 rounded-full mb-3" />
-                    <div className="w-full flex justify-between mt-1 items-end">
-                        {(() => {
-                            const STEP_INFO = [
-                                { title: 'Route', icon: Navigation },
-                                { title: 'Cargo Type', icon: Box },
-                                { title: 'Choose Vehicle', icon: Truck },
-                                { title: 'Receiver Details', icon: User },
-                                { title: 'Payment Option', icon: Banknote }
-                            ];
-                            const ActiveStepIcon = STEP_INFO[step].icon;
-                            return (
-                                <span className="flex items-center gap-1.5 text-[10px] font-black text-brand-600 uppercase tracking-widest bg-brand-50/50 px-2 py-1 rounded-md mb-2 mt-[-4px]">
-                                    <ActiveStepIcon size={12} strokeWidth={3} /> {step === 0 ? (data.activeTab === "pickup" ? "Pickup Point" : (data.waypoints.length > 0 ? "Drop offs" : "Drop off")) : STEP_INFO[step].title} ({step + 1}/6)
-                                </span>
-                            );
-                        })()}
-                        <div className="flex flex-col items-end gap-1.5 mt-[-4px]">
-                            <AnimatePresence>
-                                {step >= 2 && (data.distanceKm > 0 || data.calculatingRoute) && (
-                                    <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 5 }} className="flex items-center justify-between gap-2 bg-white px-2 py-0.5 rounded-lg border border-brand-100 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.1)] mb-1">
-                                        {data.calculatingRoute ? (
-                                            <span className="text-[10px] font-bold text-brand-600 animate-pulse w-full text-center px-2">Calculating Route...</span>
-                                        ) : (
-                                            <>
-                                                <span className="text-[11px] font-black text-gray-900 leading-none">{data.distanceKm.toFixed(1)} <span className="text-[8px] text-gray-500 font-medium tracking-tighter">km</span></span>
-                                                <div className="w-[3px] h-[3px] bg-brand-200 rounded-full" />
-                                                <div className="flex items-center gap-1">
-                                                    <div className="w-1.5 h-1.5 bg-brand-500 rounded-full animate-pulse" />
-                                                    <span className="text-[11px] font-black text-brand-600 leading-none">{data.etaTime}</span>
-                                                </div>
-                                                <div className="w-[3px] h-[3px] bg-brand-200 rounded-full ml-1" />
-                                                <span className="text-[11px] font-black text-gray-900 leading-none ml-1">KES {finalPrice.toLocaleString()} {activeVehicle ? `· ${activeVehicle.label.split(' ')[0]}` : ''}</span>
-                                            </>
-                                        )}
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                            <div className="flex space-x-1.5 opacity-80">
-                                {[0, 1, 2, 3, 4, 5].map(i => <motion.div layout key={i} className={`h-1.5 rounded-full ${i === step ? 'w-5 bg-brand-600' : 'w-1.5 bg-gray-200'}`} />)}
-                            </div>
+                <div className="px-5 pt-3 pb-1 flex flex-col items-center w-full z-10 bg-white flex-shrink-0">
+                    <div className="w-12 h-1 bg-gray-200 rounded-full mb-2 md:hidden" />
+                    <div className="w-full flex justify-between items-center">
+                        <AnimatePresence>
+                            {step >= 1 && (data.distanceKm > 0 || data.calculatingRoute) && (
+                                <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 5 }} className="flex items-center gap-2 text-[11px] font-black text-gray-500">
+                                    {data.calculatingRoute ? (
+                                        <span className="text-[10px] font-bold text-brand-600 animate-pulse">Calculating...</span>
+                                    ) : (
+                                        <>
+                                            <span className="text-brand-600">E.T.A {data.etaTime}</span>
+                                            {data.price > 0 && (<>
+                                                <span className="w-1 h-1 rounded-full bg-gray-300" />
+                                                <span className="text-gray-900">KES {data.price.toLocaleString()}</span>
+                                            </>)}
+                                        </>
+                                    )}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                        <div className="flex space-x-1.5 ml-auto">
+                            {[0, 1, 2, 3, 4].map(i => <motion.div layout key={i} className={`h-1.5 rounded-full ${i === step ? 'w-5 bg-brand-600' : 'w-1.5 bg-gray-200'}`} />)}
                         </div>
                     </div>
                 </div>

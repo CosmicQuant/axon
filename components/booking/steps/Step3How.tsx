@@ -22,9 +22,6 @@ export const Step3How = () => {
         return true;
     });
     const activeVehicle = VEHICLES.find(v => v.id === data.vehicle) || eligibleVehicles[0];
-    const previewBasePrice = activeVehicle ? activeVehicle.pricePerKm * data.distanceKm : 0;
-    const previewPrice = Math.round(Math.max(150, isStandard ? previewBasePrice : previewBasePrice * 1.5) / 10) * 10;
-    const displayPrice = data.price || previewPrice;
 
     // Auto-select first eligible vehicle if none selected
     useEffect(() => {
@@ -126,20 +123,26 @@ export const Step3How = () => {
                         exit={{ opacity: 0, height: 0 }}
                         className="overflow-hidden"
                     >
-                        <div className="flex flex-wrap gap-2 pb-2 pt-0.5 px-0.5 justify-center w-full">
-                            {eligibleVehicles.length === 0 ? (
-                                <div className="w-full p-3 bg-red-50 text-red-600 rounded-xl text-xs font-medium border border-red-100">No vehicles support these limits.</div>
-                            ) : (
-                                eligibleVehicles.map(v => (
-                                    <button
-                                        key={v.id} onClick={() => updateData({ vehicle: v.id })}
-                                        className={`flex-shrink-0 w-[85px] p-2.5 rounded-[1rem] border flex flex-col items-center text-center transition-all duration-200 ${data.vehicle === v.id ? `border-gray-300 ${v.bgLight} shadow-sm ring-1 ring-gray-300 scale-[1.02]` : 'border-gray-200 bg-white hover:border-gray-300 scale-100'}`}
-                                    >
-                                        <img src={v.img} alt={v.label} className="w-10 h-10 object-contain mb-0.5" />
-                                        <div className="font-bold text-[11px] leading-tight text-gray-900 line-clamp-1">{v.label}</div>
-                                        <div className="text-[9px] font-medium text-gray-500 mt-0.5">≤ {v.maxWeight >= 1000 ? `${v.maxWeight / 1000}T` : `${v.maxWeight}kg`}</div>
-                                    </button>
-                                ))
+                        <div className="relative">
+                            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 pt-0.5 px-0.5">
+                                {eligibleVehicles.length === 0 ? (
+                                    <div className="w-full p-3 bg-red-50 text-red-600 rounded-xl text-xs font-medium border border-red-100">No vehicles support these limits.</div>
+                                ) : (
+                                    eligibleVehicles.map(v => (
+                                        <button
+                                            key={v.id} onClick={() => updateData({ vehicle: v.id })}
+                                            className={`flex-shrink-0 w-[80px] p-2 rounded-[1rem] border flex flex-col items-center text-center transition-all duration-200 ${data.vehicle === v.id ? `border-gray-300 ${v.bgLight} shadow-sm ring-1 ring-gray-300 scale-[1.02]` : 'border-gray-200 bg-white hover:border-gray-300 scale-100'}`}
+                                        >
+                                            <img src={v.img} alt={v.label} className="w-10 h-10 object-contain mb-0.5" />
+                                            <div className="font-bold text-[11px] leading-tight text-gray-900 line-clamp-1">{v.label}</div>
+                                            <div className="text-[9px] font-medium text-gray-500 mt-0.5">≤ {v.maxWeight >= 1000 ? `${v.maxWeight / 1000}T` : `${v.maxWeight}kg`}</div>
+                                        </button>
+                                    ))
+                                )}
+                            </div>
+                            {/* Scroll fade hint */}
+                            {eligibleVehicles.length > 3 && (
+                                <div className="pointer-events-none absolute right-0 top-0 bottom-2 w-10 bg-gradient-to-l from-white to-transparent" />
                             )}
                         </div>
                     </motion.div>
@@ -170,18 +173,16 @@ export const Step3How = () => {
                 </div>
             </div>
 
-            <div className="flex items-center justify-end pt-1 sticky bottom-0 bg-white z-10 pb-2">
-                <div className="flex gap-2 w-full">
-                    <button onClick={() => prevStep()} className="px-3 bg-gray-100 text-gray-700 rounded-xl flex items-center justify-center hover:bg-gray-200"><ArrowLeft size={16} /></button>
-                    <button
-                        onClick={handleContinue}
-                        disabled={(!isStandard && !data.vehicle) || fetchingQuote}
-                        className="flex-1 py-3.5 bg-gray-900 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 shadow-lg shadow-gray-900/20 disabled:opacity-50"
-                    >
-                        {fetchingQuote ? <Loader2 size={16} className="animate-spin" /> : "Continue to Receiver"}
-                        {!fetchingQuote && <ArrowRight size={16} />}
-                    </button>
-                </div>
+            <div className="flex gap-2 sticky bottom-0 bg-white z-10">
+                <button onClick={() => prevStep()} className="w-12 h-[48px] bg-gray-100 text-gray-700 rounded-xl flex items-center justify-center hover:bg-gray-200"><ArrowLeft size={16} /></button>
+                <button
+                    onClick={handleContinue}
+                    disabled={(!isStandard && !data.vehicle) || fetchingQuote}
+                    className="flex-1 h-[48px] bg-gray-900 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                    {fetchingQuote ? <Loader2 size={16} className="animate-spin" /> : (isStandard ? "Confirm Service" : "Confirm Vehicle")}
+                    {!fetchingQuote && <ArrowRight size={16} />}
+                </button>
             </div>
         </div>
     );

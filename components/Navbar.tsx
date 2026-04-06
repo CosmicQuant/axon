@@ -91,14 +91,33 @@ const Navbar: React.FC<NavbarProps> = ({ onOpenProfile, onLogin, isDarkBackgroun
   return (
     <nav className={`absolute top-0 left-0 right-0 z-[100] w-full bg-transparent transition-all pointer-events-none ${isNativePlatform ? 'pt-6' : ''}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 flex justify-between items-center pointer-events-auto">
-        {/* Logo or Back Button */}
+        {/* Logo or Burger Menu */}
         {isMapPage ? (
-          <button
-            onClick={handleLogoClick}
-            className={`p-2 rounded-full transition-all active:scale-95 ${isDarkBackground ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-white/80 backdrop-blur-md text-slate-700 hover:bg-white shadow-sm border border-white/50'}`}
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
+          <div className="relative">
+            {user ? (
+              <>
+                <button
+                  onClick={toggleMobileDropdown}
+                  className={`p-2 rounded-full transition-all active:scale-95 ${isDarkBackground ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-white/80 backdrop-blur-md text-slate-700 hover:bg-white shadow-sm border border-white/50'}`}
+                >
+                  <Menu className="w-6 h-6" />
+                </button>
+                <DropdownMenu
+                  isOpen={isMobileDropdownOpen}
+                  onClose={() => setIsMobileDropdownOpen(false)}
+                  user={user}
+                  align="left"
+                />
+              </>
+            ) : (
+              <button
+                onClick={() => onLogin?.('customer', 'Welcome back', 'Access your AXON dashboard.')}
+                className="text-sm font-black px-6 py-2.5 rounded-full transition-all active:scale-95 bg-brand-600 text-white pointer-events-auto"
+              >
+                Sign In
+              </button>
+            )}
+          </div>
         ) : (
           <div
             className="flex items-center space-x-2 cursor-pointer group"
@@ -174,32 +193,34 @@ const Navbar: React.FC<NavbarProps> = ({ onOpenProfile, onLogin, isDarkBackgroun
           </div>
         )}
 
-        {/* Mobile Menu Button (Opens Dropdown) */}
-        <div className={`relative ${isMapPage ? '' : 'sm:hidden'}`}>
-          {user ? (
-            <>
+        {/* Mobile Menu Button (Opens Dropdown) — hidden on map pages since burger is on the left */}
+        {!isMapPage && (
+          <div className="relative sm:hidden">
+            {user ? (
+              <>
+                <button
+                  className={`flex p-2 transition-colors ${isDarkBackground ? 'text-white' : 'text-gray-600'}`}
+                  onClick={toggleMobileDropdown}
+                >
+                  <Menu className="w-6 h-6" />
+                </button>
+                {/* Dropdown */}
+                <DropdownMenu
+                  isOpen={isMobileDropdownOpen}
+                  onClose={() => setIsMobileDropdownOpen(false)}
+                  user={user}
+                />
+              </>
+            ) : (
               <button
-                className={`${isMapPage ? 'flex' : 'flex'} p-2 transition-colors ${isDarkBackground ? 'text-white' : 'text-gray-600'} ${isMapPage ? 'bg-white/80 backdrop-blur-md rounded-full shadow-sm border border-white/50 !text-slate-700 pointer-events-auto' : ''}`}
-                onClick={toggleMobileDropdown}
+                onClick={() => onLogin?.('customer', 'Welcome back', 'Access your AXON dashboard.')}
+                className="text-sm font-black px-6 py-2.5 rounded-full transition-all active:scale-95 bg-brand-600 text-white"
               >
-                <Menu className="w-6 h-6" />
+                Sign In
               </button>
-              {/* Dropdown */}
-              <DropdownMenu
-                isOpen={isMobileDropdownOpen}
-                onClose={() => setIsMobileDropdownOpen(false)}
-                user={user}
-              />
-            </>
-          ) : (
-            <button
-              onClick={() => onLogin?.('customer', 'Welcome back', 'Access your AXON dashboard.')}
-              className={`text-sm font-black px-6 py-2.5 rounded-full transition-all active:scale-95 ${isMapPage ? 'bg-brand-600 text-white pointer-events-auto' : 'bg-brand-600 text-white'}`}
-            >
-              Sign In
-            </button>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
     </nav>
   );

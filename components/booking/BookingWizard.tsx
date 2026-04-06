@@ -202,21 +202,25 @@ export default function BookingWizard({ prefillData, onOrderComplete, onCollapse
                         if (route.full_optimized_order && stopInfo.length === route.full_optimized_order.length) {
                             const optimizedStops = route.full_optimized_order.map((optimizedIndex: number) => stopInfo[optimizedIndex]);
                             if (optimizedStops.length > 0) {
+                                // Last stop in optimized order becomes the dropoff, rest are waypoints
+                                const newWaypoints = optimizedStops.slice(0, -1);
+                                const newDropoff = optimizedStops[optimizedStops.length - 1];
+
                                 handleUpdate({
-                                    waypoints: optimizedStops.map((info: any) => info.name),
+                                    dropoff: newDropoff.name,
+                                    waypoints: newWaypoints.map((info: any) => info.name),
                                     distanceKm: distKm,
                                     etaTime: timeStr,
                                     calculatingRoute: false
                                 });
 
-                                const newWpCoords = optimizedStops.map((info: any) => info.coord);
-
-                                // Prevent infinite loops by only updating context if value really changed
+                                const newWpCoords = newWaypoints.map((info: any) => info.coord);
                                 if (JSON.stringify(newWpCoords) !== JSON.stringify(waypointCoords)) {
                                     setWaypointCoords(newWpCoords);
                                 }
-                                if (dropoffCoords) {
-                                    setDropoffCoords(null);
+                                const newDropCoord = newDropoff.coord;
+                                if (!dropoffCoords || dropoffCoords.lat !== newDropCoord.lat || dropoffCoords.lng !== newDropCoord.lng) {
+                                    setDropoffCoords(newDropCoord);
                                 }
                                 return;
                             }
@@ -290,7 +294,7 @@ export default function BookingWizard({ prefillData, onOrderComplete, onCollapse
             estimatedDuration: '45 mins',
             date: new Date().toISOString(),
             sender: { name: 'Customer', phone: '' },
-            recipient: { name: data.receiverName || 'Receiver', phone: data.receiverPhone || '' },
+            recipient: { name: data.receiverName || 'Receiver', phone: data.receiverPhone || '', id: data.receiverId || '' },
             paymentMethod: data.paymentMethod || 'MPESA',
             verificationCode: dropoffCode,
             serviceType: data.serviceType || 'Standard (Same Day)',
@@ -327,72 +331,39 @@ export default function BookingWizard({ prefillData, onOrderComplete, onCollapse
     };
 
     return (
-        <div className="fixed bottom-0 inset-x-0 pointer-events-none z-[100] flex flex-col justify-end mx-auto max-w-lg">
+        <div className="fixed bottom-0 inset-x-0 md:inset-x-auto md:right-4 md:top-4 md:bottom-4 md:w-[400px] pointer-events-none z-[100] flex flex-col justify-end mx-auto max-w-lg md:max-w-none md:mx-0">
 
             {/* Sheet Background adhering exactly to the bottom */}
             <motion.div
                 layout
-                className={`w-full bg-white shadow-[0_-15px_40px_rgba(0,0,0,0.12)] rounded-t-[2.5rem] overflow-hidden pointer-events-auto border-t border-gray-100 flex flex-col pb-[env(safe-area-inset-bottom,0)] pb-1 transition-all duration-300 ${data.isSearchingText ? 'h-[90vh]' : 'max-h-[90vh]'}`}
+                className={`w-full bg-white shadow-[0_-15px_40px_rgba(0,0,0,0.12)] md:shadow-2xl rounded-t-[2.5rem] md:rounded-2xl overflow-hidden pointer-events-auto border-t border-gray-100 md:border flex flex-col pb-[env(safe-area-inset-bottom,0)] pb-1 transition-all duration-300 ${data.isSearchingText ? 'h-[90vh]' : 'max-h-[90vh] md:max-h-[calc(100vh-2rem)]'}`}
                 transition={{ duration: 0.3, type: 'tween', ease: 'easeOut' }}
             >
                 {/* Minimal Header Indicator */}
-                <div className="px-5 pt-3 pb-2 flex flex-col items-center w-full z-10 bg-white flex-shrink-0">
-                    <div className="w-12 h-1 bg-gray-200 rounded-full mb-3" />
-                    <div className="w-full flex justify-between mt-1 items-end">
-                        {(() => {
-                            const STEP_INFO = [
-                                { title: 'Route', icon: Navigation },
-                                { title: 'Cargo Type', icon: Box },
-                                { title: 'Choose Vehicle', icon: Truck },
-                                { title: 'Receiver Details', icon: User },
-                                { title: 'Payment Option', icon: Banknote }
-                            ];
-                            const ActiveStepIcon = STEP_INFO[step].icon;
-                            const totalSteps = 5;
-                            const displayStepNum = step + 1;
-                            return (
-                                <span className="flex items-center gap-1.5 text-[10px] font-black text-brand-600 uppercase tracking-widest bg-brand-50/50 px-2 py-1 rounded-md mb-2 mt-[-4px]">
-                                    <ActiveStepIcon size={12} strokeWidth={3} /> {step === 0 ? (data.activeTab === "pickup" ? "Pickup Point" : (data.waypoints.length > 0 ? "Drop offs" : "Drop off")) : STEP_INFO[step].title} ({displayStepNum}/{totalSteps})
-                                </span>
-                            );
-                        })()}
-                        <div className="flex flex-col items-end gap-1.5 mt-[-4px]">
-                            <AnimatePresence>
-                                {step >= 2 && (data.distanceKm > 0 || data.calculatingRoute) && (
-                                    <motion.div
-                                        initial={{ opacity: 0, y: 5 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: 5 }}
-                                        className="flex items-center gap-2 bg-white px-2 py-0.5 rounded-lg border border-brand-100 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.1)] mb-1"
-                                    >
-                                        {data.calculatingRoute ? (
-                                            <span className="text-[10px] font-bold text-brand-600 animate-pulse w-full text-center px-2">Calculating Route...</span>
-                                        ) : (
-                                            <>
-                                                <span className="text-[11px] font-black text-gray-900 leading-none">{data.distanceKm.toFixed(1)} <span className="text-[8px] text-gray-500 font-medium tracking-tighter">km</span></span>
-                                                <div className="w-[3px] h-[3px] bg-brand-200 rounded-full" />
-                                                <div className="flex items-center gap-1">
-                                                    <div className="w-1.5 h-1.5 bg-brand-500 rounded-full animate-pulse" />
-                                                    <span className="text-[11px] font-black text-brand-600 leading-none">{data.etaTime}</span>
-                                                </div>
-                                                {(data as any).price > 0 && (
-                                                    <>
-                                                        <div className="w-[3px] h-[3px] bg-brand-200 rounded-full ml-1" />
-                                                        <span className="text-[11px] font-black text-gray-900 leading-none ml-1">
-                                                            KES {(data as any).price.toLocaleString()}
-                                                        </span>
-                                                    </>
-                                                )}
-                                            </>
-                                        )}
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                            <div className="flex space-x-1.5 opacity-80">
-                                {[0, 1, 2, 3, 4].map(i => (
-                                    <motion.div layout key={i} className={`h-1.5 rounded-full ${i === step ? 'w-5 bg-brand-600' : 'w-1.5 bg-gray-200'}`} />
-                                ))}
-                            </div>
+                <div className="px-5 pt-3 pb-1 flex flex-col items-center w-full z-10 bg-white flex-shrink-0">
+                    <div className="w-12 h-1 bg-gray-200 rounded-full mb-2 md:hidden" />
+                    <div className="w-full flex justify-between items-center">
+                        <AnimatePresence>
+                            {step >= 1 && (data.distanceKm > 0 || data.calculatingRoute) && (
+                                <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 5 }} className="flex items-center gap-2 text-[11px] font-black text-gray-500">
+                                    {data.calculatingRoute ? (
+                                        <span className="text-[10px] font-bold text-brand-600 animate-pulse">Calculating...</span>
+                                    ) : (
+                                        <>
+                                            <span className="text-brand-600">E.T.A {data.etaTime}</span>
+                                            {(data as any).price > 0 && (<>
+                                                <span className="w-1 h-1 rounded-full bg-gray-300" />
+                                                <span className="text-gray-900">KES {(data as any).price.toLocaleString()}</span>
+                                            </>)}
+                                        </>
+                                    )}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                        <div className="flex space-x-1.5 ml-auto">
+                            {[0, 1, 2, 3, 4].map(i => (
+                                <motion.div layout key={i} className={`h-1.5 rounded-full ${i === step ? 'w-5 bg-brand-600' : 'w-1.5 bg-gray-200'}`} />
+                            ))}
                         </div>
                     </div>
                 </div>
@@ -619,24 +590,26 @@ const Step1Where = ({ data, update, next }: any) => {
                                                                 if (isFinalDropoff) {
                                                                     update({ dropoff: '' });
                                                                     setDropoffCoords(null);
-                                                                    if (pickupCoords) { setTimeout(() => { 
-                                                                        const remaining = waypointCoords.filter(Boolean);
-                                                                        if (remaining.length === 0) {
-                                                                            if (typeof fitBounds === 'function') fitBounds([pickupCoords]);
-                                                                        } else {
-                                                                            let maxLatDiff = 0;
-                                                                            let maxLngDiff = 0;
-                                                                            remaining.forEach(d => {
-                                                                                maxLatDiff = Math.max(maxLatDiff, Math.abs(d.lat - pickupCoords.lat));
-                                                                                maxLngDiff = Math.max(maxLngDiff, Math.abs(d.lng - pickupCoords.lng));
-                                                                            });
-                                                                            const padding = 1.1;
-                                                                            if (typeof fitBounds === 'function') fitBounds([
-                                                                                { lat: pickupCoords.lat - (maxLatDiff * padding), lng: pickupCoords.lng - (maxLngDiff * padding) },
-                                                                                { lat: pickupCoords.lat + (maxLatDiff * padding), lng: pickupCoords.lng + (maxLngDiff * padding) }
-                                                                            ]);
-                                                                        }
-                                                                    }, 150); }
+                                                                    if (pickupCoords) {
+                                                                        setTimeout(() => {
+                                                                            const remaining = waypointCoords.filter(Boolean);
+                                                                            if (remaining.length === 0) {
+                                                                                if (typeof fitBounds === 'function') fitBounds([pickupCoords]);
+                                                                            } else {
+                                                                                let maxLatDiff = 0;
+                                                                                let maxLngDiff = 0;
+                                                                                remaining.forEach(d => {
+                                                                                    maxLatDiff = Math.max(maxLatDiff, Math.abs(d.lat - pickupCoords.lat));
+                                                                                    maxLngDiff = Math.max(maxLngDiff, Math.abs(d.lng - pickupCoords.lng));
+                                                                                });
+                                                                                const padding = 1.1;
+                                                                                if (typeof fitBounds === 'function') fitBounds([
+                                                                                    { lat: pickupCoords.lat - (maxLatDiff * padding), lng: pickupCoords.lng - (maxLngDiff * padding) },
+                                                                                    { lat: pickupCoords.lat + (maxLatDiff * padding), lng: pickupCoords.lng + (maxLngDiff * padding) }
+                                                                                ]);
+                                                                            }
+                                                                        }, 150);
+                                                                    }
                                                                 } else {
                                                                     const newWp = data.waypoints.filter((_: any, i: number) => i !== idx);
                                                                     const newCoords = waypointCoords.filter((_: any, i: number) => i !== idx);
@@ -782,8 +755,8 @@ const Step1Where = ({ data, update, next }: any) => {
                                             const newCoords = [...waypointCoords, pinnedCoords];
                                             update({ waypoints: newWp, dropoff: '' });
                                             setWaypointCoords(newCoords);
-                                            if (pickupCoords) { 
-                                                setTimeout(() => { 
+                                            if (pickupCoords) {
+                                                setTimeout(() => {
                                                     let maxLatDiff = 0;
                                                     let maxLngDiff = 0;
                                                     newCoords.filter(Boolean).forEach(d => {
@@ -795,7 +768,7 @@ const Step1Where = ({ data, update, next }: any) => {
                                                         { lat: pickupCoords.lat - (maxLatDiff * padding), lng: pickupCoords.lng - (maxLngDiff * padding) },
                                                         { lat: pickupCoords.lat + (maxLatDiff * padding), lng: pickupCoords.lng + (maxLngDiff * padding) }
                                                     ]);
-                                                }, 150); 
+                                                }, 150);
                                             }
                                         }
                                     } else {

@@ -7,9 +7,10 @@ interface DropdownMenuProps {
     isOpen: boolean;
     onClose: () => void;
     user: any;
+    align?: 'left' | 'right';
 }
 
-const DropdownMenu: React.FC<DropdownMenuProps> = ({ isOpen, onClose, user }) => {
+const DropdownMenu: React.FC<DropdownMenuProps> = ({ isOpen, onClose, user, align = 'right' }) => {
     const navigate = useNavigate();
     const { logout } = useAuth();
     const menuRef = useRef<HTMLDivElement>(null);
@@ -58,7 +59,7 @@ const DropdownMenu: React.FC<DropdownMenuProps> = ({ isOpen, onClose, user }) =>
     return (
         <div
             ref={menuRef}
-            className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-[200] pointer-events-auto"
+            className={`absolute ${align === 'left' ? 'left-0' : 'right-0'} top-full mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-[200] pointer-events-auto`}
             onClick={(e) => e.stopPropagation()}
         >
             <div className="p-4 border-b border-gray-100">

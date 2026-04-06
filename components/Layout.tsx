@@ -21,7 +21,7 @@ const Layout: React.FC<LayoutProps> = ({ onOpenProfile, onLogin }) => {
     return (
         <div className={`relative min-h-screen min-h-[100dvh] flex flex-col font-sans pb-[env(safe-area-inset-bottom)] ${!isMapPage ? (isDarkPage ? 'bg-[#0f172a]' : 'bg-slate-50') : 'overflow-hidden'}`}>
             {/* UI Layer */}
-            <div className={`relative z-10 flex flex-col min-h-screen min-h-[100dvh] ${isMapPage ? 'pointer-events-none' : ''}`}>
+            <div className={`relative z-10 flex flex-col min-h-screen min-h-[100dvh] ${isMapPage ? 'pointer-events-none overflow-hidden h-screen h-[100dvh]' : ''}`}>
                 {!isDashboard && (
                     <div className="pointer-events-auto p-4 absolute top-0 left-0 right-0 z-[100]">
                         <Navbar
