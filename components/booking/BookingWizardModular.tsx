@@ -30,7 +30,7 @@ interface BookingWizardProps {
 
 const WizardContent: React.FC<BookingWizardProps> = ({ prefillData, onOrderComplete, onCollapseChange, startAtDashboard }) => {
     const { data, updateData, step, direction, nextStep } = useBooking();
-    const { pickupCoords, dropoffCoords, waypointCoords, setRoutePolyline, setIsMapSelecting, setActiveInput, setPickupCoords, setWaypointCoords, setDropoffCoords, userLocation, requestUserLocation, ensureFreshLocation, isMapSelecting, activeInput, mapCenter, setMapCenter, fitBounds, setBottomSheetHeight, setOrderState } = useMapState();
+    const { pickupCoords, dropoffCoords, waypointCoords, routePolyline, setRoutePolyline, setIsMapSelecting, setActiveInput, setPickupCoords, setWaypointCoords, setDropoffCoords, userLocation, requestUserLocation, ensureFreshLocation, isMapSelecting, activeInput, mapCenter, setMapCenter, fitBounds, setBottomSheetHeight, setOrderState } = useMapState();
 
     // Guard: skip mapCenter watcher until initial location is settled
     const initialSettled = useRef(false);
@@ -312,9 +312,11 @@ const WizardContent: React.FC<BookingWizardProps> = ({ prefillData, onOrderCompl
             vehicle: data.vehicle,
             items: {
                 itemDesc: `${data.category} - ${data.subCategory}`,
+                category: data.category as any,
+                subCategory: data.subCategory,
                 weightKg: parseInt(data.dimensions.weight) || 1,
-                fragile: false,
-                value: 0
+                fragile: data.isFragile || false,
+                value: data.itemValue || 0
             },
             price: finalPrice,
             driverRate: data.driverRate || Math.max(100, Math.round(finalPrice * 0.8)),
@@ -328,6 +330,7 @@ const WizardContent: React.FC<BookingWizardProps> = ({ prefillData, onOrderCompl
             serviceType: data.serviceType || 'Standard (Same Day)',
             quoteId: data.quoteId || null,
             helpersCount: data.helpersCount || 0,
+            routeGeometry: routePolyline || null,
             stops: [
                 ...intermediateWaypoints.map((addr, idx) => ({
                     id: `wp-${idx}`,

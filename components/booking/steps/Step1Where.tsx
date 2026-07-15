@@ -6,6 +6,7 @@ import { useMapState } from '@/context/MapContext';
 import { useAuth } from '@/context/AuthContext';
 import { useUserOrders } from '../../../hooks/useOrders';
 import { mapService } from '../../../services/mapService';
+import { isLocationSupported, findTown, UNSUPPORTED_MESSAGE } from '../../../services/serviceArea';
 
 export const Step1Where = () => {
     const { data, updateData, nextStep } = useBooking();
@@ -21,6 +22,8 @@ export const Step1Where = () => {
     }, [data.dropoff, data.pickup]);
 
     const maxDropoffsReached = data.waypoints.length >= 5;
+
+    const [areaError, setAreaError] = useState<string | null>(null);
 
     const [pickupSuggestions, setPickupSuggestions] = useState<any[]>([]);
     const [dropoffSuggestions, setDropoffSuggestions] = useState<any[]>([]);
@@ -44,6 +47,19 @@ export const Step1Where = () => {
         fitBounds,
         requestUserLocation,
     } = useMapState();
+
+    // Service-area validation: reject locations outside the 5 supported towns
+    const validateArea = (coords: { lat: number; lng: number } | null) => {
+        if (!coords) { setAreaError(null); return; }
+        if (!isLocationSupported(coords.lat, coords.lng)) {
+            setAreaError(UNSUPPORTED_MESSAGE);
+        } else {
+            setAreaError(null);
+        }
+    };
+
+    useEffect(() => { validateArea(pickupCoords); }, [pickupCoords]);
+    useEffect(() => { validateArea(dropoffCoords); }, [dropoffCoords]);
 
     // Auto-locate is handled by BookingWizardModular's WizardContent on mount.
     // We only need to handle the case where the user clears the pickup field manually.
@@ -301,8 +317,9 @@ export const Step1Where = () => {
     };
 
     const isReadyToContinue =
-        (!pickupConfirmed) ||
-        (pickupConfirmed && !!(pickupCoords && (dropoffCoords || data.dropoff.trim())));
+        !areaError &&
+        ((!pickupConfirmed) ||
+        (pickupConfirmed && !!(pickupCoords && (dropoffCoords || data.dropoff.trim()))));
 
     const showRecentDestinations =
         (pickupConfirmed ? recentDropoffs.length > 0 : recentPickups.length > 0) &&
@@ -609,6 +626,23 @@ export const Step1Where = () => {
                 </div>
             )}
 
+
+            {/* Service Area Error */}
+            <AnimatePresence>
+                {areaError && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                    >
+                        <div className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2.5 mb-1">
+                            <MapPin className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                            <p className="text-[11px] font-semibold text-amber-800 leading-snug">{areaError}</p>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Continue Button */}
             <div className="flex items-stretch gap-2 w-full mt-2 h-[48px] sticky bottom-0 bg-white z-10">

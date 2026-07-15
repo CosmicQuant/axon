@@ -23,15 +23,13 @@ export const Step2What = () => {
             { id: 'Custom Dimensions', label: 'Custom', desc: 'Custom', examples: 'enter sizes below', img: '/icons3d/triangular_ruler.png' }
         ],
         'B': [
-            { id: 'TVs', label: 'TVs (All Sizes)', desc: 'Secure transit', img: '/icons3d/television.png' },
-            { id: 'Fridges & Freezers', label: 'Fridges & Freezers', desc: 'Upright handling', img: '/icons3d/ice.png' },
-            { id: 'Washing Machines', label: 'Washing Machines', desc: 'Heavy appliances', img: '/icons3d/gear.png' },
-            { id: 'Sofas & Seats', label: 'Sofas & Seats', desc: 'Furniture delivery', img: '/icons3d/couch_and_lamp.png' },
-            { id: 'Beds & Mattresses', label: 'Beds & Mattresses', desc: 'Bedroom furniture', img: '/icons3d/bed.png' },
-            { id: 'Hardware', label: 'Hardware/Construction', desc: 'Raw materials', img: '/icons3d/hammer.png' },
-            { id: 'Agricultural Sacks', label: '90kg Ag Sacks', desc: 'Cereals & Produce', img: '/icons3d/sheaf_of_rice.png' },
-            { id: 'LPG & Gas', label: 'LPG / Gas (Bulk)', desc: 'Tanker transport', img: '/icons3d/fuel_pump.png' },
-            { id: 'Petroleum & Oil', label: 'Petroleum / Oil', desc: 'Liquid bulk', img: '/icons3d/oil_drum.png' },
+            { id: 'Electronics', label: 'Electronics (TVs)', desc: 'All sizes — secure transit', img: '/icons3d/television.png' },
+            { id: 'Large Appliances', label: 'Large Appliances', desc: 'Fridges, freezers, washing machines', img: '/icons3d/ice.png' },
+            { id: 'Furniture', label: 'Furniture', desc: 'Sofas, beds, mattresses', img: '/icons3d/couch_and_lamp.png' },
+            { id: 'Hardware / Construction', label: 'Hardware / Construction', desc: 'Raw materials', img: '/icons3d/hammer.png' },
+            { id: 'Agricultural', label: '90kg Ag Sacks', desc: 'Cereals & produce', img: '/icons3d/sheaf_of_rice.png' },
+            { id: 'LPG / Gas (Bulk)', label: 'LPG / Gas (Bulk)', desc: 'Tanker transport', img: '/icons3d/fuel_pump.png' },
+            { id: 'Petroleum / Oil', label: 'Petroleum / Oil', desc: 'Liquid bulk', img: '/icons3d/oil_drum.png' },
             { id: 'Loose Aggregate', label: 'Loose Aggregate', desc: 'Sand, gravel, ballast', img: '/icons3d/rock.png' }
         ]
     };

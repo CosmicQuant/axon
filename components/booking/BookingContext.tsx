@@ -35,6 +35,7 @@ export interface BookingState {
     // Enterprise Pricing Fields
     quoteId?: string;
     price?: number;
+    driverRate?: number;
     calculatingQuote?: boolean;
     helpersCount?: number;
 }

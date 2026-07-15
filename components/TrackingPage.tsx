@@ -90,11 +90,11 @@ const TrackingPageContent: React.FC = () => {
                 }
 
                 // Update Route for customer
-                if (order.routeGeometry && order.driverLocation) {
-                    // Only use stored routeGeometry when driver is active (avoids stale route after edits)
+                if (order.routeGeometry) {
+                    // Reuse the polyline persisted at booking time so the route stays
+                    // visible during the pending state (no async re-fetch gap).
                     setRoutePolyline(order.routeGeometry);
-                } else {
-                    if (order.driverLocation) {
+                } else if (order.driverLocation) {
                         // Throttle driver-location-triggered route updates to every 15s
                         const now = Date.now();
                         if (now - lastRouteUpdate.current > 15000 || !lastRouteUpdate.current) {
@@ -140,7 +140,6 @@ const TrackingPageContent: React.FC = () => {
                         const route = await mapService.getRoute(p, d, waypoints, order.vehicle, false);
                         if (route) setRoutePolyline(route.geometry);
                     }
-                }
 
                 if (order.vehicle) {
                     setDriverVehicleType(order.vehicle);

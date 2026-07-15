@@ -62,7 +62,10 @@ export const Step3How = () => {
                     vehicle: isStandard ? 'standard' : (data.vehicle || 'boda'),
                     serviceType: data.serviceType,
                     helpersCount: data.helpersCount || 0,
-                    isReturnTrip: data.isReturnTrip || false
+                    isReturnTrip: data.isReturnTrip || false,
+                    isFragile: data.isFragile || false,
+                    category: data.category,
+                    subCategory: data.subCategory
                 });
 
                 if (requestId !== quoteRequestRef.current) return;

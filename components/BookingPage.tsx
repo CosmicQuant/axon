@@ -22,6 +22,7 @@ const BookingPageContent: React.FC<BookingPageProps> = ({ prefillData: propPrefi
     const location = useLocation();
     const { user } = useAuth();
     const createOrderMutation = useCreateOrder();
+    const navigatingToTrackRef = React.useRef(false);
 
     // Redirect drivers away from booking page
     useEffect(() => {
@@ -90,11 +91,15 @@ const BookingPageContent: React.FC<BookingPageProps> = ({ prefillData: propPrefi
         onClearPrefill?.();
 
         return () => {
-            setOrderState('IDLE');
-            setPickupCoords(null);
-            setDropoffCoords(null);
-            setWaypointCoords([]);
-            setRoutePolyline(null);
+            if (navigatingToTrackRef.current) {
+                setOrderState('MATCHING');
+            } else {
+                setOrderState('IDLE');
+                setPickupCoords(null);
+                setDropoffCoords(null);
+                setWaypointCoords([]);
+                setRoutePolyline(null);
+            }
         };
     }, [ensureFreshLocation, setOrderState, onClearPrefill, setPickupCoords, setDropoffCoords, setWaypointCoords, setRoutePolyline]);
 
@@ -118,7 +123,11 @@ const BookingPageContent: React.FC<BookingPageProps> = ({ prefillData: propPrefi
             return;
         }
 
-        const orderWithUser = { ...order, userId: user.id };
+        const orderWithUser = {
+            ...order,
+            userId: user.id,
+            sender: { name: user.name || user.email || 'Customer', phone: user.phone || '' }
+        };
 
         try {
             const newOrder = await createOrderMutation.mutateAsync(orderWithUser);
@@ -127,6 +136,7 @@ const BookingPageContent: React.FC<BookingPageProps> = ({ prefillData: propPrefi
             onClearPrefill?.();
             sessionStorage.removeItem(PENDING_BOOKING_KEY);
 
+            navigatingToTrackRef.current = true;
             navigate(`/track/${newOrder.id}`);
         } catch (error) {
             console.error("Failed to create order", error);

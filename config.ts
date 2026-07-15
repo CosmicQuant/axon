@@ -9,8 +9,8 @@ export const APP_CONFIG = {
   // Firebase Functions URL (Update this with your actual project URL)
   API_BASE_URL: 'https://us-central1-axon-8b0a8.cloudfunctions.net',
 
-  // Google Gemini API Key
-  GEMINI_API_KEY: import.meta.env.VITE_GEMINI_API_KEY || '',
+  // Google Gemini API Key (exposed via vite.config define from GEMINI_API_KEY in .env.local)
+  GEMINI_API_KEY: (import.meta.env.VITE_GEMINI_API_KEY as string) || (process.env.GEMINI_API_KEY as string) || '',
 
   // Google Maps API Key (Fall back to Firebase API key if Maps specific key is missing)
   GOOGLE_MAPS_API_KEY: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || import.meta.env.VITE_FIREBASE_API_KEY || ''

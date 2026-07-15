@@ -6,15 +6,13 @@ export const CARGO_VEHICLE_MAP: Record<string, string[]> = {
     // No overrides needed for Document, Small Box, Medium Box, Large Box, Jumbo Box, Custom Dimensions
 
     // Category B — specific vehicle restrictions
-    'TVs': ['probox', 'van', 'pickup', 'canter', 'lorry-5t', 'lorry-7t', 'lorry-10t'],
-    'Fridges & Freezers': ['van', 'pickup', 'canter', 'lorry-5t', 'lorry-7t', 'lorry-10t'],
-    'Washing Machines': ['van', 'pickup', 'canter', 'lorry-5t', 'lorry-7t'],
-    'Sofas & Seats': ['van', 'pickup', 'canter', 'lorry-5t', 'lorry-7t', 'lorry-10t'],
-    'Beds & Mattresses': ['van', 'pickup', 'canter', 'lorry-5t', 'lorry-7t', 'lorry-10t'],
-    'Hardware': ['pickup', 'canter', 'lorry-5t', 'lorry-7t', 'lorry-10t', 'lorry-14t', 'tipper-7t', 'tipper-14t', 'tipper-25t'],
-    'Agricultural Sacks': ['canter', 'lorry-5t', 'lorry-7t', 'lorry-10t', 'lorry-14t'],
-    'LPG & Gas': ['lpg-tanker'],
-    'Petroleum & Oil': ['fuel-tanker'],
+    'Electronics': ['probox', 'van', 'pickup', 'canter', 'lorry-5t', 'lorry-7t', 'lorry-10t'],
+    'Large Appliances': ['van', 'pickup', 'canter', 'lorry-5t', 'lorry-7t', 'lorry-10t'],
+    'Furniture': ['van', 'pickup', 'canter', 'lorry-5t', 'lorry-7t', 'lorry-10t'],
+    'Hardware / Construction': ['pickup', 'canter', 'lorry-5t', 'lorry-7t', 'lorry-10t', 'lorry-14t', 'tipper-7t', 'tipper-14t', 'tipper-25t'],
+    'Agricultural': ['canter', 'lorry-5t', 'lorry-7t', 'lorry-10t', 'lorry-14t'],
+    'LPG / Gas (Bulk)': ['lpg-tanker'],
+    'Petroleum / Oil': ['fuel-tanker'],
     'Loose Aggregate': ['tipper-7t', 'tipper-14t', 'tipper-25t'],
 };
 

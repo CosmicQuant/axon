@@ -51,14 +51,98 @@ const VEHICLE_RATES = {
     'standard': { base: 100, perKm: 1.0, perMin: 0, stopFee: 20, min: 80 },
 };
 
-// Express = baseline, Standard = 25% discount (batch consolidation margin)
-const SERVICE_MULTIPLIERS = { 'Standard': 0.75, 'Express': 1.0 };
+// Express = baseline, Standard = consolidated discount
 const HELPER_FEE = 500;
 const RETURN_TRIP_MULTIPLIER = 1.7;
 const FRAGILE_SURCHARGE = 200;
 
+// ── Fuel / Power cost config (EPRA / KPLC — update monthly) ────
+const FUEL_PRICE_PETROL = parseFloat(process.env.FUEL_PRICE_PETROL || '192');  // KES / litre
+const FUEL_PRICE_DIESEL = parseFloat(process.env.FUEL_PRICE_DIESEL || '170');  // KES / litre
+const POWER_TARIFF      = parseFloat(process.env.POWER_TARIFF || '26');        // KES / kWh (KPLC)
+
+// Vehicle fuel / energy consumption profiles
+const VEHICLE_FUEL = {
+    'boda':      { energy: 'electric', kwhPerKm: 0.04, lPerKm: 0.045, fuel: 'petrol' },
+    'tuktuk':    { energy: 'petrol',   lPerKm: 0.06,  fuel: 'petrol' },
+    'probox':    { energy: 'petrol',   lPerKm: 0.08,  fuel: 'petrol' },
+    'van':       { energy: 'diesel',   lPerKm: 0.10,  fuel: 'diesel' },
+    'pickup':    { energy: 'diesel',   lPerKm: 0.12,  fuel: 'diesel' },
+    'canter':    { energy: 'diesel',   lPerKm: 0.18,  fuel: 'diesel' },
+    'lorry-5t':  { energy: 'diesel',   lPerKm: 0.22,  fuel: 'diesel' },
+    'lorry-7t':  { energy: 'diesel',   lPerKm: 0.28,  fuel: 'diesel' },
+    'lorry-10t': { energy: 'diesel',   lPerKm: 0.35,  fuel: 'diesel' },
+    'lorry-14t': { energy: 'diesel',   lPerKm: 0.42,  fuel: 'diesel' },
+    'tipper-7t':   { energy: 'diesel', lPerKm: 0.30, fuel: 'diesel' },
+    'tipper-14t':  { energy: 'diesel', lPerKm: 0.40, fuel: 'diesel' },
+    'tipper-25t':  { energy: 'diesel', lPerKm: 0.55, fuel: 'diesel' },
+    'container-20ft': { energy: 'diesel', lPerKm: 0.45, fuel: 'diesel' },
+    'container-40ft': { energy: 'diesel', lPerKm: 0.60, fuel: 'diesel' },
+    'lpg-tanker':  { energy: 'diesel', lPerKm: 0.50, fuel: 'diesel' },
+    'fuel-tanker': { energy: 'diesel', lPerKm: 0.55, fuel: 'diesel' },
+    'standard':    { energy: 'electric', kwhPerKm: 0.04, lPerKm: 0.045, fuel: 'petrol' },
+};
+
+// Business parameters
+const COMMISSION_RATE       = 0.15;   // Axon commission on subtotal
+const CONSOLIDATION_DISCOUNT = 0.55;  // Standard intra-city batching discount
+const EXPRESS_PREMIUM       = 50;     // KES on-demand surcharge
+const MIN_INTRA_CITY        = 80;     // KES minimum for intra-city standard
+const MIN_EXPRESS           = 150;    // KES minimum for intra-city express
+const MAINTENANCE_PER_KM    = 2;      // KES/km wear-and-tear
+const DRIVER_BASE_PAY       = 30;     // KES base driver pay
+const DRIVER_PER_KM         = 15;     // KES/km driver pay
+
+// ── Parcel tier mapping (inter-city flat pricing) ───────────────
+const PARCEL_TIERS = {
+    'Document': 'small',
+    'Small Box': 'small',
+    'Medium Box': 'medium',
+    'Large Box': 'medium',
+    'Jumbo Box': 'jumbo',
+    'Custom Dimensions': 'jumbo',
+};
+const INTERCITY_FLAT_PRICES = { small: 300, medium: 500, jumbo: 700 };
+
+// ── Bulk / specialised categories (distance × vehicle rates) ───
+const BULK_SUBCATEGORIES = [
+    'Electronics', 'Large Appliances', 'Furniture',
+    'Hardware / Construction', 'Agricultural', 'LPG / Gas (Bulk)',
+    'Petroleum / Oil', 'Loose Aggregate',
+];
+
 // Google Maps API key for server-side Routes API calls
 const GOOGLE_MAPS_KEY = process.env.GOOGLE_MAPS_KEY || '';
+
+// ── Service Area (5 supported towns) ─────────────────────────────
+const SUPPORTED_TOWNS = [
+    { name: 'Nairobi', lat: -1.2864, lng: 36.8172, radiusKm: 25 },
+    { name: 'Mombasa', lat: -4.0435, lng: 39.6682, radiusKm: 20 },
+    { name: 'Garissa', lat: -0.4536, lng: 39.6461, radiusKm: 12 },
+    { name: 'Wajir', lat: 1.7508, lng: 40.0449, radiusKm: 10 },
+    { name: 'Ukunda', lat: -4.2700, lng: 39.4147, radiusKm: 10 },
+];
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function findTown(lat, lng) {
+    for (const town of SUPPORTED_TOWNS) {
+        if (haversineKm(lat, lng, town.lat, town.lng) <= town.radiusKm) return town;
+    }
+    return null;
+}
+
+function isLocationSupported(lat, lng) {
+    return findTown(lat, lng) !== null;
+}
 
 // ── Routes API V2 — Real distance + duration ───────────────────
 async function getRouteFromGoogleV2(origin, destination, waypoints = [], vehicleType = 'boda') {
@@ -119,39 +203,82 @@ async function getRouteFromGoogleV2(origin, destination, waypoints = [], vehicle
     };
 }
 
-// ── Haversine fallback (if Routes API key not configured) ──────
-function haversineKm(lat1, lon1, lat2, lon2) {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) ** 2 +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-        Math.sin(dLon / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-// ── UNIFIED PRICE FORMULA ──────────────────────────────────────
-function computePrice({ distanceKm, durationMinutes, vehicle, serviceType, helpersCount = 0, isReturnTrip = false, isFragile = false, stopCount = 0 }) {
+// ── UNIFIED PRICE FORMULA (v2) ─────────────────────────────────
+// Three pricing models:
+//   1. intercity_flat   — parcel tiers, flat KES between supported towns
+//   2. intra_city       — fuel-aware formula (Standard = consolidated electric boda, Express = on-demand)
+//   3. bulk             — distance × vehicle rates for heavy / specialised cargo
+function computePrice({ distanceKm, durationMinutes, vehicle, serviceType, helpersCount = 0, isReturnTrip = false, isFragile = false, stopCount = 0, isIntercity = false, category = 'A', subCategory = '' }) {
     const rates = VEHICLE_RATES[vehicle] || VEHICLE_RATES['boda'];
-    const multiplier = SERVICE_MULTIPLIERS[serviceType] || 1.0;
+    const fuel = VEHICLE_FUEL[vehicle] || VEHICLE_FUEL['boda'];
+    const isBulk = category === 'B' || BULK_SUBCATEGORIES.includes(subCategory);
+    const round10 = (n) => Math.round(n / 10) * 10;
 
-    const billableKm = Math.max(0, distanceKm - 2); // first 2km included in base
-    const extraStopFee = Math.max(0, stopCount) * rates.stopFee;
-    const intercitySurcharge = distanceKm > 100 ? (rates.base * 0.5) : 0;
+    // ── 1. Inter-city parcel flat pricing ──────────────────────
+    if (isIntercity && !isBulk) {
+        const tier = PARCEL_TIERS[subCategory] || 'medium';
+        let price = INTERCITY_FLAT_PRICES[tier];
+        // Standard gets a small consolidation discount on inter-city too
+        if (serviceType === 'Standard') price = Math.round(price * 0.9);
+        price += stopCount * 50; // flat stop fee for inter-city parcels
+        if (isReturnTrip) price = Math.round(price * RETURN_TRIP_MULTIPLIER);
+        if (isFragile) price += FRAGILE_SURCHARGE;
+        const driverCut = Math.round(price * 0.7);
+        return { price: round10(Math.max(price, INTERCITY_FLAT_PRICES.small)), driverCut, model: 'intercity_flat' };
+    }
 
-    let total = (rates.base + (billableKm * rates.perKm) + (durationMinutes * rates.perMin) + extraStopFee + intercitySurcharge) * multiplier;
+    // ── 3. Bulk / specialised cargo (inter-city or intra-city) ─
+    if (isBulk) {
+        const billableKm = Math.max(0, distanceKm - 2);
+        const extraStopFee = Math.max(0, stopCount) * rates.stopFee;
+        const intercitySurcharge = isIntercity ? (rates.base * 0.3) : 0;
 
-    if (isReturnTrip) total *= RETURN_TRIP_MULTIPLIER;
-    total += helpersCount * HELPER_FEE;
-    if (isFragile) total += FRAGILE_SURCHARGE;
+        let total = rates.base + (billableKm * rates.perKm) + extraStopFee + intercitySurcharge;
+        if (isReturnTrip) total *= RETURN_TRIP_MULTIPLIER;
+        total += helpersCount * HELPER_FEE;
+        if (isFragile) total += FRAGILE_SURCHARGE;
+        total = Math.max(total, rates.min);
+        const driverCut = Math.round(total * 0.75);
+        return { price: round10(total), driverCut, model: 'bulk' };
+    }
 
-    total = Math.max(total, rates.min * multiplier);
-    return Math.round(total / 10) * 10; // round to nearest 10 KES
+    // ── 2. Intra-city parcels (fuel-aware) ─────────────────────
+    const fuelCost = fuel.energy === 'electric'
+        ? distanceKm * fuel.kwhPerKm * POWER_TARIFF
+        : distanceKm * fuel.lPerKm * (fuel.fuel === 'diesel' ? FUEL_PRICE_DIESEL : FUEL_PRICE_PETROL);
+
+    const maintenance = distanceKm * MAINTENANCE_PER_KM;
+    const driverCut = DRIVER_BASE_PAY + (distanceKm * DRIVER_PER_KM);
+    const subtotal = fuelCost + maintenance + driverCut;
+    const commission = subtotal * COMMISSION_RATE;
+
+    let price;
+    let model;
+
+    if (serviceType === 'Standard') {
+        // Consolidated delivery (8am / 12pm / 4pm windows, electric boda batching)
+        price = (subtotal + commission) * CONSOLIDATION_DISCOUNT;
+        price += stopCount * 20;
+        model = 'intra_standard';
+        price = Math.max(price, MIN_INTRA_CITY);
+    } else {
+        // Express on-demand
+        price = subtotal + commission + EXPRESS_PREMIUM;
+        price += stopCount * rates.stopFee;
+        model = 'intra_express';
+        price = Math.max(price, MIN_EXPRESS);
+    }
+
+    if (isReturnTrip) price *= RETURN_TRIP_MULTIPLIER;
+    if (isFragile) price += FRAGILE_SURCHARGE;
+    price += helpersCount * HELPER_FEE;
+
+    return { price: round10(price), driverCut: round10(driverCut), model };
 }
 
 // ── CALLABLE CLOUD FUNCTION ────────────────────────────────────
 exports.calculateQuote = functions.https.onCall(async (data, context) => {
-    const { pickupCoords, dropoffCoords, waypoints = [], vehicle, serviceType, helpersCount = 0, isReturnTrip = false, isFragile = false } = data;
+    const { pickupCoords, dropoffCoords, waypoints = [], vehicle, serviceType, helpersCount = 0, isReturnTrip = false, isFragile = false, category = 'A', subCategory = '' } = data;
 
     if (!pickupCoords || !dropoffCoords || !vehicle) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing required coordinates or vehicle type.');
@@ -161,6 +288,29 @@ exports.calculateQuote = functions.https.onCall(async (data, context) => {
     if (!rates) {
         throw new functions.https.HttpsError('invalid-argument', `Unsupported vehicle type: ${vehicle}`);
     }
+
+    // Service-area enforcement: pickup, dropoff, and all waypoints must be
+    // within one of the 5 supported towns.
+    if (!isLocationSupported(pickupCoords.lat, pickupCoords.lng)) {
+        throw new functions.https.HttpsError('failed-precondition',
+            "We don't serve this pickup area yet. Axon is live in Nairobi, Mombasa, Garissa, Wajir & Ukanda.");
+    }
+    if (!isLocationSupported(dropoffCoords.lat, dropoffCoords.lng)) {
+        throw new functions.https.HttpsError('failed-precondition',
+            "We don't serve this drop-off area yet. Axon is live in Nairobi, Mombasa, Garissa, Wajir & Ukanda.");
+    }
+    if (Array.isArray(waypoints)) {
+        for (const wp of waypoints) {
+            if (!isLocationSupported(wp.lat, wp.lng)) {
+                throw new functions.https.HttpsError('failed-precondition',
+                    "One of your stops is outside our service area. Axon is live in Nairobi, Mombasa, Garissa, Wajir & Ukanda.");
+            }
+        }
+    }
+
+    const pickupTown = findTown(pickupCoords.lat, pickupCoords.lng);
+    const dropoffTown = findTown(dropoffCoords.lat, dropoffCoords.lng);
+    const isIntercity = pickupTown.name !== dropoffTown.name;
 
     // Count extra stops (waypoints excluding dropoff)
     const stopCount = Array.isArray(waypoints) ? waypoints.length : 0;
@@ -188,13 +338,13 @@ exports.calculateQuote = functions.https.onCall(async (data, context) => {
 
     if (distanceKm < 1) distanceKm = 1;
 
-    const finalPrice = computePrice({
+    const result = computePrice({
         distanceKm, durationMinutes, vehicle, serviceType,
-        helpersCount, isReturnTrip, isFragile, stopCount
+        helpersCount, isReturnTrip, isFragile, stopCount,
+        isIntercity, category, subCategory
     });
-
-    // Driver payout = 80% of fare
-    const driverRate = Math.max(100, Math.round(finalPrice * 0.8));
+    const finalPrice = result.price;
+    const driverRate = Math.max(100, result.driverCut);
 
     const quoteId = `QT-${Math.random().toString(36).substr(2, 8).toUpperCase()}`;
     const expiresAt = new Date(Date.now() + 15 * 60000);
@@ -202,15 +352,15 @@ exports.calculateQuote = functions.https.onCall(async (data, context) => {
     await admin.firestore().collection('quotes').doc(quoteId).set({
         pickupCoords, dropoffCoords, waypoints,
         vehicle, serviceType, helpersCount, isReturnTrip, isFragile,
+        category, subCategory,
         distanceKm: Number(distanceKm.toFixed(1)),
         durationMinutes: Number(durationMinutes.toFixed(1)),
         price: finalPrice, driverRate,
+        pricingModel: result.model,
+        pickupTown: pickupTown.name, dropoffTown: dropoffTown.name, isIntercity,
         expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
         status: 'active'
     });
-
-    const multiplier = SERVICE_MULTIPLIERS[serviceType] || 1.0;
-    const billableKm = Math.max(0, distanceKm - 2);
 
     return {
         quoteId,
@@ -218,15 +368,20 @@ exports.calculateQuote = functions.https.onCall(async (data, context) => {
         driverRate,
         distanceKm: Number(distanceKm.toFixed(1)),
         durationMinutes: Number(durationMinutes.toFixed(1)),
+        pricingModel: result.model,
+        isIntercity,
         breakdown: {
             baseFare: rates.base,
-            distanceFare: Math.round(billableKm * rates.perKm),
+            distanceFare: Math.round(Math.max(0, distanceKm - 2) * rates.perKm),
             timeFare: Math.round(durationMinutes * rates.perMin),
             stopFees: stopCount * rates.stopFee,
             helpersFee: helpersCount * HELPER_FEE,
             fragileFee: isFragile ? FRAGILE_SURCHARGE : 0,
-            serviceMultiplier: multiplier,
-            returnTripMultiplier: isReturnTrip ? RETURN_TRIP_MULTIPLIER : 1.0
+            returnTripMultiplier: isReturnTrip ? RETURN_TRIP_MULTIPLIER : 1.0,
+            fuelPricePetrol: FUEL_PRICE_PETROL,
+            fuelPriceDiesel: FUEL_PRICE_DIESEL,
+            powerTariff: POWER_TARIFF,
+            commissionRate: COMMISSION_RATE
         },
         expiresAt: expiresAt.toISOString()
     };
