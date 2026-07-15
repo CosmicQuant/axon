@@ -13,6 +13,7 @@ const carriers = [
         gradient: 'from-cyan-400 to-blue-500',
         accentText: 'text-cyan-400',
         cta: 'Join Network',
+        image: 'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=900&q=80',
     },
     {
         id: '3pl',
@@ -24,6 +25,7 @@ const carriers = [
         gradient: 'from-violet-400 to-purple-500',
         accentText: 'text-violet-400',
         cta: 'Join Network',
+        image: 'https://images.unsplash.com/photo-1494412574643-ff11b0a5c1c3?auto=format&fit=crop&w=900&q=80',
     },
     {
         id: 'riders',
@@ -35,6 +37,7 @@ const carriers = [
         gradient: 'from-emerald-400 to-green-500',
         accentText: 'text-emerald-400',
         cta: 'Start Earning',
+        image: 'https://images.unsplash.com/photo-1558981852-426c6c22a060?auto=format&fit=crop&w=900&q=80',
     },
 ];
 
@@ -191,9 +194,9 @@ const CarrierNetworkSection: React.FC = () => {
                                 <div ref={(el) => { sectionRefs.current[idx] = el; }} key={carrier.title} className="relative grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] items-center gap-12 lg:gap-16 scroll-reveal anim-up w-full">
 
                                     {/* Left Side Container */}
-                                    <div className={isRightAligned ? 'hidden lg:flex justify-end' : 'hidden lg:block'}>
+                                    <div className={isRightAligned ? 'hidden lg:flex justify-end' : 'hidden lg:flex justify-end'}>
                                         {/* If it's right-aligned, the text is on the left side of the line */}
-                                        {isRightAligned && (
+                                        {isRightAligned ? (
                                             <div className="text-right max-w-md pr-8 lg:ml-auto">
                                                 <div className={`inline-block mb-4 text-[10px] font-black uppercase tracking-widest ${carrier.accentText} bg-white/5 border border-white/10 px-4 py-2 rounded-full`}>
                                                     {carrier.subtitle}
@@ -223,6 +226,11 @@ const CarrierNetworkSection: React.FC = () => {
                                                     <ArrowRight className="w-6 h-6 group-hover:translate-x-2 transition-transform" />
                                                 </button>
                                             </div>
+                                        ) : (
+                                            <div className="relative w-full max-w-md ml-auto rounded-3xl overflow-hidden shadow-2xl border border-white/10 group">
+                                                <img src={carrier.image} alt={carrier.title} className="w-full h-72 object-cover transition-transform duration-700 group-hover:scale-105" loading="lazy" />
+                                                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
+                                            </div>
                                         )}
                                     </div>
 
@@ -230,36 +238,77 @@ const CarrierNetworkSection: React.FC = () => {
                                     <div className="hidden lg:block w-16" />
 
                                     {/* Right Side Container */}
-                                    <div className={`flex w-full ${isRightAligned ? 'lg:hidden' : ''}`}>
-                                        <div className="max-w-md text-left lg:pl-8 lg:mr-auto">
-                                            <div className={`inline-block mb-4 text-[10px] font-black uppercase tracking-widest ${carrier.accentText} bg-white/5 border border-white/10 px-4 py-2 rounded-full`}>
-                                                {carrier.subtitle}
-                                            </div>
-                                            <h3 className="text-3xl md:text-5xl font-bold text-white mb-6 tracking-tight">
-                                                {carrier.title}
-                                            </h3>
-                                            <p className="text-lg text-slate-400 leading-relaxed mb-10">
-                                                {carrier.description}
-                                            </p>
-
-                                            <div className="flex flex-col gap-4 mb-8">
-                                                {carrier.perks.map((perk, i) => (
-                                                    <div key={i} className="flex items-center gap-4">
-                                                        <div className="w-2 h-2 rounded-full relative bg-white/20 shrink-0">
-                                                            <div className="absolute inset-0 rounded-full animate-ping bg-emerald-400 opacity-75" />
-                                                        </div>
-                                                        <span className="text-slate-300 font-medium text-lg">{perk}</span>
+                                    <div className="flex w-full">
+                                        {/* On desktop right-aligned rows: show image; else show text. Mobile always shows text. */}
+                                        {isRightAligned ? (
+                                            <>
+                                                {/* Mobile: text */}
+                                                <div className="max-w-md text-left lg:hidden">
+                                                    <div className={`inline-block mb-4 text-[10px] font-black uppercase tracking-widest ${carrier.accentText} bg-white/5 border border-white/10 px-4 py-2 rounded-full`}>
+                                                        {carrier.subtitle}
                                                     </div>
-                                                ))}
-                                            </div>
+                                                    <h3 className="text-3xl md:text-5xl font-bold text-white mb-6 tracking-tight">
+                                                        {carrier.title}
+                                                    </h3>
+                                                    <p className="text-lg text-slate-400 leading-relaxed mb-10">
+                                                        {carrier.description}
+                                                    </p>
 
-                                            <button onClick={() => navigate(`/fulfillment-network#${carrier.id}`)} className={`group inline-flex items-center gap-3 font-bold text-xl hover:${carrier.accentText} transition-colors ${carrier.accentText}`}>
-                                                <span className="underline decoration-2 underline-offset-8 decoration-transparent group-hover:decoration-current transition-all">
-                                                    {carrier.cta}
-                                                </span>
-                                                <ArrowRight className="w-6 h-6 group-hover:translate-x-2 transition-transform" />
-                                            </button>
-                                        </div>
+                                                    <div className="flex flex-col gap-4 mb-8">
+                                                        {carrier.perks.map((perk, i) => (
+                                                            <div key={i} className="flex items-center gap-4">
+                                                                <div className="w-2 h-2 rounded-full relative bg-white/20 shrink-0">
+                                                                    <div className="absolute inset-0 rounded-full animate-ping bg-emerald-400 opacity-75" />
+                                                                </div>
+                                                                <span className="text-slate-300 font-medium text-lg">{perk}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+
+                                                    <button onClick={() => navigate(`/fulfillment-network#${carrier.id}`)} className={`group inline-flex items-center gap-3 font-bold text-xl hover:${carrier.accentText} transition-colors ${carrier.accentText}`}>
+                                                        <span className="underline decoration-2 underline-offset-8 decoration-transparent group-hover:decoration-current transition-all">
+                                                            {carrier.cta}
+                                                        </span>
+                                                        <ArrowRight className="w-6 h-6 group-hover:translate-x-2 transition-transform" />
+                                                    </button>
+                                                </div>
+                                                {/* Desktop: image */}
+                                                <div className="hidden lg:block relative w-full max-w-md mr-auto rounded-3xl overflow-hidden shadow-2xl border border-white/10 group">
+                                                    <img src={carrier.image} alt={carrier.title} className="w-full h-72 object-cover transition-transform duration-700 group-hover:scale-105" loading="lazy" />
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="max-w-md text-left lg:pl-8 lg:mr-auto">
+                                                <div className={`inline-block mb-4 text-[10px] font-black uppercase tracking-widest ${carrier.accentText} bg-white/5 border border-white/10 px-4 py-2 rounded-full`}>
+                                                    {carrier.subtitle}
+                                                </div>
+                                                <h3 className="text-3xl md:text-5xl font-bold text-white mb-6 tracking-tight">
+                                                    {carrier.title}
+                                                </h3>
+                                                <p className="text-lg text-slate-400 leading-relaxed mb-10">
+                                                    {carrier.description}
+                                                </p>
+
+                                                <div className="flex flex-col gap-4 mb-8">
+                                                    {carrier.perks.map((perk, i) => (
+                                                        <div key={i} className="flex items-center gap-4">
+                                                            <div className="w-2 h-2 rounded-full relative bg-white/20 shrink-0">
+                                                                <div className="absolute inset-0 rounded-full animate-ping bg-emerald-400 opacity-75" />
+                                                            </div>
+                                                            <span className="text-slate-300 font-medium text-lg">{perk}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                <button onClick={() => navigate(`/fulfillment-network#${carrier.id}`)} className={`group inline-flex items-center gap-3 font-bold text-xl hover:${carrier.accentText} transition-colors ${carrier.accentText}`}>
+                                                    <span className="underline decoration-2 underline-offset-8 decoration-transparent group-hover:decoration-current transition-all">
+                                                        {carrier.cta}
+                                                    </span>
+                                                    <ArrowRight className="w-6 h-6 group-hover:translate-x-2 transition-transform" />
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             );

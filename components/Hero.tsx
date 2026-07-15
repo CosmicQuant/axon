@@ -893,62 +893,7 @@ const Hero: React.FC<HeroProps> = ({
                            ))}
                         </div>
                      </>
-                  ) : (
-                     /* LOGGED OUT VIEW: Two service cards */
-                     <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                        {/* Standard Consolidated — Emerald */}
-                        <div
-                           onClick={() => handleUseCaseSelect('A', undefined, 'Standard')}
-                           className="relative bg-gradient-to-br from-emerald-500 to-emerald-700 p-3 sm:p-5 rounded-[1.2rem] sm:rounded-[1.5rem] shadow-xl border border-emerald-400/50 overflow-hidden cursor-pointer hover:shadow-emerald-500/40 hover:-translate-y-1 transition-all group min-h-[7.5rem] sm:min-h-[9rem] flex flex-col justify-between"
-                        >
-                           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/20 via-transparent to-transparent opacity-50"></div>
-                           <div className="relative z-10">
-                              <span className="inline-flex items-center px-3 py-1 bg-black/20 backdrop-blur-md rounded-full text-[8px] sm:text-[9px] text-white font-bold tracking-widest uppercase mb-1.5 sm:mb-2 border border-white/10">
-                                 <Package className="w-2.5 h-2.5 mr-1" /> Consolidated
-                              </span>
-                              <h3 className="text-lg sm:text-xl font-black text-white leading-tight drop-shadow-md">
-                                 Standard
-                                 <br />
-                                 Parcel
-                              </h3>
-                           </div>
-                           <div className="relative z-10 flex justify-between items-end mt-2">
-                              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center group-hover:bg-white transition-colors duration-300">
-                                 <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white group-hover:text-emerald-600 transition-colors duration-300" />
-                              </div>
-                           </div>
-                           <div className="absolute bottom-[-5%] right-[-5%] transform group-hover:scale-110 group-hover:translate-x-2 transition-transform duration-500 origin-bottom-right">
-                              <img src="/icons3d/package.png" alt="Standard" className="w-20 h-20 sm:w-28 sm:h-28 object-contain drop-shadow-2xl opacity-90 group-hover:opacity-100" />
-                           </div>
-                        </div>
-
-                        {/* Express Dedicated — Amber */}
-                        <div
-                           onClick={() => handleUseCaseSelect('B', undefined, 'Express')}
-                           className="relative bg-gradient-to-br from-amber-500 to-amber-700 p-3 sm:p-5 rounded-[1.2rem] sm:rounded-[1.5rem] shadow-xl border border-amber-400/50 overflow-hidden cursor-pointer hover:shadow-amber-500/40 hover:-translate-y-1 transition-all group min-h-[7.5rem] sm:min-h-[9rem] flex flex-col justify-between"
-                        >
-                           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-white/20 via-transparent to-transparent opacity-50"></div>
-                           <div className="relative z-10">
-                              <span className="inline-flex items-center px-3 py-1 bg-black/20 backdrop-blur-md rounded-full text-[8px] sm:text-[9px] text-white font-bold tracking-widest uppercase mb-1.5 sm:mb-2 border border-white/10">
-                                 <Zap className="w-2.5 h-2.5 mr-1" /> Dedicated Vehicle
-                              </span>
-                              <h3 className="text-lg sm:text-xl font-black text-white leading-tight drop-shadow-md">
-                                 Express
-                                 <br />
-                                 Dedicated
-                              </h3>
-                           </div>
-                           <div className="relative z-10 flex justify-between items-end mt-2">
-                              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center group-hover:bg-white transition-colors duration-300">
-                                 <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white group-hover:text-amber-600 transition-colors duration-300" />
-                              </div>
-                           </div>
-                           <div className="absolute bottom-[-5%] right-[-5%] transform group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-500 origin-bottom-right">
-                              <img src="/icons3d/rocket.png" alt="Express" className="w-20 h-20 sm:w-28 sm:h-28 object-contain drop-shadow-2xl opacity-90 group-hover:opacity-100" />
-                           </div>
-                        </div>
-                     </div>
-                  )}
+                   ) : null}
                </div>
 
                {/* Dropoff Location Picker — Animated Search */}
