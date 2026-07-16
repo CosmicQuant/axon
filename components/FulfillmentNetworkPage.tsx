@@ -31,6 +31,7 @@ const sections = [
         ctaText: 'Register Your Fleet',
         loginTitle: 'Fleet Owner Access',
         loginDesc: 'Register or sign in to manage your fleet on Axon.',
+        image: 'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=900&q=80',
     },
     {
         id: '3pl',
@@ -54,6 +55,7 @@ const sections = [
         ctaText: 'Partner With Us',
         loginTitle: '3PL Partner Access',
         loginDesc: 'Register or sign in to integrate with Axon\'s logistics network.',
+        image: 'https://images.unsplash.com/photo-1494412574643-ff11b0a5c1c3?auto=format&fit=crop&w=900&q=80',
     },
     {
         id: 'riders',
@@ -77,6 +79,7 @@ const sections = [
         ctaText: 'Start Earning',
         loginTitle: 'Rider Access',
         loginDesc: 'Sign up or log in to start earning with Axon.',
+        image: 'https://images.unsplash.com/photo-1558981852-426c6c22a060?auto=format&fit=crop&w=900&q=80',
     },
 ];
 
@@ -129,10 +132,14 @@ const FulfillmentNetworkPage: React.FC<FulfillmentNetworkPageProps> = ({ onJoin,
                     >
                         <div className="max-w-5xl mx-auto w-full">
                             <div className={`flex flex-col ${idx % 2 === 0 ? 'lg:flex-row' : 'lg:flex-row-reverse'} items-center gap-12 lg:gap-20`}>
-                                {/* Icon / Visual Side */}
-                                <div className="flex-shrink-0">
-                                    <div className={`w-36 h-36 sm:w-48 sm:h-48 rounded-3xl bg-gradient-to-br ${section.gradient} flex items-center justify-center shadow-2xl shadow-black/30`}>
-                                        <Icon className="w-16 h-16 sm:w-24 sm:h-24 text-white/90" strokeWidth={1.5} />
+                                {/* Image / Visual Side */}
+                                <div className="flex-shrink-0 relative">
+                                    <div className="w-36 h-36 sm:w-56 sm:h-56 lg:w-64 lg:h-64 rounded-3xl overflow-hidden shadow-2xl shadow-black/30 border border-white/10">
+                                        <img src={section.image} alt={section.title} className="w-full h-full object-cover" loading="lazy" />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/50 via-transparent to-transparent" />
+                                        <div className={`absolute bottom-3 left-3 w-10 h-10 rounded-xl bg-gradient-to-br ${section.gradient} flex items-center justify-center shadow-lg`}>
+                                            <Icon className="w-5 h-5 text-white/90" strokeWidth={1.5} />
+                                        </div>
                                     </div>
                                 </div>
 

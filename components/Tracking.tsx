@@ -65,6 +65,8 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
   // ── Price change state ─────────────────────────────────
   const [priceChange, setPriceChange] = useState<{ oldPrice: number; newPrice: number; newEta: string } | null>(null);
   const [requoting, setRequoting] = useState(false);
+  const [payingDifference, setPayingDifference] = useState(false);
+  const [paymentSettled, setPaymentSettled] = useState(false);
 
   // ── Bottom sheet height reporting (map refit) ─────
   useEffect(() => {
@@ -572,6 +574,8 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
     const helpersCount = overrides?.helpersCount ?? (order as any).helpersCount ?? 0;
     const isReturnTrip = (order as any).isReturnTrip || false;
     const isFragile = order.items?.fragile || false;
+    const category = order.items?.category || 'A';
+    const subCategory = order.items?.subCategory || order.items?.itemDesc?.split(' - ')[1] || '';
 
     setRequoting(true);
     try {
@@ -587,6 +591,8 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
         helpersCount,
         isReturnTrip,
         isFragile,
+        category,
+        subCategory,
       });
 
       const { price: newPrice, driverRate, durationMinutes, quoteId } = response.data;
@@ -611,6 +617,56 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
       console.error('Requote failed:', e);
     }
     setRequoting(false);
+  };
+
+  // ── Pay the price difference after an edit ─────────────
+  const handlePayDifference = async () => {
+    if (!priceChange || !order) return;
+    const difference = priceChange.newPrice - priceChange.oldPrice;
+    if (difference <= 0) return;
+
+    const paymentPhone = order.sender?.phone || (order as any).paymentPhone || '';
+    if (!paymentPhone) {
+      setPriceChange({ ...priceChange, newEta: priceChange.newEta + ' (Add phone to pay)' });
+      return;
+    }
+
+    setPayingDifference(true);
+    try {
+      const { paymentService } = await import('../services/paymentService');
+      const response = await paymentService.initiateMpesaPayment(
+        paymentPhone,
+        difference,
+        `${order.id}-adjust`
+      );
+
+      if (response.success && response.checkoutRequestId) {
+        // Poll for completion
+        let attempts = 0;
+        const poll = async () => {
+          attempts++;
+          const status = await paymentService.checkPaymentStatus(response.checkoutRequestId!);
+          if (status.status === 'COMPLETED') {
+            setPaymentSettled(true);
+            setPayingDifference(false);
+            await onUpdateOrder(order.id, {
+              price: priceChange.newPrice,
+              priceAdjustmentPaid: true,
+            } as any);
+          } else if (status.status === 'FAILED') {
+            setPayingDifference(false);
+          } else if (attempts < 12) {
+            setTimeout(poll, 3000);
+          } else {
+            setPayingDifference(false);
+          }
+        };
+        setTimeout(poll, 3000);
+      }
+    } catch (e) {
+      console.error('Payment difference failed:', e);
+      setPayingDifference(false);
+    }
   };
 
   // ── Other handlers ─────────────────────────────────────
@@ -1098,6 +1154,34 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
                     <div className="text-[9px] font-bold text-gray-400">ETA: {priceChange.newEta}</div>
                   </div>
                 </div>
+                {/* Pay difference or refund notice */}
+                {priceChange.newPrice > priceChange.oldPrice && (
+                  <div className="mt-2 pt-2 border-t border-amber-100">
+                    {paymentSettled ? (
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600">
+                        <Check size={12} /> Difference paid — order updated
+                      </div>
+                    ) : payingDifference ? (
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-600">
+                        <Loader2 size={12} className="animate-spin" /> M-Pesa STK push sent — check your phone...
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handlePayDifference}
+                        className="w-full py-2 bg-amber-500 text-white rounded-lg text-[11px] font-bold hover:bg-amber-600 transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        Pay KES {(priceChange.newPrice - priceChange.oldPrice).toLocaleString()} via M-Pesa
+                      </button>
+                    )}
+                  </div>
+                )}
+                {priceChange.newPrice < priceChange.oldPrice && (
+                  <div className="mt-2 pt-2 border-t border-emerald-100">
+                    <div className="text-[11px] font-bold text-emerald-600">
+                      Refund of KES {(priceChange.oldPrice - priceChange.newPrice).toLocaleString()} will be sent to your M-Pesa
+                    </div>
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

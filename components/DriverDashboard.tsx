@@ -166,6 +166,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
    const [verificationError, setVerificationError] = useState('');
    const [deliveryConfirmationImage, setDeliveryConfirmationImage] = useState<string | null>(null);
    const [deliveryConfirmationFile, setDeliveryConfirmationFile] = useState<File | null>(null);
+   const deliveryPhotoInputRef = useRef<HTMLInputElement>(null);
 
    // Review State
    const [reviewingOrder, setReviewingOrder] = useState<DeliveryOrder | null>(null);
@@ -2196,105 +2197,108 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
             )}
          </main>
 
-         {/* Verification Modal */}
-         {verifyingOrder && (
-            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-               <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-md" onClick={closeVerificationModal}></div>
-               <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-100">
-                  <div className="bg-brand-50 p-8 text-gray-900 text-center border-b border-gray-100">
-                     <div className="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-4 border border-brand-200">
-                        <Shield className="w-8 h-8 text-brand-600" />
-                     </div>
-                     <h3 className="text-xl font-bold">Verify {verifyingStopId ? 'Stop' : 'Delivery'}</h3>
-                     <p className="text-gray-500 text-sm mt-2">
-                        {verifyingStopId
-                           ? `Enter the 4-digit passcode for ${allStops.find(s => s.id === verifyingStopId)?.address.split(',')[0] || 'this stop'}.`
-                           : 'Enter the 4-digit passcode from the recipient to complete this delivery.'}
-                     </p>
-                  </div>
-                  <div className="p-8">
-                     <div className="flex flex-col items-center">
-                        <input
-                           type="text"
-                           maxLength={4}
-                           placeholder="0000"
-                           value={verificationInput}
-                           onChange={(e) => {
-                              const val = e.target.value.replace(/\D/g, '');
-                              setVerificationInput(val);
-                              setVerificationError('');
-                           }}
-                           className="text-center text-4xl font-extrabold tracking-[1rem] w-full py-4 border-2 border-gray-100 bg-gray-50 rounded-2xl focus:border-brand-500 focus:ring-0 outline-none transition-all tabular-nums text-gray-900 placeholder:text-gray-200"
-                           autoFocus
-                        />
+          {/* Verification Modal */}
+          {verifyingOrder && (
+             <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 pointer-events-auto">
+                <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-md" onClick={closeVerificationModal}></div>
+                <div className="relative z-10 bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-y-auto max-h-[90vh] border border-gray-100">
+                   <div className="bg-brand-50 p-8 text-gray-900 text-center border-b border-gray-100">
+                      <div className="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-4 border border-brand-200">
+                         <Shield className="w-8 h-8 text-brand-600" />
+                      </div>
+                      <h3 className="text-xl font-bold">Verify {verifyingStopId ? 'Stop' : 'Delivery'}</h3>
+                      <p className="text-gray-500 text-sm mt-2">
+                         {verifyingStopId
+                            ? `Enter the 4-digit passcode for ${allStops.find(s => s.id === verifyingStopId)?.address.split(',')[0] || 'this stop'}.`
+                            : 'Enter the 4-digit passcode from the recipient to complete this delivery.'}
+                      </p>
+                   </div>
+                   <div className="p-8">
+                      <div className="flex flex-col items-center">
+                         <input
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={4}
+                            placeholder="0000"
+                            value={verificationInput}
+                            onChange={(e) => {
+                               const val = e.target.value.replace(/\D/g, '');
+                               setVerificationInput(val);
+                               setVerificationError('');
+                            }}
+                            className="text-center text-4xl font-extrabold tracking-[1rem] w-full py-4 border-2 border-gray-100 bg-gray-50 rounded-2xl focus:border-brand-500 focus:ring-0 outline-none transition-all tabular-nums text-gray-900 placeholder:text-gray-200"
+                            autoFocus
+                         />
 
-                        {/* Delivery Photo Upload */}
-                        <div className="w-full mt-6">
-                           <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 text-center">Proof of Delivery (Photo)</label>
-                           <div
-                              onClick={() => document.getElementById('delivery-photo-upload')?.click()}
-                              className={`w-full h-40 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden ${deliveryConfirmationImage ? 'border-emerald-500 bg-emerald-500/10' : 'border-gray-100 bg-gray-50 hover:border-brand-500/50'}`}
-                           >
-                              {deliveryConfirmationImage ? (
-                                 <img src={deliveryConfirmationImage} alt="Delivery Proof" className="w-full h-full object-cover" />
-                              ) : (
-                                 <>
-                                    <Truck className="w-8 h-8 text-gray-200 mb-2" />
-                                    <span className="text-sm font-bold text-gray-400">Tap to take/upload photo</span>
-                                 </>
-                              )}
-                           </div>
-                           <input
-                              id="delivery-photo-upload"
-                              type="file"
-                              accept="image/*"
-                              capture="environment"
-                              className="hidden"
-                              onChange={(e) => {
-                                 const file = e.target.files?.[0];
-                                 if (file) {
-                                    setDeliveryConfirmationFile(file);
-                                    const reader = new FileReader();
-                                    reader.onloadend = () => {
-                                       setDeliveryConfirmationImage(reader.result as string);
-                                       setVerificationError('');
-                                    };
-                                    reader.readAsDataURL(file);
-                                 }
-                              }}
-                           />
-                        </div>
+                         {/* Delivery Photo Upload */}
+                         <div className="w-full mt-6">
+                            <p className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 text-center">Proof of Delivery (Photo)</p>
+                            <button
+                               type="button"
+                               onClick={() => deliveryPhotoInputRef.current?.click()}
+                               className={`w-full h-40 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden ${deliveryConfirmationImage ? 'border-emerald-500 bg-emerald-500/10' : 'border-gray-100 bg-gray-50 hover:border-brand-500/50'}`}
+                            >
+                               {deliveryConfirmationImage ? (
+                                  <img src={deliveryConfirmationImage} alt="Delivery Proof" className="w-full h-full object-cover" />
+                               ) : (
+                                  <>
+                                     <Truck className="w-8 h-8 text-gray-200 mb-2" />
+                                     <span className="text-sm font-bold text-gray-400">Tap to take/upload photo</span>
+                                  </>
+                               )}
+                            </button>
+                            <input
+                               ref={deliveryPhotoInputRef}
+                               type="file"
+                               accept="image/*"
+                               className="hidden"
+                               onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                     setDeliveryConfirmationFile(file);
+                                     const reader = new FileReader();
+                                     reader.onloadend = () => {
+                                        setDeliveryConfirmationImage(reader.result as string);
+                                        setVerificationError('');
+                                     };
+                                     reader.readAsDataURL(file);
+                                  }
+                               }}
+                            />
+                         </div>
 
-                        {verificationError && (
-                           <p className="text-red-500 text-xs font-bold mt-4 flex items-center">
-                              <AlertCircle className="w-3 h-3 mr-1" /> {verificationError}
-                           </p>
-                        )}
-                     </div>
+                         {verificationError && (
+                            <p className="text-red-500 text-xs font-bold mt-4 flex items-center">
+                               <AlertCircle className="w-3 h-3 mr-1" /> {verificationError}
+                            </p>
+                         )}
+                      </div>
 
-                     <div className="grid grid-cols-2 gap-3 mt-8">
-                        <button
-                           onClick={closeVerificationModal}
-                           className="py-3 px-4 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition-colors border border-gray-200"
-                        >
-                           Cancel
-                        </button>
-                        <button
-                           onClick={handleVerifyAndComplete}
-                           disabled={verificationInput.length !== 4 || loading}
-                           className="py-3 px-4 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-brand-600/20"
-                        >
-                           {loading ? 'Verifying...' : 'Verify & Finish'}
-                        </button>
-                     </div>
-                  </div>
-               </div>
-            </div>
-         )}
+                      <div className="grid grid-cols-2 gap-3 mt-8">
+                         <button
+                            type="button"
+                            onClick={closeVerificationModal}
+                            className="py-3 px-4 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition-colors border border-gray-200"
+                         >
+                            Cancel
+                         </button>
+                         <button
+                            type="button"
+                            onClick={handleVerifyAndComplete}
+                            disabled={verificationInput.length !== 4 || loading}
+                            className="py-3 px-4 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-brand-600/20"
+                         >
+                            {loading ? 'Verifying...' : 'Verify & Finish'}
+                         </button>
+                      </div>
+                   </div>
+                </div>
+             </div>
+          )}
 
-         {/* Review Modal */}
-         {reviewingOrder && (
-            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          {/* Review Modal */}
+          {reviewingOrder && (
+             <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 pointer-events-auto">
                <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-md" onClick={() => setReviewingOrder(null)}></div>
                <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-100">
                   <div className="bg-brand-50 p-8 text-gray-900 text-center border-b border-gray-100">

@@ -242,8 +242,12 @@ const CarrierNetworkSection: React.FC = () => {
                                         {/* On desktop right-aligned rows: show image; else show text. Mobile always shows text. */}
                                         {isRightAligned ? (
                                             <>
-                                                {/* Mobile: text */}
+                                                {/* Mobile: image + text */}
                                                 <div className="max-w-md text-left lg:hidden">
+                                                    <div className="relative w-full rounded-3xl overflow-hidden shadow-2xl border border-white/10 mb-6">
+                                                        <img src={carrier.image} alt={carrier.title} className="w-full h-48 object-cover" loading="lazy" />
+                                                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
+                                                    </div>
                                                     <div className={`inline-block mb-4 text-[10px] font-black uppercase tracking-widest ${carrier.accentText} bg-white/5 border border-white/10 px-4 py-2 rounded-full`}>
                                                         {carrier.subtitle}
                                                     </div>
@@ -280,6 +284,11 @@ const CarrierNetworkSection: React.FC = () => {
                                             </>
                                         ) : (
                                             <div className="max-w-md text-left lg:pl-8 lg:mr-auto">
+                                                {/* Mobile: image (desktop image is on the left side container) */}
+                                                <div className="relative w-full rounded-3xl overflow-hidden shadow-2xl border border-white/10 mb-6 lg:hidden">
+                                                    <img src={carrier.image} alt={carrier.title} className="w-full h-48 object-cover" loading="lazy" />
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
+                                                </div>
                                                 <div className={`inline-block mb-4 text-[10px] font-black uppercase tracking-widest ${carrier.accentText} bg-white/5 border border-white/10 px-4 py-2 rounded-full`}>
                                                     {carrier.subtitle}
                                                 </div>
