@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Capacitor } from '@capacitor/core';
 import type { DeliveryOrder, Driver, DriverMetrics, User } from '../types';
 import { VehicleType } from '../types';
@@ -6,12 +6,12 @@ import { orderService } from '../services/orderService';
 import { mapService } from '../services/mapService';
 import { storageService } from '../services/storageService';
 import { MapProvider, useMapState } from '@/context/MapContext';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, limit } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { usePrompt } from '../context/PromptContext';
 import { LOCATION_COORDINATES } from '../constants';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
    LayoutDashboard, LayoutGrid, Map, Package, Wallet, User as UserIcon, LogOut,
    ChevronRight, Star, TrendingUp, Clock, MapPin, Navigation, CheckCircle,
@@ -22,6 +22,49 @@ import {
 } from 'lucide-react';
 import { MarketplaceJobCard } from './driver/MarketplaceJobCard';
 import MapLayer from './MapLayer';
+
+// ── MODULE-SCOPE SUB-COMPONENTS (avoids remount on every parent render) ──
+
+const SidebarItem = ({ view, icon: Icon, label, currentView, availableCount, onClick }: {
+   view: DashboardView; icon: any; label: string;
+   currentView: DashboardView; availableCount: number; onClick: () => void;
+}) => (
+   <button
+      onClick={onClick}
+      className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all mb-1 ${currentView === view
+         ? 'bg-brand-50 text-brand-600 font-bold border border-brand-100'
+         : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium'
+         }`}
+   >
+      <Icon className={`w-5 h-5 ${currentView === view ? 'stroke-[2.5px]' : ''}`} />
+      <span>{label}</span>
+      {view === 'MARKET' && availableCount > 0 && (
+         <span className="ml-auto bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+            {availableCount}
+         </span>
+      )}
+   </button>
+);
+
+const StatCard = ({ title, value, icon: Icon, color, trend, onClick }: any) => (
+   <div
+      onClick={onClick}
+      className={`bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-start justify-between transition-all ${onClick ? 'cursor-pointer hover:border-brand-200 hover:shadow-md active:scale-[0.98]' : ''}`}
+   >
+      <div>
+         <p className="text-gray-500 text-sm font-medium mb-1">{title}</p>
+         <h3 className="text-2xl font-bold text-gray-900">{value}</h3>
+         {trend && (
+            <p className="text-emerald-600 text-xs font-bold mt-2 flex items-center">
+               <TrendingUp className="w-3 h-3 mr-1" /> {trend}
+            </p>
+         )}
+      </div>
+      <div className={`p-3 rounded-xl ${color}`}>
+         <Icon className="w-6 h-6" />
+      </div>
+   </div>
+);
 
 interface DriverDashboardProps {
    user: User;
@@ -41,7 +84,6 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
    const { showAlert } = usePrompt();
    const { isLoaded, setPickupCoords, setDropoffCoords, setWaypointCoords, setOrderState, fitBounds, setDriverCoords, setDriverBearing, setDriverVehicleType, setRoutePolyline, requestUserLocation, driverCoords, setBottomSheetHeight } = useMapState();
 
-   // Internal state if not controlled
    const [internalView, setInternalView] = useState<DashboardView>('JOBS');
 
    // Use prop if available, otherwise internal state
@@ -55,37 +97,23 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
       }
    };
 
-   const location = useLocation();
    const navigate = useNavigate();
-
-   useEffect(() => {
-      if (propCurrentView) return; // Skip URL parsing if controlled
-
-      const params = new URLSearchParams(location.search);
-      const view = params.get('view') as DashboardView;
-      const openMenu = params.get('menu');
-
-      if (view && ['OVERVIEW', 'MARKET', 'JOBS', 'DELIVERIES', 'EARNINGS', 'PROFILE'].includes(view)) {
-         setCurrentView(view);
-      }
-
-      if (openMenu === 'open') {
-         setIsSidebarOpen(true);
-      }
-   }, [location.search, propCurrentView]);
 
    const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile toggle
    const [isOnline, setIsOnline] = useState(true);
    const lastRouteUpdateRef = useRef<number>(0);
-   const lastValidCoordsRef = useRef<any>(null);
-   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-   const [copiedId, setCopiedId] = useState<string | null>(null);
+    const lastValidCoordsRef = useRef<any>(null);
+    const [copiedId, setCopiedId] = useState<string | null>(null);
 
-   const handleCopyId = (id: string) => {
-      navigator.clipboard.writeText(id);
-      setCopiedId(id);
-      setTimeout(() => setCopiedId(null), 2000);
-   };
+    const handleCopyId = (id: string) => {
+       try {
+          navigator.clipboard.writeText(id);
+       } catch {
+          // Fallback for environments without clipboard API
+       }
+       setCopiedId(id);
+       setTimeout(() => setCopiedId(null), 2000);
+    };
 
    // Set Vehicle Type
    useEffect(() => {
@@ -116,10 +144,8 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
    const [searchQuery, setSearchQuery] = useState('');
 
    // Settings & Security States
-   const [expandedSection, setExpandedSection] = useState<string | null>(null);
-   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
-   const [isUpdating2FA, setIsUpdating2FA] = useState(false);
-   const [showPasswordFields, setShowPasswordFields] = useState(false);
+    const [expandedSection, setExpandedSection] = useState<string | null>(null);
+    const [showPasswordFields, setShowPasswordFields] = useState(false);
    const [passwords, setPasswords] = useState({ new: '', confirm: '' });
    const [showPass, setShowPass] = useState(false);
    const [deleteConfirmation, setDeleteConfirmation] = useState('');
@@ -138,11 +164,25 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
    const [totalRouteDistance, setTotalRouteDistance] = useState<number | null>(null);
    const [isDrawerCollapsed, setIsDrawerCollapsed] = useState(true);
 
-   // Track Driver Online Status & Time
-   useEffect(() => {
-      if (!user?.id) return;
-      orderService.updateDriverStatus(user.id, isOnline ? 'online' : 'offline');
-   }, [isOnline, user.id]);
+    // Track Driver Online Status & Time
+    useEffect(() => {
+       if (!user?.id) return;
+       orderService.updateDriverStatus(user.id, isOnline ? 'online' : 'offline');
+       // Cleanup: mark driver offline when component unmounts or user goes offline
+       return () => {
+          if (isOnline) {
+             orderService.updateDriverStatus(user.id, 'offline');
+          }
+       };
+    }, [isOnline, user.id]);
+
+    // Also mark offline on page unload / app background
+    useEffect(() => {
+       if (!user?.id) return;
+       const handleUnload = () => orderService.updateDriverStatus(user.id, 'offline');
+       window.addEventListener('beforeunload', handleUnload);
+       return () => window.removeEventListener('beforeunload', handleUnload);
+    }, [user.id, isOnline]);
 
    useEffect(() => {
       if (!isOnline || !user.id) return;
@@ -230,84 +270,94 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
 
    const nextStop = allStops.find(s => s.status !== 'completed');
 
-   // Geocode Active Job and Sync with Global Map
-   useEffect(() => {
-      const syncMap = async () => {
-         // Changed so that it syncs even if currentView isn't 'JOBS' (for 'OVERVIEW')
-         if (activeJob && (currentView === 'JOBS' || currentView === 'OVERVIEW') && isLoaded) {
-            const p = activeJob.pickupCoords || await mapService.geocodeAddress(activeJob.pickup);
-            const d = activeJob.dropoffCoords || await mapService.geocodeAddress(activeJob.dropoff);
-            setActiveJobCoords({ pickup: p, dropoff: d });
+    // Geocode Active Job and Sync with Global Map
+    useEffect(() => {
+       const syncMap = async () => {
+          if (activeJob && isLoaded) {
+             const p = activeJob.pickupCoords || await mapService.geocodeAddress(activeJob.pickup);
+             const d = activeJob.dropoffCoords || await mapService.geocodeAddress(activeJob.dropoff);
 
-            if (p && d) {
-               setPickupCoords(p);
-               setDropoffCoords(d);
+             // Only update coords if they actually changed (prevents re-geocode loops)
+             setActiveJobCoords(prev => {
+                if (prev.pickup?.lat === p?.lat && prev.pickup?.lng === p?.lng &&
+                    prev.dropoff?.lat === d?.lat && prev.dropoff?.lng === d?.lng) {
+                   return prev;
+                }
+                return { pickup: p, dropoff: d };
+             });
 
-               // Set Waypoints for multi-stop visualization
-               if (activeJob.stops && activeJob.stops.length > 0) {
-                  const wpCoords = activeJob.stops
-                     .filter(s => s.type === 'waypoint')
-                     .map(s => ({ lat: s.lat, lng: s.lng }));
-                  setWaypointCoords(wpCoords);
-               } else {
-                  setWaypointCoords([]);
-               }
+             if (p && d) {
+                setPickupCoords(p);
+                setDropoffCoords(d);
 
-               setOrderState('IN_TRANSIT');
+                // Set Waypoints for multi-stop visualization
+                if (activeJob.stops && activeJob.stops.length > 0) {
+                   const wpCoords = activeJob.stops
+                      .filter(s => s.type === 'waypoint')
+                      .map(s => ({ lat: s.lat, lng: s.lng }));
+                   setWaypointCoords(wpCoords);
+                } else {
+                   setWaypointCoords([]);
+                }
 
-               // Determine navigation target based on multi-stop logic
-               const userLoc = await requestUserLocation();
-               const remainingStops = allStops.filter(s => s.status !== 'completed');
+                setOrderState('IN_TRANSIT');
 
-               if (remainingStops.length > 0) {
-                  const startPoint = userLoc || (activeJob.status === 'in_transit' ? p : p);
-                  const endPoint = remainingStops[remainingStops.length - 1].coords;
-                  const waypoints = remainingStops.slice(0, -1).map(s => s.coords);
+                // Determine navigation target based on multi-stop logic
+                const userLoc = await requestUserLocation();
+                const remainingStops = allStops.filter(s => s.status !== 'completed');
 
-                  if (startPoint && endPoint) {
-                     // Fit bounds to include current location and all stops for the "entire route" view
-                     const allPoints = [startPoint, p, d, ...allStops.map(s => s.coords!)].filter(pt => !!pt);
-                     fitBounds(allPoints);
-                     const route = await mapService.getRoute(startPoint, endPoint, waypoints, activeJob.vehicle);
-                     if (route) {
-                        setRoutePolyline(route.geometry);
-                        setRouteDuration(route.nextLegDuration);
-                        setRouteDistance(Math.round(((route.nextLegDistance || 0) / 1000) * 10) / 10);
-                        setTotalRouteDuration(route.duration);
-                        setTotalRouteDistance(Math.round((route.distance / 1000) * 10) / 10);
-                     }
-                  }
-               } else {
-                  fitBounds([p, d]);
-                  const route = await mapService.getRoute(p, d, [], activeJob.vehicle);
-                  if (route) {
-                     setRoutePolyline(route.geometry);
-                     setRouteDuration(route.duration); // For single stop, next leg is the total
-                     setRouteDistance(Math.round((route.distance / 1000) * 10) / 10); // For single stop, next leg is the total
-                     setTotalRouteDuration(route.duration);
-                     setTotalRouteDistance(Math.round((route.distance / 1000) * 10) / 10);
-                  }
-               }
-            }
-         } else if (!activeJob) {
-            setPickupCoords(null);
-            setDropoffCoords(null);
-            setWaypointCoords([]);
-            setRoutePolyline(null);
-            setOrderState('IDLE');
-            setRouteDuration(null);
-            setRouteDistance(null);
-            setTotalRouteDuration(null);
-            setTotalRouteDistance(null);
-         }
-      };
-      syncMap();
-   }, [activeJob?.id, activeJob?.pickup, activeJob?.dropoff, nextStop?.id, currentView, isLoaded, setPickupCoords, setDropoffCoords, setWaypointCoords, setOrderState, fitBounds, setRoutePolyline, requestUserLocation, allStops]);
+                if (remainingStops.length > 0) {
+                   const startPoint = userLoc || p;
+                   const endPoint = remainingStops[remainingStops.length - 1].coords;
+                   const waypoints = remainingStops.slice(0, -1).map(s => s.coords);
 
-   // Real-time Driver Tracking
-   useEffect(() => {
-      if (hasActiveJob && currentView === 'JOBS' && isLoaded && activeJob) {
-         const ROUTE_UPDATE_INTERVAL = 15000; // Update route every 15 seconds
+                   if (startPoint && endPoint) {
+                      const allPoints = [startPoint, p, d, ...allStops.map(s => s.coords!)].filter(pt => !!pt);
+                      fitBounds(allPoints);
+                      const route = await mapService.getRoute(startPoint, endPoint, waypoints, activeJob.vehicle);
+                      if (route) {
+                         setRoutePolyline(route.geometry);
+                         setRouteDuration(route.nextLegDuration);
+                         setRouteDistance(Math.round(((route.nextLegDistance || 0) / 1000) * 10) / 10);
+                         setTotalRouteDuration(route.duration);
+                         setTotalRouteDistance(Math.round((route.distance / 1000) * 10) / 10);
+                      }
+                   }
+                } else {
+                   fitBounds([p, d]);
+                   const route = await mapService.getRoute(p, d, [], activeJob.vehicle);
+                   if (route) {
+                      setRoutePolyline(route.geometry);
+                      setRouteDuration(route.duration);
+                      setRouteDistance(Math.round((route.distance / 1000) * 10) / 10);
+                      setTotalRouteDuration(route.duration);
+                      setTotalRouteDistance(Math.round((route.distance / 1000) * 10) / 10);
+                   }
+                }
+             }
+          } else if (!activeJob) {
+             setPickupCoords(null);
+             setDropoffCoords(null);
+             setWaypointCoords([]);
+             setRoutePolyline(null);
+             setOrderState('IDLE');
+             setRouteDuration(null);
+             setRouteDistance(null);
+             setTotalRouteDuration(null);
+             setTotalRouteDistance(null);
+          }
+       };
+       syncMap();
+       // Removed currentView and allStops from deps to prevent re-fetching on view switches
+       // and geocode loops. Route refresh is handled by the tracking effect.
+    }, [activeJob?.id, activeJob?.pickup, activeJob?.dropoff, nextStop?.id, isLoaded, setPickupCoords, setDropoffCoords, setWaypointCoords, setOrderState, fitBounds, setRoutePolyline, requestUserLocation]);
+
+    // Real-time Driver Tracking — runs whenever there's an active job, regardless of view
+    useEffect(() => {
+       if (hasActiveJob && isLoaded && activeJob) {
+          const ROUTE_UPDATE_INTERVAL = 15000; // Update route every 15 seconds
+          const LOCATION_WRITE_INTERVAL = 5000; // Throttle Firestore location writes to every 5s
+          let lastLocationWrite = 0;
 
          const watchId = navigator.geolocation.watchPosition(
             async (position) => {
@@ -331,15 +381,14 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                   }
                }
 
-               // 3. Proximity Geofencing (Tight Radius Stabilization)
-               // If within 30m (0.03km) of the next stop, snap to the stop's exact coordinates.
-               // We reduced this from 200m so it only happens exactly when arriving, not blocks away.
-               if (nextStop?.coords) {
-                  const distanceToStop = mapService.calculateDistance(currentCoords, nextStop.coords);
-                  if (distanceToStop <= 0.03) {
-                     currentCoords = nextStop.coords;
-                  }
-               }
+                // 3. Proximity Geofencing (Tight Radius Stabilization)
+                // Only snap when coords are valid (non-zero) to prevent snapping to (0,0)
+                if (nextStop?.coords && nextStop.coords.lat !== 0 && nextStop.coords.lng !== 0) {
+                   const distanceToStop = mapService.calculateDistance(currentCoords, nextStop.coords);
+                   if (distanceToStop <= 0.03) {
+                      currentCoords = nextStop.coords;
+                   }
+                }
 
                // Update last known valid coords
                lastValidCoordsRef.current = currentCoords;
@@ -347,16 +396,16 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                setDriverCoords(currentCoords);
                if (heading) setDriverBearing(heading);
 
-               // Update Firestore with live location
-               if (activeJob) {
-                  const now = Date.now();
-                  let remDist: number | undefined;
-                  let remDur: number | undefined;
-                  let totalDist: number | undefined;
-                  let totalDur: number | undefined;
-                  let currentRouteGeometry: string | undefined;
+                // Update Firestore with live location (throttled to every 5s)
+                if (activeJob) {
+                   const now = Date.now();
+                   let remDist: number | undefined;
+                   let remDur: number | undefined;
+                   let totalDist: number | undefined;
+                   let totalDur: number | undefined;
+                   let currentRouteGeometry: string | undefined;
 
-                  if (now - lastRouteUpdateRef.current > ROUTE_UPDATE_INTERVAL) {
+                   if (now - lastRouteUpdateRef.current > ROUTE_UPDATE_INTERVAL) {
                      lastRouteUpdateRef.current = now;
 
                      // Determine destination based on status and stops
@@ -388,11 +437,15 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                      }
                   }
 
-                  orderService.updateDriverLocation(activeJob.id, {
-                     lat: currentCoords.lat,
-                     lng: currentCoords.lng,
-                     bearing: heading || 0
-                  }, remDist, remDur, currentRouteGeometry, totalDist, totalDur);
+                   // Throttle Firestore writes — only write every 5s to reduce cost/battery
+                   if (now - lastLocationWrite > LOCATION_WRITE_INTERVAL) {
+                      lastLocationWrite = now;
+                      orderService.updateDriverLocation(activeJob.id, {
+                         lat: currentCoords.lat,
+                         lng: currentCoords.lng,
+                         bearing: heading || 0
+                      }, remDist, remDur, currentRouteGeometry, totalDist, totalDur);
+                   }
                }
             },
             (error) => console.error("Geolocation error:", error),
@@ -400,7 +453,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
          );
          return () => navigator.geolocation.clearWatch(watchId);
       }
-   }, [hasActiveJob, currentView, isLoaded, setDriverCoords, setDriverBearing, activeJob?.id, activeJob?.status, activeJobCoords.pickup, activeJobCoords.dropoff, setRoutePolyline, nextStop?.coords, allStops, setRouteDuration, setRouteDistance, setTotalRouteDuration, setTotalRouteDistance]);
+    }, [hasActiveJob, isLoaded, setDriverCoords, setDriverBearing, activeJob?.id, activeJob?.status, activeJobCoords.pickup, activeJobCoords.dropoff, setRoutePolyline, nextStop?.coords, allStops, setRouteDuration, setRouteDistance, setTotalRouteDuration, setTotalRouteDistance]);
 
    // Normalize VehicleType enum display names to lowercase vehicle IDs used in orders
    const normalizeVehicle = (vt?: string): string | null => {
@@ -417,32 +470,32 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
       return lower;
    };
 
-   const driverVehicleId = normalizeVehicle(user?.vehicleType);
+    const driverVehicleId = normalizeVehicle(user?.vehicleType);
 
-   // Filtered Orders Logic
-   const filteredOrders = availableOrders.filter(order => {
-      const matchesSearch =
-         order.pickup.toLowerCase().includes(searchQuery.toLowerCase()) ||
-         order.dropoff.toLowerCase().includes(searchQuery.toLowerCase()) ||
-         order.items.itemDesc.toLowerCase().includes(searchQuery.toLowerCase());
+    // Single source of truth for vehicle matching (used in filter + disabled prop)
+    const vehicleMatches = (order: DeliveryOrder): boolean => {
+       if (!driverVehicleId) return true;
+       const orderVehicle = String(order.vehicle || '').toLowerCase();
+       if (orderVehicle === 'standard') {
+          return ['boda', 'tuktuk', 'probox'].includes(driverVehicleId);
+       }
+       return orderVehicle === driverVehicleId;
+    };
 
-      const isPending = order.status === 'pending';
+    // Filtered Orders Logic (memoized + null-safe)
+    const filteredOrders = useMemo(() => availableOrders.filter(order => {
+       // Guard against malformed orders that would crash the filter
+       if (!order.pickup || !order.dropoff || !order.items?.itemDesc) return false;
 
-      // Vehicle matching: Standard orders (vehicle='standard') are consolidated
-      // deliveries — show to all light-vehicle drivers (boda, tuktuk, probox).
-      // Express orders match if the driver's vehicle equals the order's vehicle.
-      let matchesVehicle = true;
-      if (driverVehicleId) {
-         const orderVehicle = String(order.vehicle).toLowerCase();
-         if (orderVehicle === 'standard') {
-            matchesVehicle = ['boda', 'tuktuk', 'probox'].includes(driverVehicleId);
-         } else {
-            matchesVehicle = orderVehicle === driverVehicleId;
-         }
-      }
+       const matchesSearch =
+          order.pickup.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          order.dropoff.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          order.items.itemDesc.toLowerCase().includes(searchQuery.toLowerCase());
 
-      return matchesSearch && matchesVehicle && isPending;
-   });
+       const isPending = order.status === 'pending';
+
+       return matchesSearch && vehicleMatches(order) && isPending;
+    }), [availableOrders, searchQuery, vehicleMatches]);
 
    // Helper for Icons
    const getVehicleIcon = (type: string) => {
@@ -451,67 +504,60 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
       return Truck;
    };
 
-   // Fetch Logic
-   const fetchData = async () => {
-      // Only set loading on initial fetch, not polling
-      if (!metrics) setLoading(true);
-      try {
-         const [market, jobs, driverMetrics] = await Promise.all([
-            orderService.getMarketplaceOrders(),
-            orderService.getDriverJobs(user.id),
-            orderService.getDriverMetrics(user.id)
-         ]);
-
-         setAvailableOrders(market);
-         setMyJobs(jobs);
-         setMetrics(driverMetrics);
-      } catch (e) {
-         console.error(e);
-      } finally {
-         if (!metrics) setLoading(false);
-      }
-   };
-
-   // --- REAL-TIME DATA LISTENERS ---
+    // --- REAL-TIME DATA LISTENERS ---
    useEffect(() => {
       if (!user || !user.id) return;
       setLoading(true);
 
-      // 1. Listen for Marketplace Orders (status == 'pending')
-      const qMarket = query(collection(db, 'orders'), where('status', '==', 'pending'));
-      const unsubMarket = onSnapshot(qMarket, (snapshot) => {
-         const marketOrders = snapshot.docs.map(doc => ({ ...doc.data() as any, id: doc.id } as DeliveryOrder));
-         // Deduplicate by ID
-         const uniqueOrders = marketOrders.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
-         setAvailableOrders(uniqueOrders.sort((a, b) => {
-            const dateA = a.date ? new Date(a.date).getTime() : 0;
-            const dateB = b.date ? new Date(b.date).getTime() : 0;
-            return dateB - dateA;
-         }));
-         setLoading(false);
-      }, (error) => {
-         console.error("Marketplace Listener Error:", error);
-         setLoading(false);
-      });
+       // 1. Listen for Marketplace Orders (status == 'pending', limited to 50)
+       const qMarket = query(collection(db, 'orders'), where('status', '==', 'pending'), limit(50));
+       const unsubMarket = onSnapshot(qMarket, (snapshot) => {
+          const marketOrders = snapshot.docs.map(doc => {
+             const data = doc.data() as any;
+             // Security: strip verification code and recipient PII from marketplace orders
+             // Drivers should only see fields needed to decide whether to accept.
+             return {
+                ...data,
+                id: doc.id,
+                verificationCode: undefined,
+                recipient: data.recipient ? { name: undefined, phone: undefined, instructions: undefined } : undefined,
+                sender: data.sender ? { ...data.sender, phone: undefined } : undefined,
+             } as DeliveryOrder;
+          });
+          // Deduplicate by ID
+          const uniqueOrders = marketOrders.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+          setAvailableOrders(uniqueOrders.sort((a, b) => {
+             const dateA = a.date ? new Date(a.date).getTime() : 0;
+             const dateB = b.date ? new Date(b.date).getTime() : 0;
+             return dateB - dateA;
+          }));
+          setLoading(false);
+       }, (error) => {
+          console.error("Marketplace Listener Error:", error);
+          setLoading(false);
+       });
 
-      // 2. Listen for My Jobs (driver.id == user.id)
-      const qJobs = query(collection(db, 'orders'), where('driver.id', '==', user.id));
-      const unsubJobs = onSnapshot(qJobs, async (snapshot) => {
-         const jobs = snapshot.docs.map(doc => ({ ...doc.data() as any, id: doc.id } as DeliveryOrder));
-         // Deduplicate by ID
-         const uniqueJobs = jobs.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
-         setMyJobs(uniqueJobs.sort((a, b) => {
-            const dateA = a.date ? new Date(a.date).getTime() : 0;
-            const dateB = b.date ? new Date(b.date).getTime() : 0;
-            return dateB - dateA;
-         }));
+       // 2. Listen for My Active Jobs (driver.id == user.id, status not delivered/cancelled)
+       const qJobs = query(collection(db, 'orders'),
+          where('driver.id', '==', user.id),
+          where('status', 'in', ['driver_assigned', 'in_transit'])
+       );
+       const unsubJobs = onSnapshot(qJobs, async (snapshot) => {
+          const jobs = snapshot.docs.map(doc => ({ ...doc.data() as any, id: doc.id } as DeliveryOrder));
+          const uniqueJobs = jobs.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+          setMyJobs(uniqueJobs.sort((a, b) => {
+             const dateA = a.date ? new Date(a.date).getTime() : 0;
+             const dateB = b.date ? new Date(b.date).getTime() : 0;
+             return dateB - dateA;
+          }));
 
-         // Refresh metrics when jobs change (e.g., a delivery is completed)
-         const m = await orderService.getDriverMetrics(user.id);
-         setMetrics(m);
-      }, (error) => {
-         console.error("Jobs Listener Error:", error);
-      });
+          // Refresh metrics when active jobs change
+          const m = await orderService.getDriverMetrics(user.id);
+          setMetrics(m);
+       }, (error) => {
+          console.error("Jobs Listener Error:", error);
+          showAlert("Connection Error", "Could not load your jobs. Please check your connection.", "error");
+       });
 
       // 3. Real-time Metrics
       const loadMetrics = async () => {
@@ -573,12 +619,16 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                return;
             }
 
-            try {
-               await orderService.updateOrderStatus(order.id, 'in_transit');
-               // Also mark the pickup stop as completed if multi-stop
-               if (order.stops?.some(s => s.id === 'pickup-start')) {
-                  await orderService.updateStopStatus(order.id, 'pickup-start', 'completed');
-               }
+             try {
+                // Use server-side status transition
+                const { httpsCallable } = await import('firebase/functions');
+                const { functions } = await import('../firebase');
+                if (functions) {
+                   const updateStatus = httpsCallable(functions, 'updateOrderStatus');
+                   await updateStatus({ orderId: order.id, newStatus: 'in_transit' });
+                } else {
+                   await orderService.updateOrderStatus(order.id, 'in_transit');
+                }
             } catch (e) {
                showAlert("Update Failed", "Failed to start delivery. Please try again.", "error");
             }
@@ -591,58 +641,67 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
       );
    };
 
-   const handleUpdateStatus = async (orderId: string, newStatus: DeliveryOrder['status']) => {
-      if (newStatus === 'delivered') {
-         const order = myJobs.find(j => j.id === orderId);
-         if (order) {
-            // Check if all intermediate waypoints are completed first
-            const pendingWaypoints = (order.stops || []).filter(s => s.type === 'waypoint' && s.status !== 'completed');
-            if (pendingWaypoints.length > 0) {
-               showAlert("Pending Stops", `You must complete all ${pendingWaypoints.length} intermediate stops before final delivery.`, "warning");
-               return;
-            }
+    const handleUpdateStatus = async (orderId: string, newStatus: DeliveryOrder['status']) => {
+       if (newStatus === 'delivered') {
+          const order = myJobs.find(j => j.id === orderId);
+          if (order) {
+             // Check if all intermediate waypoints are completed first
+             const pendingWaypoints = (order.stops || []).filter(s => s.type === 'waypoint' && s.status !== 'completed');
+             if (pendingWaypoints.length > 0) {
+                showAlert("Pending Stops", `You must complete all ${pendingWaypoints.length} intermediate stops before final delivery.`, "warning");
+                return;
+             }
 
-            // Check distance to dropoff before allowing completion
-            let dropoff = order.dropoffCoords || (activeJob?.id === order.id ? activeJobCoords.dropoff : null);
-            if (!dropoff) {
-               dropoff = await mapService.geocodeAddress(order.dropoff);
-            }
+             // Check distance to dropoff before allowing completion
+             let dropoff = order.dropoffCoords || (activeJob?.id === order.id ? activeJobCoords.dropoff : null);
+             if (!dropoff) {
+                dropoff = await mapService.geocodeAddress(order.dropoff);
+             }
 
-            if (!dropoff) {
-               showAlert("Location Error", "Could not verify dropoff location coordinates.", "error");
-               return;
-            }
+             if (!dropoff) {
+                showAlert("Location Error", "Could not verify dropoff location coordinates.", "error");
+                return;
+             }
 
-            navigator.geolocation.getCurrentPosition(
-               async (position) => {
-                  const currentCoords = { lat: position.coords.latitude, lng: position.coords.longitude };
-                  const distance = mapService.calculateDistance(currentCoords, dropoff!);
+             navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                   const currentCoords = { lat: position.coords.latitude, lng: position.coords.longitude };
+                   const distance = mapService.calculateDistance(currentCoords, dropoff!);
 
-                  if (distance > 0.05) { // 50 meters
-                     showAlert("Too Far", `You must be within 50m of the dropoff location to complete delivery.`, "warning");
-                     return;
-                  }
+                   if (distance > 0.05) { // 50 meters
+                      showAlert("Too Far", `You must be within 50m of the dropoff location to complete delivery.`, "warning");
+                      return;
+                   }
 
-                  closeVerificationModal();
-                  setVerifyingOrder(order);
-               },
-               (error) => {
-                  console.error("Geolocation error:", error);
-                  showAlert("Location Error", "Could not get your current location. Please enable GPS to complete delivery.", "error");
-               },
-               { enableHighAccuracy: true }
-            );
-            return;
-         }
-      }
+                   closeVerificationModal();
+                   setVerifyingOrder(order);
+                },
+                (error) => {
+                   console.error("Geolocation error:", error);
+                   showAlert("Location Error", "Could not get your current location. Please enable GPS to complete delivery.", "error");
+                },
+                { enableHighAccuracy: true }
+             );
+             return;
+          }
+       }
 
-      try {
-         await orderService.updateOrderStatus(orderId, newStatus);
-      } catch (e: any) {
-         console.error("Failed to update status", e);
-         showAlert("Update Failed", "Failed to update order status. Please try again.", "error");
-      }
-   };
+       try {
+          // Use server-side status transition for security
+          const { httpsCallable } = await import('firebase/functions');
+          const { functions } = await import('../firebase');
+          if (functions) {
+             const updateStatus = httpsCallable(functions, 'updateOrderStatus');
+             await updateStatus({ orderId, newStatus });
+          } else {
+             await orderService.updateOrderStatus(orderId, newStatus);
+          }
+       } catch (e: any) {
+          console.error("Failed to update status", e);
+          const msg = e.message || "Failed to update order status. Please try again.";
+          showAlert("Update Failed", msg, "error");
+       }
+    };
 
    const handleUpdateStopStatus = async (orderId: string, stopId: string, status: 'pending' | 'arrived' | 'completed') => {
       const stop = allStops.find(s => s.id === stopId);
@@ -693,32 +752,45 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
       }
    };
 
-   const handleVerifyAndComplete = async () => {
-      if (!verifyingOrder) return;
+    const handleVerifyAndComplete = async () => {
+       if (!verifyingOrder) return;
 
-      // Determine which code to check
-      let targetCode = verifyingOrder.verificationCode;
-      let targetStop: any = null;
+       if (!deliveryConfirmationImage || !deliveryConfirmationFile) {
+          setVerificationError('Please take a photo of the delivered goods to complete verification.');
+          return;
+       }
 
-      if (verifyingStopId) {
-         targetStop = allStops.find(s => s.id === verifyingStopId);
-         if (targetStop) {
-            targetCode = targetStop.verificationCode;
-         }
-      }
+       try {
+          setLoading(true);
 
-      if (verificationInput !== targetCode) {
-         setVerificationError('Incorrect passcode. Please ask the recipient for the correct 4-digit code.');
-         return;
-      }
+          // Server-side verification: call the Cloud Function to check the code
+          // (the driver never has access to the verification code)
+          const { httpsCallable } = await import('firebase/functions');
+          const { functions } = await import('../firebase');
+          if (functions) {
+             const verifyCode = httpsCallable(functions, 'verifyDeliveryCode');
+             const result: any = await verifyCode({
+                orderId: verifyingOrder.id,
+                code: verificationInput,
+                stopId: verifyingStopId || undefined
+             });
 
-      if (!deliveryConfirmationImage || !deliveryConfirmationFile) {
-         setVerificationError('Please take a photo of the delivered goods to complete verification.');
-         return;
-      }
-
-      try {
-         setLoading(true);
+             if (!result.data?.valid) {
+                setVerificationError('Incorrect passcode. Please ask the recipient for the correct 4-digit code.');
+                return;
+             }
+          } else {
+             // Fallback: client-side check (less secure, for local dev only)
+             let targetCode = (verifyingOrder as any).verificationCode;
+             if (verifyingStopId) {
+                const targetStop: any = allStops.find(s => s.id === verifyingStopId);
+                if (targetStop) targetCode = targetStop.verificationCode;
+             }
+             if (verificationInput !== targetCode) {
+                setVerificationError('Incorrect passcode. Please ask the recipient for the correct 4-digit code.');
+                return;
+             }
+          }
 
          // Upload image to Firebase Storage instead of storing base64 in Firestore
          const storagePath = `deliveries/${verifyingOrder.id}_${verifyingStopId || 'final'}_${Date.now()}.jpg`;
@@ -728,12 +800,23 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
             // Complete individual stop
             await orderService.updateStopStatus(verifyingOrder.id, verifyingStopId, 'completed', imageUrl);
             showAlert("Stop Completed", "Verification confirmed. Heading to next stop!", "success");
-         } else {
-            // Complete whole order
-            const orderToReview = verifyingOrder;
-            await orderService.updateOrderStatus(verifyingOrder.id, 'delivered', {
-               deliveryConfirmationImage: imageUrl
-            });
+          } else {
+             // Complete whole order via server-side function
+             const orderToReview = verifyingOrder;
+             const { httpsCallable } = await import('firebase/functions');
+             const { functions: fn } = await import('../firebase');
+             if (fn) {
+                const updateStatus = httpsCallable(fn, 'updateOrderStatus');
+                await updateStatus({
+                   orderId: verifyingOrder.id,
+                   newStatus: 'delivered',
+                   extraData: { deliveryConfirmationImage: imageUrl }
+                });
+             } else {
+                await orderService.updateOrderStatus(verifyingOrder.id, 'delivered', {
+                   deliveryConfirmationImage: imageUrl
+                });
+             }
 
             // Also mark the final stop as completed if multi-stop
             if (verifyingOrder.stops?.some(s => s.id === 'dropoff-end')) {
@@ -770,79 +853,70 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
       }
    };
 
-   const handleToggle2FA = async () => {
-      setIsUpdating2FA(true);
-      try {
-         await new Promise(resolve => setTimeout(resolve, 1500));
-         setIs2FAEnabled(!is2FAEnabled);
-         showAlert(is2FAEnabled ? '2FA Disabled' : '2FA Enabled Successfully', 'success');
-      } catch (error) {
-         showAlert('Failed to update security settings', 'error');
-      } finally {
-         setIsUpdating2FA(false);
-      }
+    const handlePasswordUpdate = async () => {
+       if (passwords.new !== passwords.confirm) {
+          showAlert("Error", "Passwords do not match!", 'error');
+          return;
+       }
+       if (passwords.new.length < 6) {
+          showAlert("Error", "Password must be at least 6 characters.", 'error');
+          return;
+       }
+
+       setLoading(true);
+       try {
+          const { getAuth, updatePassword } = await import('firebase/auth');
+          const auth = getAuth();
+          if (auth.currentUser) {
+             await updatePassword(auth.currentUser, passwords.new);
+             showAlert("Success", "Password updated successfully!", 'success');
+             setShowPasswordFields(false);
+             setPasswords({ new: '', confirm: '' });
+          } else {
+             showAlert("Error", "You must be logged in to update your password.", 'error');
+          }
+       } catch (error: any) {
+          if (error.code === 'auth/requires-recent-login') {
+             showAlert("Action Required", "Please log out and log back in to change your password.", 'error');
+          } else {
+             showAlert("Error", error.message || "Failed to update password", 'error');
+          }
+       } finally {
+          setLoading(false);
+       }
    };
 
-   const handlePasswordUpdate = async () => {
-      if (passwords.new !== passwords.confirm) {
-         showAlert("Passwords do not match!", 'error');
-         return;
-      }
-      if (passwords.new.length < 6) {
-         showAlert("Password must be at least 6 characters.", 'error');
-         return;
-      }
+    const handleDeactivateAccount = async () => {
+       const confirmed = window.confirm('Are you sure you want to deactivate your driver account? You can reactivate anytime by logging back in.');
+       if (!confirmed) return;
 
-      setLoading(true);
-      try {
-         const { getAuth, updatePassword } = await import('firebase/auth');
-         const auth = getAuth();
-         if (auth.currentUser) {
-            await updatePassword(auth.currentUser, passwords.new);
-            showAlert("Password updated successfully!", 'success');
-            setShowPasswordFields(false);
-            setPasswords({ new: '', confirm: '' });
-         } else {
-            showAlert("You must be logged in to update your password.", 'error');
-         }
-      } catch (error: any) {
-         showAlert(error.message || "Failed to update password", 'error');
-      } finally {
-         setLoading(false);
-      }
-   };
+       try {
+          await orderService.updateDriverStatus(user.id, 'offline');
+          await updateUser({ status: 'suspended' });
+          showAlert('Account Deactivated', 'Your account has been deactivated. You can reactivate by logging back in.', 'info');
+          logout();
+          navigate('/');
+       } catch (error) {
+          showAlert('Error', 'Failed to deactivate account. Please try again.', 'error');
+       }
+    };
 
-   const handleDeactivateAccount = async () => {
-      if (!window.confirm('Are you sure you want to deactivate your driver account? You can reactivate anytime by logging back in.')) return;
+    const handleDeleteAccount = async () => {
+       if (deleteConfirmation !== 'DELETE') return;
 
-      try {
-         await updateUser({ status: 'suspended' });
-         showAlert('Account deactivated. Powering down...', 'info');
-         logout();
-         navigate('/');
-      } catch (error) {
-         showAlert('Failed to deactivate account', 'error');
-      }
-   };
-
-   const handleDeleteAccount = async () => {
-      if (deleteConfirmation !== 'DELETE') return;
-
-      try {
-         await deleteAccount();
-         showAlert('All driver data has been erased.', 'success');
-         logout();
-         navigate('/');
-      } catch (error: any) {
-         if (error.code === 'auth/requires-recent-login') {
-            showAlert('Action Required', 'Please log out and log back in to perform this security-sensitive action.', 'error');
-         } else {
-            showAlert('Error', error.message || "Failed to delete account", 'error');
-         }
-      } finally {
-         setIsDeleteModalOpen(false);
-      }
-   };
+       try {
+          await deleteAccount();
+          showAlert('Success', 'All driver data has been erased.', 'success');
+          logout();
+          navigate('/');
+       } catch (error: any) {
+          if (error.code === 'auth/requires-recent-login') {
+             showAlert('Action Required', 'Please log out and log back in to perform this security-sensitive action.', 'error');
+          } else {
+             showAlert('Error', error.message || "Failed to delete account", 'error');
+          }
+       }
+    };
 
    const handleReviewSubmit = async () => {
       if (!reviewingOrder) return;
@@ -918,30 +992,9 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
       }
    };
 
-   // --- SUB-COMPONENTS ---
+    // --- SUB-COMPONENTS (moved to module scope above) ---
 
-   const SidebarItem = ({ view, icon: Icon, label }: { view: DashboardView, icon: any, label: string }) => (
-      <button
-         onClick={() => {
-            setCurrentView(view);
-            setIsSidebarOpen(false);
-         }}
-         className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all mb-1 ${currentView === view
-            ? 'bg-brand-50 text-brand-600 font-bold border border-brand-100'
-            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium'
-            }`}
-      >
-         <Icon className={`w-5 h-5 ${currentView === view ? 'stroke-[2.5px]' : ''}`} />
-         <span>{label}</span>
-         {view === 'MARKET' && availableOrders.length > 0 && (
-            <span className="ml-auto bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
-               {availableOrders.length}
-            </span>
-         )}
-      </button>
-   );
-
-   // Bottom Sheet Height tracker for Map Padding
+    // Bottom Sheet Height tracker for Map Padding
    const bottomSheetRef = useRef<HTMLDivElement>(null);
 
    useEffect(() => {
@@ -961,30 +1014,10 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
 
       observer.observe(bottomSheetRef.current);
       return () => observer.disconnect();
-   }, [currentView, isDrawerCollapsed, hasActiveJob, isOnline, setBottomSheetHeight]);
+    }, [currentView, isDrawerCollapsed, hasActiveJob, isOnline, setBottomSheetHeight]);
 
-   const StatCard = ({ title, value, icon: Icon, color, trend, onClick }: any) => (
-      <div
-         onClick={onClick}
-         className={`bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-start justify-between transition-all ${onClick ? 'cursor-pointer hover:border-brand-200 hover:shadow-md active:scale-[0.98]' : ''}`}
-      >
-         <div>
-            <p className="text-gray-500 text-sm font-medium mb-1">{title}</p>
-            <h3 className="text-2xl font-bold text-gray-900">{value}</h3>
-            {trend && (
-               <p className="text-emerald-600 text-xs font-bold mt-2 flex items-center">
-                  <TrendingUp className="w-3 h-3 mr-1" /> {trend}
-               </p>
-            )}
-         </div>
-         <div className={`p-3 rounded-xl ${color}`}>
-            <Icon className="w-6 h-6" />
-         </div>
-      </div>
-   );
-
-   return (
-      <div className={`min-h-screen flex relative ${hasActiveJob && currentView === 'JOBS' ? '' : 'bg-slate-50'}`}>
+    return (
+       <div className={`h-[100dvh] flex relative overflow-hidden ${hasActiveJob && currentView === 'JOBS' ? '' : 'bg-slate-50'}`}>
          {/* SIDEBAR (Desktop) - Always interactive */}
          <aside className={`fixed inset-y-0 left-0 bg-white border-r border-gray-100 w-64 z-50 transform transition-transform duration-300 lg:translate-x-0 pointer-events-auto ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
             <div className="h-full flex flex-col">
@@ -998,16 +1031,16 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                </div>
 
                <div className="flex-1 overflow-y-auto pb-4">
-                  <div className="p-4 space-y-2">
-                     {/* Home button removed for drivers */}
-                     <div className="text-xs font-bold text-gray-400 uppercase px-4 py-2">Menu</div>
-                     <SidebarItem view="OVERVIEW" icon={LayoutDashboard} label="Dashboard" />
-                     <SidebarItem view="MARKET" icon={Search} label="Marketplace" />
-                     <SidebarItem view="JOBS" icon={Package} label="Active Job" />
-                     <SidebarItem view="DELIVERIES" icon={List} label="My Deliveries" />
-                     <SidebarItem view="EARNINGS" icon={Wallet} label="Earnings" />
-                     <SidebarItem view="PROFILE" icon={UserIcon} label="Profile" />
-                  </div>
+                   <div className="p-4 space-y-2">
+                      {/* Home button removed for drivers */}
+                      <div className="text-xs font-bold text-gray-400 uppercase px-4 py-2">Menu</div>
+                      <SidebarItem view="OVERVIEW" icon={LayoutDashboard} label="Dashboard" currentView={currentView} availableCount={availableOrders.length} onClick={() => { setCurrentView('OVERVIEW'); setIsSidebarOpen(false); }} />
+                      <SidebarItem view="MARKET" icon={Search} label="Marketplace" currentView={currentView} availableCount={availableOrders.length} onClick={() => { setCurrentView('MARKET'); setIsSidebarOpen(false); }} />
+                      <SidebarItem view="JOBS" icon={Package} label="Active Job" currentView={currentView} availableCount={availableOrders.length} onClick={() => { setCurrentView('JOBS'); setIsSidebarOpen(false); }} />
+                      <SidebarItem view="DELIVERIES" icon={List} label="My Deliveries" currentView={currentView} availableCount={availableOrders.length} onClick={() => { setCurrentView('DELIVERIES'); setIsSidebarOpen(false); }} />
+                      <SidebarItem view="EARNINGS" icon={Wallet} label="Earnings" currentView={currentView} availableCount={availableOrders.length} onClick={() => { setCurrentView('EARNINGS'); setIsSidebarOpen(false); }} />
+                      <SidebarItem view="PROFILE" icon={UserIcon} label="Profile" currentView={currentView} availableCount={availableOrders.length} onClick={() => { setCurrentView('PROFILE'); setIsSidebarOpen(false); }} />
+                   </div>
 
                   {/* User Info & Sign Out - INSIDE scrollable area */}
                   <div className="p-4 mt-4 border-t border-gray-100 bg-gray-50 mx-2 rounded-2xl" style={{ marginBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}>
@@ -1044,8 +1077,8 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
             <div className="fixed inset-0 bg-black/20 z-40 lg:hidden" onClick={() => setIsSidebarOpen(false)}></div>
          )}
 
-         {/* MAIN CONTENT */}
-         <main className={`flex-1 lg:ml-64 flex flex-col transition-all relative ${currentView === 'JOBS' ? 'bg-transparent' : ''}`}>
+          {/* MAIN CONTENT */}
+          <main className={`flex-1 lg:ml-64 flex flex-col transition-all relative ${currentView === 'JOBS' ? 'bg-transparent overflow-hidden' : 'bg-slate-50 overflow-y-auto'}`}>
             {/* Map Layer - Now inside main and relative to it */}
             {currentView === 'JOBS' && (
                <div className="absolute inset-0 z-0 pointer-events-auto">
@@ -1085,15 +1118,20 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                      <span className="text-sm font-bold">{isOnline ? 'Online' : 'Offline'}</span>
                   </div>
 
-                  <button className={`p-2.5 backdrop-blur-md border rounded-xl transition-all relative ${currentView === 'JOBS' ? 'bg-white/10 border-white/20 text-white/60 hover:text-white' : 'bg-white border-gray-100 text-gray-400 hover:text-gray-600'}`}>
-                     <Bell className="w-5 h-5" />
-                     <span className="absolute top-2 right-2 w-2 h-2 bg-brand-600 rounded-full border-2 border-white"></span>
-                  </button>
+                   <button
+                      onClick={() => setCurrentView('MARKET')}
+                      className={`p-2.5 backdrop-blur-md border rounded-xl transition-all relative ${currentView === 'JOBS' ? 'bg-white/10 border-white/20 text-white/60 hover:text-white' : 'bg-white border-gray-100 text-gray-400 hover:text-gray-600'}`}
+                   >
+                      <Bell className="w-5 h-5" />
+                      {availableOrders.length > 0 && (
+                         <span className="absolute top-2 right-2 w-2 h-2 bg-brand-600 rounded-full border-2 border-white"></span>
+                      )}
+                   </button>
                </div>
             </header>
 
             {/* VIEW CONTENT */}
-            <div className={`relative z-10 p-4 sm:p-8 space-y-6 ${currentView === 'JOBS' ? 'hidden' : 'pointer-events-auto'}`}>
+            <div className={`relative z-10 p-4 sm:p-8 space-y-6 ${currentView === 'JOBS' ? 'hidden' : 'pointer-events-auto flex-1'}`}>
 
                {/* ... (Other Views OVERVIEW, EARNINGS, MARKET remain unchanged) ... */}
                {currentView === 'OVERVIEW' && metrics && (
@@ -1364,14 +1402,14 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                               </div>
                            </div>
                            <div className="mt-8 md:mt-0 flex flex-col items-center md:items-end">
-                              <button
-                                 onClick={() => {
-                                    if (metrics.earnings.balance < 500) {
-                                       alert("Minimum withdrawal amount is KES 500");
-                                       return;
-                                    }
-                                    alert("Withdrawal request sent to M-Pesa. You will receive funds within 24 hours.");
-                                 }}
+                               <button
+                                  onClick={() => {
+                                     if ((metrics.earnings.balance || 0) < 500) {
+                                        showAlert("Withdrawal", "Minimum withdrawal amount is KES 500.", "warning");
+                                        return;
+                                     }
+                                     showAlert("Coming Soon", "Withdrawal to M-Pesa is being set up. Please contact support for manual withdrawal.", "info");
+                                  }}
                                  className="bg-white text-brand-600 px-8 py-4 rounded-2xl font-black transition-all flex items-center shadow-lg hover:scale-105 active:scale-95"
                               >
                                  <DollarSign className="w-5 h-5 mr-3" /> Withdraw Funds
@@ -1629,7 +1667,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                                  key={order.id}
                                  order={order}
                                  onAccept={handleAcceptJob}
-                                  disabled={hasActiveJob || (driverVehicleId && String(order.vehicle).toLowerCase() !== 'standard' && String(order.vehicle).toLowerCase() !== driverVehicleId)}
+                                  disabled={hasActiveJob || (driverVehicleId && !vehicleMatches(order))}
                               />
                            ))}
                         </div>
@@ -1663,9 +1701,9 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                            <div className="text-center md:text-left">
                               <h2 className="text-4xl font-black tracking-tight">{user.name || 'Professional Driver'}</h2>
                               <div className="flex flex-wrap justify-center md:justify-start gap-3 mt-3">
-                                 <span className="bg-white/20 backdrop-blur-md px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest border border-white/10 flex items-center">
-                                    <Shield className="w-3.5 h-3.5 mr-2" /> Verified Partner
-                                 </span>
+                                  <span className="bg-white/20 backdrop-blur-md px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest border border-white/10 flex items-center">
+                                     <Shield className="w-3.5 h-3.5 mr-2" /> {user.idImage && user.licenseImage ? 'Verified' : 'Pending Verification'}
+                                  </span>
                                  <span className="bg-emerald-400 text-emerald-900 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest flex items-center">
                                     <div className="w-2 h-2 bg-emerald-900 rounded-full mr-2 animate-pulse" /> {metrics.status}
                                  </span>
@@ -1776,13 +1814,13 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 flex items-center">
                                           <Shield className="w-3.5 h-3.5 mr-2" /> Verification
                                        </label>
-                                       <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-4 flex items-center justify-between">
-                                          <div>
-                                             <p className="text-xs font-black text-emerald-900 uppercase">Documents Verified</p>
-                                             <p className="text-[10px] text-emerald-600/60 font-medium">Auto-renew in 184 days</p>
-                                          </div>
-                                          <ShieldCheck className="w-6 h-6 text-emerald-500" />
-                                       </div>
+                                        <div className={`rounded-2xl p-4 flex items-center justify-between ${user.idImage ? 'bg-emerald-50/50 border border-emerald-100' : 'bg-amber-50/50 border border-amber-100'}`}>
+                                           <div>
+                                              <p className={`text-xs font-black uppercase ${user.idImage ? 'text-emerald-900' : 'text-amber-900'}`}>{user.idImage ? 'Documents Verified' : 'Verification Pending'}</p>
+                                              <p className={`text-[10px] font-medium ${user.idImage ? 'text-emerald-600/60' : 'text-amber-600/60'}`}>{user.idImage ? 'Upload your documents to complete verification' : 'Upload your documents to complete verification'}</p>
+                                           </div>
+                                           <ShieldCheck className={`w-6 h-6 ${user.idImage ? 'text-emerald-500' : 'text-amber-500'}`} />
+                                        </div>
                                     </div>
                                  </div>
                               </div>
@@ -1857,24 +1895,18 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                               {expandedSection === 'SECURITY' && (
                                  <div className="px-8 pb-8 space-y-6 animate-in slide-in-from-top-4 duration-300">
                                     <div className="space-y-4">
-                                       <div className="p-5 bg-white rounded-2xl border border-gray-100 flex items-center justify-between group cursor-pointer hover:border-brand-200 transition-all">
-                                          <div className="flex items-center gap-4">
-                                             <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center text-purple-600">
-                                                <QrCode className="w-5 h-5" />
-                                             </div>
-                                             <div>
-                                                <h4 className="font-bold text-slate-900 text-sm">Two-Factor Auth</h4>
-                                                <p className="text-[10px] text-gray-400 font-medium">Protect your earnings wallet</p>
-                                             </div>
-                                          </div>
-                                          <button
-                                             onClick={handleToggle2FA}
-                                             disabled={isUpdating2FA}
-                                             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${is2FAEnabled ? 'bg-emerald-500' : 'bg-gray-200'}`}
-                                          >
-                                             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${is2FAEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-                                          </button>
-                                       </div>
+                                        <div className="p-5 bg-white rounded-2xl border border-gray-100 flex items-center justify-between group">
+                                           <div className="flex items-center gap-4">
+                                              <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center text-purple-600">
+                                                 <QrCode className="w-5 h-5" />
+                                              </div>
+                                              <div>
+                                                 <h4 className="font-bold text-slate-900 text-sm">Two-Factor Auth</h4>
+                                                 <p className="text-[10px] text-gray-400 font-medium">Coming soon — protect your earnings wallet</p>
+                                              </div>
+                                           </div>
+                                           <span className="text-[9px] font-black uppercase tracking-widest bg-amber-50 text-amber-600 px-2 py-1 rounded-full border border-amber-100">Soon</span>
+                                        </div>
 
                                        <div className="p-5 bg-white rounded-2xl border border-gray-100 flex items-center justify-between group cursor-pointer hover:border-brand-200 transition-all" onClick={() => setShowPasswordFields(!showPasswordFields)}>
                                           <div className="flex items-center gap-4">
@@ -1933,21 +1965,21 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                                           <span className="text-[10px] font-black uppercase tracking-tighter">Empty Slot</span>
                                        </div>
                                     )}
-                                    <div className="absolute top-4 right-4 bg-emerald-500 text-white px-3 py-1 rounded-full text-[8px] font-black uppercase shadow-lg">Verified</div>
-                                 </div>
-                              </div>
-                              <div className="space-y-4">
-                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block ml-2">Driving License</label>
-                                 <div className="relative aspect-[16/10] rounded-3xl overflow-hidden bg-gray-50 border-2 border-gray-100 group shadow-inner">
-                                    {user.licenseImage ? (
-                                       <img src={user.licenseImage} alt="License" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                                    ) : (
-                                       <div className="w-full h-full flex flex-col items-center justify-center text-gray-300">
-                                          <FileText className="w-8 h-8 opacity-20 mb-2" />
-                                          <span className="text-[10px] font-black uppercase tracking-tighter">Empty Slot</span>
-                                       </div>
-                                    )}
-                                    <div className="absolute top-4 right-4 bg-emerald-500 text-white px-3 py-1 rounded-full text-[8px] font-black uppercase shadow-lg">Active</div>
+                                     {user.idImage && <div className="absolute top-4 right-4 bg-emerald-500 text-white px-3 py-1 rounded-full text-[8px] font-black uppercase shadow-lg">Verified</div>}
+                                  </div>
+                               </div>
+                               <div className="space-y-4">
+                                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block ml-2">Driving License</label>
+                                  <div className="relative aspect-[16/10] rounded-3xl overflow-hidden bg-gray-50 border-2 border-gray-100 group shadow-inner">
+                                     {user.licenseImage ? (
+                                        <img src={user.licenseImage} alt="License" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                                     ) : (
+                                        <div className="w-full h-full flex flex-col items-center justify-center text-gray-300">
+                                           <FileText className="w-8 h-8 opacity-20 mb-2" />
+                                           <span className="text-[10px] font-black uppercase tracking-tighter">Empty Slot</span>
+                                        </div>
+                                     )}
+                                     {user.licenseImage && <div className="absolute top-4 right-4 bg-emerald-500 text-white px-3 py-1 rounded-full text-[8px] font-black uppercase shadow-lg">Active</div>}
                                  </div>
                               </div>
                            </div>
@@ -2004,41 +2036,6 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                   </div>
                )}
             </div>
-
-            {/* Delete Account Confirmation Modal */}
-            {
-               isDeleteModalOpen && (
-                  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-                     <div className="bg-white rounded-[2.5rem] w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
-                        <div className="p-8 text-center space-y-6">
-                           <div className="w-20 h-20 bg-red-50 rounded-3xl flex items-center justify-center mx-auto">
-                              <AlertCircle className="w-10 h-10 text-red-600" />
-                           </div>
-                           <div>
-                              <h3 className="text-2xl font-black text-gray-900">Delete Account?</h3>
-                              <p className="text-gray-500 font-medium mt-2">
-                                 This action is permanent. All your driver data, earnings history, and performance metrics will be permanently removed.
-                              </p>
-                           </div>
-                           <div className="flex flex-col gap-3">
-                              <button
-                                 onClick={handleDeleteAccount}
-                                 className="w-full bg-red-600 text-white py-4 rounded-2xl font-black shadow-lg shadow-red-600/20 hover:bg-red-700 transition-all active:scale-95"
-                              >
-                                 Yes, Delete My Account
-                              </button>
-                              <button
-                                 onClick={() => setIsDeleteModalOpen(false)}
-                                 className="w-full bg-gray-100 text-gray-900 py-4 rounded-2xl font-black hover:bg-gray-200 transition-all active:scale-95"
-                              >
-                                 Cancel
-                              </button>
-                           </div>
-                        </div>
-                     </div>
-                  </div>
-               )
-            }
 
             {/* Active Job Overlay (Map View) */}
             {currentView === 'JOBS' && (
@@ -2164,12 +2161,18 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                                        <span>Final Delivery Complete</span>
                                     </button>
                                  )}
-                                 <button className="flex items-center justify-center py-3 bg-gray-100 text-gray-900 rounded-xl font-bold hover:bg-gray-200 border border-gray-200">
-                                    <Phone className="w-4 h-4 mr-2" /> Call
-                                 </button>
-                                 <button className="flex items-center justify-center py-3 bg-gray-100 text-gray-900 rounded-xl font-bold hover:bg-gray-200 border border-gray-200">
-                                    <MessageSquare className="w-4 h-4 mr-2" /> Chat
-                                 </button>
+                                  <button
+                                     onClick={() => { if (activeJob?.recipient?.phone) window.open(`tel:${activeJob.recipient.phone}`); }}
+                                     className="flex items-center justify-center py-3 bg-gray-100 text-gray-900 rounded-xl font-bold hover:bg-gray-200 border border-gray-200"
+                                  >
+                                     <Phone className="w-4 h-4 mr-2" /> Call
+                                  </button>
+                                  <button
+                                     onClick={() => { if (activeJob?.recipient?.phone) window.open(`https://wa.me/${activeJob.recipient.phone.replace(/[^0-9]/g, '')}`); }}
+                                     className="flex items-center justify-center py-3 bg-gray-100 text-gray-900 rounded-xl font-bold hover:bg-gray-200 border border-gray-200"
+                                  >
+                                     <MessageSquare className="w-4 h-4 mr-2" /> Chat
+                                  </button>
                               </div>
                            </>
                         ) : (
@@ -2181,7 +2184,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                                     </span>
                                     <Navigation className="w-3 h-3 text-brand-500 animate-pulse" />
                                  </div>
-                                 <p className="text-sm font-bold text-gray-900 line-clamp-1">{nextStop?.address || activeJob.dropoffAddress}</p>
+                                  <p className="text-sm font-bold text-gray-900 line-clamp-1">{nextStop?.address || activeJob.dropoff}</p>
                                  <div className="flex items-center space-x-2 mt-1">
                                     <span className="text-[10px] font-black text-emerald-600 uppercase tracking-tighter bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
                                        Earn: KES {(activeJob.driverRate || Math.floor((activeJob.price || 0) * 0.8)).toLocaleString()}

@@ -141,9 +141,9 @@ const Navbar: React.FC<NavbarProps> = ({
               <button
                 onClick={() =>
                   onLogin?.(
-                    "customer",
-                    "Welcome back",
-                    "Access your AXON dashboard."
+                    undefined as any,
+                    "Welcome to Axon",
+                    "Choose how you want to sign in."
                   )
                 }
                 className="text-sm font-black px-6 py-2.5 rounded-full transition-all active:scale-95 bg-brand-600 text-white pointer-events-auto"
@@ -248,9 +248,9 @@ const Navbar: React.FC<NavbarProps> = ({
               <button
                 onClick={() =>
                   onLogin?.(
-                    "customer",
-                    "Welcome back",
-                    "Access your AXON dashboard."
+                    undefined as any,
+                    "Welcome to Axon",
+                    "Choose how you want to sign in."
                   )
                 }
                 className="bg-brand-600 hover:bg-brand-700 text-white text-sm font-black px-6 py-2.5 rounded-full transition-all active:scale-95"
@@ -285,9 +285,9 @@ const Navbar: React.FC<NavbarProps> = ({
                 <button
                   onClick={() =>
                     onLogin?.(
-                      "customer",
-                      "Welcome back",
-                      "Access your AXON dashboard."
+                      undefined as any,
+                      "Welcome to Axon",
+                      "Choose how you want to sign in."
                     )
                   }
                   className="bg-brand-600 hover:bg-brand-700 text-white text-sm font-black px-4 py-2 rounded-full transition-all shadow-sm active:scale-95"

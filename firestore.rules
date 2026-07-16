@@ -66,8 +66,7 @@ service cloud.firestore {
         (resource.data.driver != null && resource.data.driver.id == request.auth.uid) ||
         (
           resource.data.status == 'pending' &&
-          isDriver() &&
-          get(/databases/$(database)/documents/drivers/$(request.auth.uid)).data.vehicleType == resource.data.vehicle
+          isDriver()
         )
       );
 

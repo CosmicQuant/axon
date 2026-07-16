@@ -298,7 +298,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, defaultView = 'L
       <button
         onClick={() => {
           if (tempFirebaseUser) finalizeGoogleSignup('customer');
-          else { setRole('customer'); setView('SIGNUP'); }
+          else { setRole('customer'); setView('LOGIN'); }
         }}
         className="w-full flex items-center p-4 rounded-xl border-2 border-gray-100 hover:border-brand-500/50 hover:bg-brand-50 transition-all group text-left"
       >
@@ -314,7 +314,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, defaultView = 'L
       <button
         onClick={() => {
           if (tempFirebaseUser) finalizeGoogleSignup('driver');
-          else { setRole('driver'); setView('SIGNUP'); }
+          else { setRole('driver'); setView('LOGIN'); }
         }}
         className="w-full flex items-center p-4 rounded-xl border-2 border-gray-100 hover:border-yellow-400/50 hover:bg-yellow-50 transition-all group text-left"
       >
@@ -330,7 +330,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, defaultView = 'L
       <button
         onClick={() => {
           if (tempFirebaseUser) finalizeGoogleSignup('business');
-          else { setRole('business'); setView('SIGNUP'); }
+          else { setRole('business'); setView('LOGIN'); }
         }}
         className="w-full flex items-center p-4 rounded-xl border-2 border-gray-100 hover:border-blue-500/50 hover:bg-blue-50 transition-all group text-left"
       >

@@ -90,9 +90,8 @@ const TrackingPageContent: React.FC = () => {
                 }
 
                 // Update Route for customer
-                if (order.routeGeometry) {
-                    // Reuse the polyline persisted at booking time so the route stays
-                    // visible during the pending state (no async re-fetch gap).
+                if (order.routeGeometry && !order.driverLocation && !p) {
+                    // Reuse stored geometry only when we don't have live coords yet
                     setRoutePolyline(order.routeGeometry);
                 } else if (order.driverLocation) {
                         // Throttle driver-location-triggered route updates to every 15s

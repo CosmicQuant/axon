@@ -391,3 +391,119 @@ exports.calculateQuote = functions.https.onCall(async (data, context) => {
 // --- API & WEBHOOKS MODULE ---
 const apiV1 = require('./v1/api');
 exports.v1 = functions.https.onRequest(apiV1);
+
+// ── SERVER-SIDE DELIVERY VERIFICATION ───────────────────────────
+// Verifies the 4-digit passcode server-side so the driver never has
+// access to the code in the order document.
+exports.verifyDeliveryCode = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'You must be signed in to verify a delivery.');
+    }
+
+    const { orderId, code, stopId } = data;
+    if (!orderId || !code) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing orderId or code.');
+    }
+
+    const orderRef = admin.firestore().doc(`orders/${orderId}`);
+    const orderDoc = await orderRef.get();
+    if (!orderDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'Order not found.');
+    }
+
+    const orderData = orderDoc.data();
+
+    // Ensure the caller is the assigned driver
+    if (!orderData.driver || orderData.driver.id !== context.auth.uid) {
+        throw new functions.https.HttpsError('permission-denied', 'You are not assigned to this order.');
+    }
+
+    // Determine which code to check
+    let targetCode = orderData.verificationCode;
+    if (stopId && Array.isArray(orderData.stops)) {
+        const stop = orderData.stops.find(s => s.id === stopId);
+        if (stop) {
+            targetCode = stop.verificationCode || orderData.verificationCode;
+        }
+    }
+
+    if (!targetCode) {
+        throw new functions.https.HttpsError('internal', 'No verification code found for this order.');
+    }
+
+    const isValid = String(code) === String(targetCode);
+
+    return { valid: isValid };
+});
+
+// ── SERVER-SIDE ORDER STATUS TRANSITION ─────────────────────────
+// Ensures only the assigned driver can transition order status,
+// and validates the state machine server-side.
+exports.updateOrderStatus = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'You must be signed in.');
+    }
+
+    const { orderId, newStatus, extraData } = data;
+    if (!orderId || !newStatus) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing orderId or newStatus.');
+    }
+
+    const allowedTransitions = {
+        'driver_assigned': ['in_transit', 'cancelled'],
+        'in_transit': ['delivered', 'cancelled'],
+        'pending': ['driver_assigned', 'cancelled'],
+    };
+
+    const orderRef = admin.firestore().doc(`orders/${orderId}`);
+
+    try {
+        await admin.firestore().runTransaction(async (transaction) => {
+            const orderDoc = await transaction.get(orderRef);
+            if (!orderDoc.exists) {
+                throw new functions.https.HttpsError('not-found', 'Order not found.');
+            }
+
+            const orderData = orderDoc.data();
+            const currentStatus = orderData.status;
+
+            // Only the assigned driver (or the customer for cancellation) can transition
+            const isDriver = orderData.driver && orderData.driver.id === context.auth.uid;
+            const isCustomer = orderData.userId === context.auth.uid;
+
+            if (!isDriver && !(isCustomer && newStatus === 'cancelled')) {
+                throw new functions.https.HttpsError('permission-denied', 'You are not authorized to update this order.');
+            }
+
+            // Validate the transition
+            const allowed = allowedTransitions[currentStatus] || [];
+            if (!allowed.includes(newStatus)) {
+                throw new functions.https.HttpsError('failed-precondition',
+                    `Cannot transition from ${currentStatus} to ${newStatus}.`);
+            }
+
+            const updates = {
+                status: newStatus,
+                updatedAt: new Date().toISOString(),
+            };
+
+            if (newStatus === 'in_transit') {
+                updates.startedAt = new Date().toISOString();
+                updates.startTime = updates.startedAt;
+            } else if (newStatus === 'delivered') {
+                updates.deliveredAt = new Date().toISOString();
+                updates.endTime = updates.deliveredAt;
+                if (extraData?.deliveryConfirmationImage) {
+                    updates.deliveryConfirmationImage = extraData.deliveryConfirmationImage;
+                }
+            }
+
+            transaction.update(orderRef, updates);
+        });
+
+        return { success: true };
+    } catch (error) {
+        console.error('updateOrderStatus error:', error);
+        throw error;
+    }
+});

@@ -9,7 +9,8 @@ import {
   updateDoc,
   orderBy,
   limit,
-  runTransaction
+  runTransaction,
+  increment
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { DeliveryOrder, DriverMetrics, Driver, PricingDetails, Review } from '../types';
@@ -409,7 +410,7 @@ export const orderService = {
       if (routeGeometry !== undefined) updates.routeGeometry = routeGeometry;
       await updateDoc(orderRef, updates);
     } catch (error) {
-      // Silent fail
+      console.error("Error updating driver location:", error);
     }
   },
 
@@ -661,14 +662,10 @@ export const orderService = {
   incrementDriverOnlineTime: async (driverId: string, minutes: number): Promise<void> => {
     try {
       const driverRef = doc(db, 'drivers', driverId);
-      const driverSnap = await getDoc(driverRef);
-      if (driverSnap.exists()) {
-        const currentMins = driverSnap.data().totalOnlineMinutes || 0;
-        await updateDoc(driverRef, {
-          totalOnlineMinutes: currentMins + minutes,
-          updatedAt: new Date().toISOString()
-        });
-      }
+      await updateDoc(driverRef, {
+        totalOnlineMinutes: increment(minutes),
+        updatedAt: new Date().toISOString()
+      });
     } catch (error) {
       console.error("Error incrementing online time:", error);
     }

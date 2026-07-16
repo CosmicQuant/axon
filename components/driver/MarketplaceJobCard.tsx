@@ -10,6 +10,17 @@ interface MarketplaceJobCardProps {
 }
 
 export const MarketplaceJobCard: React.FC<MarketplaceJobCardProps> = ({ order, onAccept, disabled }) => {
+  const [accepting, setAccepting] = React.useState(false);
+
+  const handleAccept = async () => {
+    setAccepting(true);
+    try {
+      await onAccept(order);
+    } catch {
+      setAccepting(false);
+    }
+  };
+
   return (
     <div className={`bg-white rounded-[2rem] p-6 border transition-all shadow-sm ${
       disabled ? 'opacity-50 grayscale' : 'hover:border-brand-200 hover:shadow-md'
@@ -60,9 +71,10 @@ export const MarketplaceJobCard: React.FC<MarketplaceJobCardProps> = ({ order, o
       </div>
 
       {/* Slide to Accept Action */}
-      <SlideToAccept 
-        onAccept={() => onAccept(order)} 
-        disabled={disabled} 
+      <SlideToAccept
+        onAccept={handleAccept}
+        isLoading={accepting}
+        disabled={disabled}
       />
     </div>
   );

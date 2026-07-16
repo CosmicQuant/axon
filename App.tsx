@@ -333,7 +333,7 @@ const App = () => {
 
   return (
     <ChatProvider>
-      <div className={`bg-gray-50 flex flex-col font-sans text-gray-900 overflow-x-hidden ${isMapPage || location.pathname.startsWith('/driver') ? 'h-[100dvh] h-screen overflow-hidden' : 'min-h-screen'} ${shouldShowBottomNav ? 'pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-0' : 'pb-[env(safe-area-inset-bottom,0px)]'}`}>
+      <div className={`bg-gray-50 flex flex-col font-sans text-gray-900 overflow-x-hidden ${isMapPage ? 'h-[100dvh] h-screen overflow-hidden' : 'min-h-screen'} ${shouldShowBottomNav ? 'pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-0' : 'pb-[env(safe-area-inset-bottom,0px)]'}`}>
         <Toaster position="top-center" toastOptions={{ duration: 4000, style: { background: '#333', color: '#fff' } }} />
 
         <MapProvider>
@@ -341,7 +341,12 @@ const App = () => {
             <Navbar
               onToggleMobileMenu={() => setIsMenuOpen(true)}
               onLogin={(role, title, desc) => {
-                if (role) setAuthModalRole(role);
+                if (role) {
+                  setAuthModalRole(role);
+                  setAuthModalView('LOGIN');
+                } else {
+                  setAuthModalView('ROLE_SELECT');
+                }
                 if (title) setAuthModalTitle(title);
                 if (desc) setAuthModalDesc(desc);
                 setShowAuthModal(true);
@@ -367,15 +372,16 @@ const App = () => {
             onProfile={() => { setIsMenuOpen(false); setShowProfile(true); }}
           />
 
-          {/* Global Map Layer (Singleton) for caching and preloading */}
+          {/* Global Map Layer (Singleton) for booking/tracking pages only.
+              Driver dashboard renders its own MapLayer inside the JOBS view. */}
           <div
-            className={`fixed inset-0 transition-opacity duration-300 z-0 ${isMapPage || location.pathname.startsWith('/driver') ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
-            aria-hidden={!isMapPage && !location.pathname.startsWith('/driver')}
+            className={`fixed inset-0 transition-opacity duration-300 z-0 ${isMapPage ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+            aria-hidden={!isMapPage}
           >
             <MapLayer />
           </div>
 
-          <main className={`flex-grow flex flex-col relative z-10 ${isMapPage || location.pathname.startsWith('/driver') ? 'pointer-events-none' : 'pb-16 md:pb-0'}`}>
+          <main className={`flex-grow flex flex-col relative z-10 ${isMapPage ? 'pointer-events-none' : 'pb-16 md:pb-0'}`}>
             <Suspense fallback={<SkeletonFallback />}>
               <Routes>
                 {/* Temporary Test Route */}

@@ -284,46 +284,43 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
         coords = resolved ? { lat: resolved.lat, lng: resolved.lng } : null;
       }
 
+      // Truncate address to 20 chars for display
+      const shortAddress = addressQuery.trim().length > 20
+        ? addressQuery.trim().substring(0, 20) + '…'
+        : addressQuery.trim();
+
       if (editField === 'pickup') {
-        const updates: any = { pickup: addressQuery.trim() };
+        const updates: any = { pickup: shortAddress };
         if (coords) updates.pickupCoords = coords;
         await onUpdateOrder(order.id, updates);
-        // Refresh map immediately
+        // Refresh map immediately with new route
         const newPickup = coords || order.pickupCoords;
         const newDropoff = order.dropoffCoords;
         if (newPickup) refreshMapAfterEdit(newPickup, newDropoff || null, order.stops || []);
-        // Auto-optimize after location change
         optimizeCurrentRoute();
-        // Requote with new pickup
         requoteAfterEdit({ pickupCoords: newPickup || undefined });
       } else if (editField === 'dropoff') {
-        const updates: any = { dropoff: addressQuery.trim() };
+        const updates: any = { dropoff: shortAddress };
         if (coords) updates.dropoffCoords = coords;
         const dropoffStop = order.stops?.find(s => s.type === 'dropoff');
         const updatedStops = dropoffStop
           ? (order.stops || []).map(s =>
-            s.type === 'dropoff' ? { ...s, address: addressQuery.trim(), ...(coords ? { lat: coords.lat, lng: coords.lng } : {}) } : s
+            s.type === 'dropoff' ? { ...s, address: shortAddress, ...(coords ? { lat: coords.lat, lng: coords.lng } : {}) } : s
           )
           : order.stops || [];
         if (dropoffStop) updates.stops = updatedStops;
         await onUpdateOrder(order.id, updates);
-        // Refresh map immediately
         const newDropoff = coords || order.dropoffCoords;
         if (newDropoff) refreshMapAfterEdit(order.pickupCoords || null, newDropoff, updatedStops);
-        // Auto-optimize after location change
         optimizeCurrentRoute(updatedStops);
-        // Requote with new dropoff
         requoteAfterEdit({ dropoffCoords: newDropoff || undefined, stops: updatedStops });
       } else if (editField === 'stop' && editingStopId) {
         const updatedStops = (order.stops || []).map(s =>
-          s.id === editingStopId ? { ...s, address: addressQuery.trim(), ...(coords ? { lat: coords.lat, lng: coords.lng } : {}) } : s
+          s.id === editingStopId ? { ...s, address: shortAddress, ...(coords ? { lat: coords.lat, lng: coords.lng } : {}) } : s
         );
         await onUpdateOrder(order.id, { stops: updatedStops } as any);
-        // Refresh map immediately
         refreshMapAfterEdit(order.pickupCoords || null, order.dropoffCoords || null, updatedStops);
-        // Auto-optimize after location change
         optimizeCurrentRoute(updatedStops);
-        // Requote with updated stops
         requoteAfterEdit({ stops: updatedStops });
       }
     } catch (e) {
@@ -608,10 +605,10 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
         estimatedDuration: newEta,
       } as any);
 
-      // Show price change banner if price actually changed
+      // Show price change banner if price actually changed (persistent until paid/dismissed)
       if (newPrice !== oldPrice) {
         setPriceChange({ oldPrice, newPrice, newEta });
-        setTimeout(() => setPriceChange(null), 8000);
+        setPaymentSettled(false);
       }
     } catch (e) {
       console.error('Requote failed:', e);
