@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, User, ArrowRight, Rss, ArrowLeft, Share2, Facebook, Twitter, Linkedin, MessageCircle } from 'lucide-react';
+import { Calendar, Clock, User, ArrowRight, Rss, ArrowLeft, Share2, Facebook, Instagram, MessageCircle } from 'lucide-react';
 import { useChat } from '../context/ChatContext';
 
 const BLOG_POSTS = [
@@ -149,9 +149,9 @@ const BlogPage: React.FC = () => {
                                 <div>
                                     <h4 className="font-black text-white mb-2">Share this article</h4>
                                     <div className="flex gap-4">
-                                        <button className="p-2 bg-white/5 rounded-lg hover:bg-brand-500/10 hover:text-brand-400 transition-all border border-white/10"><Facebook className="w-5 h-5" /></button>
-                                        <button className="p-2 bg-white/5 rounded-lg hover:bg-brand-500/10 hover:text-brand-400 transition-all border border-white/10"><Twitter className="w-5 h-5" /></button>
-                                        <button className="p-2 bg-white/5 rounded-lg hover:bg-brand-500/10 hover:text-brand-400 transition-all border border-white/10"><Linkedin className="w-5 h-5" /></button>
+                                        <a href="https://www.facebook.com/share/14RVAxopGWE/" target="_blank" rel="noopener noreferrer" className="p-2 bg-white/5 rounded-lg hover:bg-brand-500/10 hover:text-brand-400 transition-all border border-white/10"><Facebook className="w-5 h-5" /></a>
+                                        <a href="https://www.instagram.com/axon_delivery025?igsh=cnNzZWx2d282ZWJk" target="_blank" rel="noopener noreferrer" className="p-2 bg-white/5 rounded-lg hover:bg-brand-500/10 hover:text-brand-400 transition-all border border-white/10"><Instagram className="w-5 h-5" /></a>
+                                        <a href="https://www.tiktok.com/@slh...7?_r=1&_t=ZS-983LzcRwEb6" target="_blank" rel="noopener noreferrer" className="p-2 bg-white/5 rounded-lg hover:bg-brand-500/10 hover:text-brand-400 transition-all border border-white/10"><MessageCircle className="w-5 h-5" /></a>
                                     </div>
                                 </div>
                                 <button

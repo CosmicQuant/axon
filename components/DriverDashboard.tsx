@@ -402,6 +402,23 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
       }
    }, [hasActiveJob, currentView, isLoaded, setDriverCoords, setDriverBearing, activeJob?.id, activeJob?.status, activeJobCoords.pickup, activeJobCoords.dropoff, setRoutePolyline, nextStop?.coords, allStops, setRouteDuration, setRouteDistance, setTotalRouteDuration, setTotalRouteDistance]);
 
+   // Normalize VehicleType enum display names to lowercase vehicle IDs used in orders
+   const normalizeVehicle = (vt?: string): string | null => {
+      if (!vt) return null;
+      const lower = vt.toLowerCase();
+      if (lower.includes('boda') || lower.includes('motorbike') || lower.includes('bike')) return 'boda';
+      if (lower.includes('tuk') || lower.includes('auto')) return 'tuktuk';
+      if (lower.includes('probox')) return 'probox';
+      if (lower.includes('van')) return 'van';
+      if (lower.includes('pickup')) return 'pickup';
+      if (lower.includes('lorry') || lower.includes('truck')) return 'lorry-5t';
+      if (lower.includes('trailer') || lower.includes('container')) return 'container-20ft';
+      // Already a lowercase ID
+      return lower;
+   };
+
+   const driverVehicleId = normalizeVehicle(user?.vehicleType);
+
    // Filtered Orders Logic
    const filteredOrders = availableOrders.filter(order => {
       const matchesSearch =
@@ -409,9 +426,20 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
          order.dropoff.toLowerCase().includes(searchQuery.toLowerCase()) ||
          order.items.itemDesc.toLowerCase().includes(searchQuery.toLowerCase());
 
-      // Only show orders that match the driver's vehicle type and are still pending
-      const matchesVehicle = order.vehicle === user?.vehicleType;
       const isPending = order.status === 'pending';
+
+      // Vehicle matching: Standard orders (vehicle='standard') are consolidated
+      // deliveries — show to all light-vehicle drivers (boda, tuktuk, probox).
+      // Express orders match if the driver's vehicle equals the order's vehicle.
+      let matchesVehicle = true;
+      if (driverVehicleId) {
+         const orderVehicle = String(order.vehicle).toLowerCase();
+         if (orderVehicle === 'standard') {
+            matchesVehicle = ['boda', 'tuktuk', 'probox'].includes(driverVehicleId);
+         } else {
+            matchesVehicle = orderVehicle === driverVehicleId;
+         }
+      }
 
       return matchesSearch && matchesVehicle && isPending;
    });
@@ -1601,7 +1629,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                                  key={order.id}
                                  order={order}
                                  onAccept={handleAcceptJob}
-                                 disabled={hasActiveJob || (user.vehicleType && order.vehicle !== user.vehicleType)}
+                                  disabled={hasActiveJob || (driverVehicleId && String(order.vehicle).toLowerCase() !== 'standard' && String(order.vehicle).toLowerCase() !== driverVehicleId)}
                               />
                            ))}
                         </div>

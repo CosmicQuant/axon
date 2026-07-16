@@ -642,9 +642,9 @@ const App = () => {
               <div className="max-w-7xl mx-auto px-6 mt-16 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center text-xs font-bold text-gray-500 uppercase tracking-tighter">
                 <span>© {new Date().getFullYear()} Axon Kenya Ltd. All rights reserved.</span>
                 <div className="flex space-x-4 mt-4 md:mt-0">
-                  <a href="#" className="hover:text-white">Twitter</a>
-                  <a href="#" className="hover:text-white">Facebook</a>
-                  <a href="#" className="hover:text-white">LinkedIn</a>
+                  <a href="https://www.tiktok.com/@slh...7?_r=1&_t=ZS-983LzcRwEb6" target="_blank" rel="noopener noreferrer" className="hover:text-white">TikTok</a>
+                  <a href="https://www.instagram.com/axon_delivery025?igsh=cnNzZWx2d282ZWJk" target="_blank" rel="noopener noreferrer" className="hover:text-white">Instagram</a>
+                  <a href="https://www.facebook.com/share/14RVAxopGWE/" target="_blank" rel="noopener noreferrer" className="hover:text-white">Facebook</a>
                 </div>
               </div>
             </footer>
