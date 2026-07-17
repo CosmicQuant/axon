@@ -113,9 +113,9 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
   // ── Editability logic ──────────────────────────────────
   // A stop is editable if the driver hasn't started delivery to it
   const canEditStop = (stop: RouteStop): boolean => {
-    if (isPending) return true; // all editable before driver assigned
-    if (isDelivered) return false;
-    // Assigned or in-transit: only stops still pending
+    if (isPending) return true;
+    if (isDelivered || order.status === 'cancelled' || order.status === 'expired') return false;
+    // After driver assigned: only stops still pending (minor changes auto-apply, major need driver consent)
     return stop.status === 'pending';
   };
 
@@ -125,9 +125,10 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
 
   const canEditDropoff = (): boolean => {
     if (isPending) return true;
-    if (isAssigned) return true; // driver heading to pickup, dropoff can still change
+    if (isDelivered || order.status === 'cancelled' || order.status === 'expired') return false;
+    if (order.status === 'driver_assigned' || order.status === 'arriving_pickup') return true; // needs driver consent if >1km change
     if (isInTransit) {
-      // Dropoff editable if it's still pending in stops
+      // In transit: only if dropoff stop is still pending AND distance change < 1km (auto-apply)
       const dropoffStop = order.stops?.find(s => s.type === 'dropoff');
       return !dropoffStop || dropoffStop.status === 'pending';
     }
@@ -136,9 +137,15 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
 
   const canEditField = (field: string) => {
     if (isPending) return true;
-    if (isAssigned && (field === 'items' || field === 'receiver')) return true;
-    // Vehicle/service can only change before a driver is matched
-    if (field === 'vehicle' && isPending) return true;
+    if (order.status === 'cancelled' || order.status === 'expired') return false;
+    // After driver assigned: receiver details always editable (no price impact)
+    if ((order.status === 'driver_assigned' || order.status === 'arriving_pickup') && field === 'receiver') return true;
+    // Item details editable before pickup (requires requote)
+    if ((order.status === 'driver_assigned' || order.status === 'arriving_pickup') && field === 'items') return true;
+    // Vehicle/service locked once driver is assigned
+    if (field === 'vehicle') return isPending;
+    // In transit: receiver still editable (phone might change)
+    if (isInTransit && field === 'receiver') return true;
     return false;
   };
 
@@ -334,7 +341,7 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
       // The requote will set priceChange state. If the price increased,
       // the pending update is held until payment. If same or decreased, commit now.
       setPendingRouteUpdate(pendingUpdate);
-      await requoteAfterEdit(requoteOverrides);
+      await requoteAfterEdit(requoteOverrides, pendingUpdate);
     } catch (e) {
       console.error('Failed to update location:', e);
     }
@@ -567,7 +574,7 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
     vehicle?: string;
     serviceType?: string;
     helpersCount?: number;
-  }) => {
+  }, routeUpdate?: any) => {
     const pCoords = overrides?.pickupCoords || order.pickupCoords;
     const dCoords = overrides?.dropoffCoords || order.dropoffCoords;
     if (!pCoords || !dCoords) return;
@@ -618,12 +625,13 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
         // Do NOT save to Firestore yet — pendingRouteUpdate holds the changes.
       } else {
         // Price same or decreased (refund) — commit immediately.
+        // Use the routeUpdate parameter (not state, which may be stale)
         await onUpdateOrder(order.id, {
           price: newPrice,
           driverRate,
           quoteId,
           estimatedDuration: newEta,
-          ...pendingRouteUpdate,
+          ...(routeUpdate || {}),
         } as any);
         setPendingRouteUpdate(null);
 
@@ -719,9 +727,27 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
   };
 
   const handleCancel = async () => {
-    if (!isPending) return;
-    if (confirm('Cancel this order? This cannot be undone.')) {
-      await onUpdateStatus(order.id, 'cancelled');
+    if (isDelivered || order.status === 'cancelled' || order.status === 'expired') return;
+
+    const isAssignedStatus = order.status === 'driver_assigned' || order.status === 'arriving_pickup';
+    const cancelMsg = isAssignedStatus
+      ? 'Cancel this order? A 100 KES cancellation fee will be charged to compensate your driver. This cannot be undone.'
+      : 'Cancel this order? This cannot be undone.';
+
+    if (!confirm(cancelMsg)) return;
+
+    try {
+      // Use the cancelOrder Cloud Function for structured cancel + refund
+      const { httpsCallable } = await import('firebase/functions');
+      const { functions } = await import('../firebase');
+      if (functions) {
+        const cancelFn = httpsCallable(functions, 'cancelOrder');
+        await cancelFn({ orderId: order.id, reason: 'Customer cancelled from tracking' });
+      } else {
+        await onUpdateStatus(order.id, 'cancelled');
+      }
+    } catch (e: any) {
+      console.error('Cancel failed:', e);
     }
   };
 
@@ -1404,7 +1430,7 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
                 <Phone size={14} /> Call Driver
               </a>
             )}
-            {isPending && (
+            {(isPending || order.status === 'driver_assigned' || order.status === 'arriving_pickup') && (
               <button
                 onClick={handleCancel}
                 className="flex items-center justify-center gap-2 py-3 px-4 bg-red-50 border border-red-100 rounded-xl text-xs font-bold text-red-600 hover:bg-red-100 active:scale-95 transition-all"

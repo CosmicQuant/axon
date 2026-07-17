@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { mapService } from '../../services/mapService';
 import { useMapState } from '@/context/MapContext';
+import { storageService } from '../../services/storageService';
 import { BookingProvider, useBooking } from './BookingContext';
 import { VEHICLES } from './constants';
 
@@ -285,7 +286,7 @@ const WizardContent: React.FC<BookingWizardProps> = ({ prefillData, onOrderCompl
     // Server-only pricing — no client-side fallback
     const finalPrice = data.price || 0;
 
-    const submitBooking = () => {
+    const submitBooking = async () => {
         if (!finalPrice) return; // Block submit until server quote received
         let finalDropoffAddress = data.dropoff;
         let finalDropoffCoords = dropoffCoords;
@@ -301,6 +302,24 @@ const WizardContent: React.FC<BookingWizardProps> = ({ prefillData, onOrderCompl
 
         const generateCode = () => Math.floor(1000 + Math.random() * 9000).toString();
         const dropoffCode = generateCode();
+
+        // Upload item image to Storage if present (instead of base64 in Firestore)
+        let itemImageUrl: string | undefined;
+        if (data.itemImage && data.itemImage.startsWith('data:')) {
+            try {
+                const response = await fetch(data.itemImage);
+                const blob = await response.blob();
+                itemImageUrl = await storageService.uploadFile(blob, `items/${Date.now()}.jpg`);
+            } catch (e) {
+                console.error('Item image upload failed:', e);
+            }
+        }
+
+        // Determine if intercity (longer expiry for intercity orders)
+        const isIntercity = pickupCoords && dropoffCoords &&
+            Math.abs(pickupCoords.lat - (finalDropoffCoords?.lat || 0)) > 0.5;
+        const expiryMinutes = isIntercity ? 30 : 15;
+        const expiresAt = new Date(Date.now() + expiryMinutes * 60000);
 
         const newOrder = {
             id: `ORD-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
@@ -331,6 +350,9 @@ const WizardContent: React.FC<BookingWizardProps> = ({ prefillData, onOrderCompl
             quoteId: data.quoteId || null,
             helpersCount: data.helpersCount || 0,
             routeGeometry: routePolyline || null,
+            expiresAt: expiresAt.toISOString(),
+            editHistory: [],
+            itemImage: itemImageUrl,
             stops: [
                 ...intermediateWaypoints.map((addr, idx) => ({
                     id: `wp-${idx}`,

@@ -42,7 +42,7 @@ export interface RouteStop {
   lat: number;
   lng: number;
   type: 'pickup' | 'dropoff' | 'waypoint';
-  status: 'pending' | 'arrived' | 'completed';
+  status: 'pending' | 'arriving' | 'arrived' | 'completed';
   contact?: ContactInfo;
   instructions?: string;
   completedAt?: string;
@@ -201,7 +201,7 @@ export interface DeliveryOrder {
   itemDescription?: string; // Legacy/Bulk field
   price: number; // Total customer price
   driverRate: number; // Amount driver earns
-  status: 'pending' | 'driver_assigned' | 'in_transit' | 'delivered' | 'cancelled';
+  status: 'pending' | 'driver_assigned' | 'arriving_pickup' | 'in_transit' | 'delivered' | 'reviewed' | 'cancelled' | 'expired' | 'disputed' | 'refunded';
   estimatedDuration: string;
   date: string;
   createdAt?: string;
@@ -218,8 +218,8 @@ export interface DeliveryOrder {
   remainingDuration?: number;
   totalRemainingDistance?: number;
   totalRemainingDuration?: number;
-  distance?: number; // Total distance for the order (for analytics)
-  routeGeometry?: string; // Encoded polyline for the current active route
+  distance?: number;
+  routeGeometry?: string;
   itemImage?: string;
   deliveryConfirmationImage?: string;
   reviewForDriver?: Review;
@@ -230,18 +230,66 @@ export interface DeliveryOrder {
   startTime?: string;
   endTime?: string;
   serviceType: ServiceType;
-  stops?: RouteStop[]; // Optional: for multi-stop orders
-  total?: number; // Total cost (legacy)
-  dropoffAddress?: string; // Legacy
+  stops?: RouteStop[];
+  total?: number;
+  dropoffAddress?: string;
   isDedicated?: boolean;
   isIntercounty?: boolean;
   zone?: LogisticsZone;
+  // ── Lifecycle management fields ──
+  expiresAt?: any; // Firestore Timestamp — set at booking, checked by cron
+  pendingEdit?: PendingEdit;
+  editHistory?: EditEvent[];
+  dispute?: Dispute;
+  priceAdjustmentPaid?: boolean;
+  cancellationReason?: string;
+  refundAmount?: number;
+  cancelPenaltyPaid?: boolean;
 }
 
 export interface Review {
   rating: number;
   comment?: string;
+  tags?: string[];
   date: string;
+  submittedBy: 'customer' | 'driver';
+}
+
+// ── Pending edit proposed by customer after driver assignment ──
+export interface PendingEdit {
+  proposedBy: 'customer' | 'driver';
+  changes: Record<string, any>;
+  newPrice: number;
+  newDriverRate: number;
+  oldPrice: number;
+  oldDriverRate: number;
+  priceDifference: number;
+  distanceChangeKm: number;
+  status: 'proposed' | 'accepted' | 'rejected' | 'paid' | 'expired';
+  createdAt: string;
+  respondedAt?: string;
+  reason?: string;
+}
+
+// ── Edit history for audit trail ──
+export interface EditEvent {
+  field: string;
+  oldValue: any;
+  newValue: any;
+  changedBy: 'customer' | 'driver' | 'system';
+  reason?: string;
+  timestamp: string;
+}
+
+// ── Dispute record ──
+export interface Dispute {
+  raisedBy: 'customer' | 'driver';
+  reason: string;
+  description: string;
+  status: 'open' | 'resolved';
+  resolution?: string;
+  createdAt: string;
+  resolvedAt?: string;
 }
 
 export interface AddressBookEntry {

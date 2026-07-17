@@ -450,9 +450,13 @@ exports.updateOrderStatus = functions.https.onCall(async (data, context) => {
     }
 
     const allowedTransitions = {
-        'driver_assigned': ['in_transit', 'cancelled'],
-        'in_transit': ['delivered', 'cancelled'],
-        'pending': ['driver_assigned', 'cancelled'],
+        'pending':          ['driver_assigned', 'cancelled', 'expired'],
+        'driver_assigned':  ['arriving_pickup', 'in_transit', 'cancelled'],
+        'arriving_pickup':  ['in_transit', 'cancelled'],
+        'in_transit':       ['delivered', 'cancelled', 'disputed'],
+        'delivered':        ['reviewed', 'disputed', 'refunded'],
+        'disputed':         ['resolved', 'refunded'],
+        'resolved':         ['refunded'],
     };
 
     const orderRef = admin.firestore().doc(`orders/${orderId}`);
@@ -467,15 +471,24 @@ exports.updateOrderStatus = functions.https.onCall(async (data, context) => {
             const orderData = orderDoc.data();
             const currentStatus = orderData.status;
 
-            // Only the assigned driver (or the customer for cancellation) can transition
             const isDriver = orderData.driver && orderData.driver.id === context.auth.uid;
             const isCustomer = orderData.userId === context.auth.uid;
 
-            if (!isDriver && !(isCustomer && newStatus === 'cancelled')) {
-                throw new functions.https.HttpsError('permission-denied', 'You are not authorized to update this order.');
+            // Permission checks based on the transition
+            if (newStatus === 'cancelled') {
+                if (!isCustomer && !isDriver) {
+                    throw new functions.https.HttpsError('permission-denied', 'You are not authorized to cancel this order.');
+                }
+            } else if (newStatus === 'disputed') {
+                if (!isCustomer && !isDriver) {
+                    throw new functions.https.HttpsError('permission-denied', 'You are not authorized to raise a dispute.');
+                }
+            } else {
+                if (!isDriver) {
+                    throw new functions.https.HttpsError('permission-denied', 'You are not authorized to update this order.');
+                }
             }
 
-            // Validate the transition
             const allowed = allowedTransitions[currentStatus] || [];
             if (!allowed.includes(newStatus)) {
                 throw new functions.https.HttpsError('failed-precondition',
@@ -487,7 +500,9 @@ exports.updateOrderStatus = functions.https.onCall(async (data, context) => {
                 updatedAt: new Date().toISOString(),
             };
 
-            if (newStatus === 'in_transit') {
+            if (newStatus === 'arriving_pickup') {
+                updates.assignedAt = updates.updatedAt;
+            } else if (newStatus === 'in_transit') {
                 updates.startedAt = new Date().toISOString();
                 updates.startTime = updates.startedAt;
             } else if (newStatus === 'delivered') {
@@ -496,10 +511,33 @@ exports.updateOrderStatus = functions.https.onCall(async (data, context) => {
                 if (extraData?.deliveryConfirmationImage) {
                     updates.deliveryConfirmationImage = extraData.deliveryConfirmationImage;
                 }
+            } else if (newStatus === 'cancelled') {
+                if (extraData?.cancellationReason) {
+                    updates.cancellationReason = extraData.cancellationReason;
+                }
+                // Cancel penalty: if driver was assigned and customer cancels, driver gets 100 KES
+                if (currentStatus === 'driver_assigned' || currentStatus === 'arriving_pickup') {
+                    if (isCustomer && orderData.paymentMethod === 'M-Pesa') {
+                        updates.refundAmount = Math.max(0, (orderData.price || 0) - 100);
+                        updates.cancelPenaltyPaid = true;
+                    }
+                }
             }
 
             transaction.update(orderRef, updates);
         });
+
+        // Send push notification for status changes
+        if (newStatus === 'arriving_pickup' || newStatus === 'in_transit' || newStatus === 'delivered' || newStatus === 'cancelled') {
+            const orderDoc = await orderRef.get();
+            const orderData = orderDoc.data();
+            if (orderData.userId) {
+                await sendPushNotification(orderData.userId, {
+                    title: getNotificationTitle(newStatus),
+                    body: getNotificationBody(newStatus, orderData),
+                });
+            }
+        }
 
         return { success: true };
     } catch (error) {
@@ -507,3 +545,454 @@ exports.updateOrderStatus = functions.https.onCall(async (data, context) => {
         throw error;
     }
 });
+
+// ── PROPOSE ORDER EDIT (customer → driver) ──────────────────────
+exports.proposeOrderEdit = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'You must be signed in.');
+    }
+
+    const { orderId, changes, newPrice, newDriverRate, distanceChangeKm, reason } = data;
+    if (!orderId || !changes) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing orderId or changes.');
+    }
+
+    const orderRef = admin.firestore().doc(`orders/${orderId}`);
+    const orderDoc = await orderRef.get();
+    if (!orderDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'Order not found.');
+    }
+
+    const orderData = orderDoc.data();
+
+    // Only the customer can propose edits
+    if (orderData.userId !== context.auth.uid) {
+        throw new functions.https.HttpsError('permission-denied', 'Only the customer can propose edits.');
+    }
+
+    // Can only propose edits when driver is assigned or in transit
+    if (!['driver_assigned', 'arriving_pickup', 'in_transit'].includes(orderData.status)) {
+        throw new functions.https.HttpsError('failed-precondition', 'Cannot edit at this stage.');
+    }
+
+    // If there's already a pending edit, reject
+    if (orderData.pendingEdit && orderData.pendingEdit.status === 'proposed') {
+        throw new functions.https.HttpsError('failed-precondition', 'There is already a pending edit request.');
+    }
+
+    const oldPrice = orderData.price || 0;
+    const oldDriverRate = orderData.driverRate || 0;
+
+    const pendingEdit = {
+        proposedBy: 'customer',
+        changes,
+        newPrice,
+        newDriverRate,
+        oldPrice,
+        oldDriverRate,
+        priceDifference: newPrice - oldPrice,
+        distanceChangeKm: distanceChangeKm || 0,
+        status: 'proposed',
+        createdAt: new Date().toISOString(),
+        reason: reason || '',
+    };
+
+    await orderRef.update({ pendingEdit, updatedAt: new Date().toISOString() });
+
+    // Notify the driver
+    if (orderData.driver && orderData.driver.id) {
+        await sendPushNotification(orderData.driver.id, {
+            title: 'Route Change Requested',
+            body: `Customer wants to change the route. ${distanceChangeKm > 1 ? `${distanceChangeKm.toFixed(1)}km difference. ` : ''}New price: KES ${newPrice}. Tap to review.`,
+        });
+    }
+
+    return { success: true };
+});
+
+// ── RESPOND TO EDIT PROPOSAL (driver accepts/rejects) ──────────
+exports.respondToEdit = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'You must be signed in.');
+    }
+
+    const { orderId, accepted } = data;
+    if (!orderId) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing orderId.');
+    }
+
+    const orderRef = admin.firestore().doc(`orders/${orderId}`);
+
+    try {
+        await admin.firestore().runTransaction(async (transaction) => {
+            const orderDoc = await transaction.get(orderRef);
+            if (!orderDoc.exists) {
+                throw new functions.https.HttpsError('not-found', 'Order not found.');
+            }
+
+            const orderData = orderDoc.data();
+
+            // Only the assigned driver can respond
+            if (!orderData.driver || orderData.driver.id !== context.auth.uid) {
+                throw new functions.https.HttpsError('permission-denied', 'Only the assigned driver can respond.');
+            }
+
+            if (!orderData.pendingEdit || orderData.pendingEdit.status !== 'proposed') {
+                throw new functions.https.HttpsError('failed-precondition', 'No pending edit to respond to.');
+            }
+
+            const updates = {
+                'pendingEdit.status': accepted ? 'accepted' : 'rejected',
+                'pendingEdit.respondedAt': new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            };
+
+            if (accepted) {
+                // Apply the changes to the order
+                const changes = orderData.pendingEdit.changes;
+                Object.keys(changes).forEach(key => {
+                    updates[key] = changes[key];
+                });
+                updates.price = orderData.pendingEdit.newPrice;
+                updates.driverRate = orderData.pendingEdit.newDriverRate;
+            }
+
+            transaction.update(orderRef, updates);
+        });
+
+        // Notify the customer
+        const updatedDoc = await orderRef.get();
+        const updatedData = updatedDoc.data();
+        if (updatedData.userId) {
+            await sendPushNotification(updatedData.userId, {
+                title: accepted ? 'Route Change Accepted' : 'Route Change Declined',
+                body: accepted
+                    ? `Your driver accepted the route change. ${updatedData.pendingEdit.priceDifference > 0 ? `Please pay KES ${updatedData.pendingEdit.priceDifference} to confirm.` : 'The route has been updated.'}`
+                    : 'Your driver declined the route change. The original route will be used.',
+            });
+        }
+
+        return { success: true, accepted };
+    } catch (error) {
+        console.error('respondToEdit error:', error);
+        throw error;
+    }
+});
+
+// ── CANCEL ORDER (structured cancel with refund logic) ──────────
+exports.cancelOrder = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'You must be signed in.');
+    }
+
+    const { orderId, reason } = data;
+    if (!orderId) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing orderId.');
+    }
+
+    const orderRef = admin.firestore().doc(`orders/${orderId}`);
+    const orderDoc = await orderRef.get();
+    if (!orderDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'Order not found.');
+    }
+
+    const orderData = orderDoc.data();
+
+    // Either the customer or the assigned driver can cancel
+    const isCustomer = orderData.userId === context.auth.uid;
+    const isDriver = orderData.driver && orderData.driver.id === context.auth.uid;
+
+    if (!isCustomer && !isDriver) {
+        throw new functions.https.HttpsError('permission-denied', 'You are not authorized to cancel this order.');
+    }
+
+    // Can only cancel before in_transit
+    if (!['pending', 'driver_assigned', 'arriving_pickup'].includes(orderData.status)) {
+        throw new functions.https.HttpsError('failed-precondition', 'Cannot cancel at this stage. Please raise a dispute instead.');
+    }
+
+    const updates = {
+        status: 'cancelled',
+        cancellationReason: reason || (isDriver ? 'Driver cancelled' : 'Customer cancelled'),
+        cancelledBy: isDriver ? 'driver' : 'customer',
+        updatedAt: new Date().toISOString(),
+    };
+
+    // Cancel penalty: if customer cancels after driver assigned, driver gets 100 KES
+    if (isCustomer && ['driver_assigned', 'arriving_pickup'].includes(orderData.status)) {
+        if (orderData.paymentMethod === 'M-Pesa') {
+            updates.refundAmount = Math.max(0, (orderData.price || 0) - 100);
+            updates.cancelPenaltyPaid = true;
+        }
+    }
+
+    await orderRef.update(updates);
+
+    // Notify the other party
+    if (isCustomer && orderData.driver && orderData.driver.id) {
+        await sendPushNotification(orderData.driver.id, {
+            title: 'Order Cancelled',
+            body: `The customer cancelled order #${orderId.substring(0, 8)}. ${updates.cancelPenaltyPaid ? 'You will receive KES 100 compensation.' : ''}`,
+        });
+    } else if (isDriver && orderData.userId) {
+        await sendPushNotification(orderData.userId, {
+            title: 'Order Cancelled',
+            body: `Your driver cancelled order #${orderId.substring(0, 8)}. We're finding you a new driver.`,
+        });
+    }
+
+    return { success: true };
+});
+
+// ── SUBMIT REVIEW (double-blind) ────────────────────────────────
+exports.submitReview = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'You must be signed in.');
+    }
+
+    const { orderId, rating, comment, tags, reviewedRole } = data;
+    if (!orderId || !rating || !reviewedRole) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing required fields.');
+    }
+
+    const orderRef = admin.firestore().doc(`orders/${orderId}`);
+    const orderDoc = await orderRef.get();
+    if (!orderDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'Order not found.');
+    }
+
+    const orderData = orderDoc.data();
+
+    // Can only review delivered orders
+    if (!['delivered', 'reviewed'].includes(orderData.status)) {
+        throw new functions.https.HttpsError('failed-precondition', 'Can only review after delivery.');
+    }
+
+    const isCustomer = orderData.userId === context.auth.uid;
+    const isDriver = orderData.driver && orderData.driver.id === context.auth.uid;
+
+    if (!isCustomer && !isDriver) {
+        throw new functions.https.HttpsError('permission-denied', 'Not authorized.');
+    }
+
+    const review = {
+        rating,
+        comment: comment || '',
+        tags: tags || [],
+        date: new Date().toISOString(),
+        submittedBy: isCustomer ? 'customer' : 'driver',
+    };
+
+    const updates = { updatedAt: new Date().toISOString() };
+
+    if (isCustomer) {
+        // Customer reviews the driver
+        if (orderData.reviewForDriver) {
+            throw new functions.https.HttpsError('failed-precondition', 'You have already reviewed this order.');
+        }
+        updates.reviewForDriver = review;
+    } else {
+        // Driver reviews the customer
+        if (orderData.reviewForCustomer) {
+            throw new functions.https.HttpsError('failed-precondition', 'You have already reviewed this order.');
+        }
+        updates.reviewForCustomer = review;
+    }
+
+    // If both reviews are now submitted, transition to 'reviewed'
+    const willHaveBoth = (isCustomer && orderData.reviewForCustomer) || (isDriver && orderData.reviewForDriver);
+    if (willHaveBoth) {
+        updates.status = 'reviewed';
+    }
+
+    await orderRef.update(updates);
+
+    // Update driver's average rating
+    if (isCustomer && orderData.driver && orderData.driver.id) {
+        const driverRef = admin.firestore().doc(`drivers/${orderData.driver.id}`);
+        const driverDoc = await driverRef.get();
+        if (driverDoc.exists) {
+            const driverData = driverDoc.data();
+            const currentRating = driverData.rating || 0;
+            const currentTrips = driverData.totalTrips || 0;
+            const newTrips = currentTrips + 1;
+            const newRating = ((currentRating * currentTrips) + rating) / newTrips;
+            await driverRef.update({ rating: Math.round(newRating * 10) / 10, totalTrips: newTrips });
+        }
+    }
+
+    return { success: true, bothSubmitted: !!willHaveBoth };
+});
+
+// ── RAISE DISPUTE ───────────────────────────────────────────────
+exports.raiseDispute = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'You must be signed in.');
+    }
+
+    const { orderId, reason, description } = data;
+    if (!orderId || !reason) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing orderId or reason.');
+    }
+
+    const orderRef = admin.firestore().doc(`orders/${orderId}`);
+    const orderDoc = await orderRef.get();
+    if (!orderDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'Order not found.');
+    }
+
+    const orderData = orderDoc.data();
+
+    const isCustomer = orderData.userId === context.auth.uid;
+    const isDriver = orderData.driver && orderData.driver.id === context.auth.uid;
+
+    if (!isCustomer && !isDriver) {
+        throw new functions.https.HttpsError('permission-denied', 'Not authorized.');
+    }
+
+    // Can only dispute delivered or in_transit orders
+    if (!['in_transit', 'delivered'].includes(orderData.status)) {
+        throw new functions.https.HttpsError('failed-precondition', 'Can only dispute active or delivered orders.');
+    }
+
+    const dispute = {
+        raisedBy: isCustomer ? 'customer' : 'driver',
+        reason,
+        description: description || '',
+        status: 'open',
+        createdAt: new Date().toISOString(),
+    };
+
+    // Save dispute to a separate collection for admin review
+    await admin.firestore().collection('disputes').add({
+        orderId,
+        orderData: {
+            pickup: orderData.pickup,
+            dropoff: orderData.dropoff,
+            price: orderData.price,
+            customerName: orderData.sender?.name,
+            driverName: orderData.driver?.name,
+        },
+        ...dispute,
+    });
+
+    await orderRef.update({
+        status: 'disputed',
+        dispute,
+        updatedAt: new Date().toISOString(),
+    });
+
+    return { success: true };
+});
+
+// ── EXPIRE PENDING ORDERS (scheduled cron) ──────────────────────
+exports.expirePendingOrders = functions.pubsub.schedule('every 1 minutes').onRun(async (event) => {
+    const now = admin.firestore.Timestamp.now();
+    const q = admin.firestore()
+        .collection('orders')
+        .where('status', '==', 'pending')
+        .where('expiresAt', '<', now);
+
+    const snapshot = await q.get();
+    const batch = admin.firestore().batch();
+
+    snapshot.forEach(doc => {
+        batch.update(doc.ref, {
+            status: 'expired',
+            updatedAt: new Date().toISOString(),
+        });
+    });
+
+    await batch.commit();
+    console.log(`Expired ${snapshot.size} pending orders.`);
+    return null;
+});
+
+// ── FCM TOKEN REGISTRATION ──────────────────────────────────────
+exports.registerFcmToken = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'You must be signed in.');
+    }
+
+    const { token, platform } = data;
+    if (!token) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing FCM token.');
+    }
+
+    // Store the token on the user's document
+    const userRef = admin.firestore().doc(`users/${context.auth.uid}`);
+    await userRef.set({
+        fcmTokens: admin.firestore.FieldValue.arrayUnion(token),
+        fcmPlatform: platform || 'web',
+        updatedAt: new Date().toISOString(),
+    }, { merge: true });
+
+    // Also store on driver document if they're a driver
+    const driverRef = admin.firestore().doc(`drivers/${context.auth.uid}`);
+    const driverDoc = await driverRef.get();
+    if (driverDoc.exists) {
+        await driverRef.set({
+            fcmToken: token,
+            fcmPlatform: platform || 'web',
+            updatedAt: new Date().toISOString(),
+        }, { merge: true });
+    }
+
+    return { success: true };
+});
+
+// ── Helper: send push notification ──────────────────────────────
+async function sendPushNotification(userId, notification) {
+    try {
+        const userDoc = await admin.firestore().doc(`users/${userId}`).get();
+        if (!userDoc.exists) return;
+
+        const userData = userDoc.data();
+        const tokens = userData.fcmTokens || [];
+        if (tokens.length === 0) {
+            // Also check driver document
+            const driverDoc = await admin.firestore().doc(`drivers/${userId}`).get();
+            if (driverDoc.exists) {
+                const driverToken = driverDoc.data().fcmToken;
+                if (driverToken) tokens.push(driverToken);
+            }
+        }
+
+        if (tokens.length === 0) return;
+
+        const messages = tokens.map(token => ({
+            notification: {
+                title: notification.title,
+                body: notification.body,
+            },
+            data: { ...notification.data },
+            token,
+        }));
+
+        await admin.messaging().sendEach(messages);
+    } catch (error) {
+        console.error('Push notification error:', error);
+    }
+}
+
+function getNotificationTitle(status) {
+    const titles = {
+        'arriving_pickup': 'Driver on the way!',
+        'in_transit': 'Package picked up!',
+        'delivered': 'Delivery complete!',
+        'cancelled': 'Order cancelled',
+        'driver_assigned': 'Driver found!',
+    };
+    return titles[status] || 'Order update';
+}
+
+function getNotificationBody(status, orderData) {
+    const bodies = {
+        'arriving_pickup': `Your driver ${orderData.driver?.name || ''} is heading to pickup.`,
+        'in_transit': 'Your package is now in transit. Track it live!',
+        'delivered': 'Your package has been delivered. Please rate your experience.',
+        'cancelled': `Order #${(orderData.id || '').substring(0, 8)} has been cancelled.`,
+        'driver_assigned': `Driver ${orderData.driver?.name || ''} has been assigned to your order.`,
+    };
+    return bodies[status] || 'Your order status has been updated.';
+}
