@@ -6,20 +6,28 @@ import { Capacitor } from '@capacitor/core';
 const FCM_VAPID_KEY = import.meta.env?.VITE_FCM_VAPID_KEY || '';
 
 let messagingInstance: any = null;
+let lastRegisteredToken: string | null = null;
 
-isSupported()
+const initPromise = isSupported()
     .then((supported) => {
         if (supported) {
             messagingInstance = getMessaging(app);
         }
+        return messagingInstance;
     })
     .catch((e) => {
         console.warn('FCM not supported on this browser:', e);
+        return null;
     });
+
+async function getMessagingInstance(): Promise<any> {
+    return initPromise;
+}
 
 export const pushNotificationService = {
     async registerToken(): Promise<string | null> {
-        if (!messagingInstance) return null;
+        const messaging = await getMessagingInstance();
+        if (!messaging) return null;
         if (typeof Notification === 'undefined') return null;
         if (!FCM_VAPID_KEY) {
             console.warn('VITE_FCM_VAPID_KEY not set; FCM token registration skipped.');
@@ -31,10 +39,14 @@ export const pushNotificationService = {
             if (permission !== 'granted') return null;
 
             const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-            const token = await getToken(messagingInstance, {
+            const token = await getToken(messaging, {
                 vapidKey: FCM_VAPID_KEY,
                 serviceWorkerRegistration: swReg,
             });
+
+            // Dedup: skip CF write if token unchanged since last registration
+            if (token && token === lastRegisteredToken) return token;
+            lastRegisteredToken = token;
 
             if (token && functions) {
                 const registerFn = httpsCallable(functions, 'registerFcmToken');
@@ -51,9 +63,10 @@ export const pushNotificationService = {
         }
     },
 
-    onMessage(callback: (payload: any) => void): (() => void) | null {
-        if (!messagingInstance) return null;
-        return onMessage(messagingInstance, callback);
+    async onMessage(callback: (payload: any) => void): Promise<(() => void) | null> {
+        const messaging = await getMessagingInstance();
+        if (!messaging) return null;
+        return onMessage(messaging, callback);
     },
 
     showLocalNotification(title: string, body: string, data?: any): void {

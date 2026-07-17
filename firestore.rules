@@ -74,7 +74,7 @@ service cloud.firestore {
     }
 
     match /disputes/{disputeId} {
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow read: if isAuthenticated() && (
         resource.data.userId == request.auth.uid ||
         (resource.data.driver != null && resource.data.driver.id == request.auth.uid)

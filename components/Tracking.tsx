@@ -17,6 +17,39 @@ interface TrackingProps {
   onBack: () => void;
 }
 
+const ExpiryCountdown: React.FC<{ expiresAt: string }> = ({ expiresAt }) => {
+  const [countdown, setCountdown] = useState<string | null>(null);
+
+  useEffect(() => {
+    const expiresAtMs = new Date(expiresAt).getTime();
+    const tick = () => {
+      const remaining = expiresAtMs - Date.now();
+      if (remaining <= 0) {
+        setCountdown('Expiring…');
+        return;
+      }
+      const m = Math.floor(remaining / 60000);
+      const s = Math.floor((remaining % 60000) / 1000);
+      setCountdown(`${m}:${s.toString().padStart(2, '0')}`);
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [expiresAt]);
+
+  if (!countdown) return null;
+  const isExpiring = countdown === 'Expiring…';
+  return (
+    <div className={`flex items-center justify-between rounded-xl px-4 py-2.5 ${isExpiring ? 'bg-red-50 border border-red-200' : 'bg-orange-50 border border-orange-200'}`}>
+      <div className="flex items-center gap-2">
+        <Clock size={14} className={isExpiring ? 'text-red-500' : 'text-orange-500'} />
+        <span className="text-[11px] font-bold text-gray-600">Finding your driver…</span>
+      </div>
+      <span className={`text-sm font-black tabular-nums ${isExpiring ? 'text-red-600' : 'text-orange-600'}`}>{countdown}</span>
+    </div>
+  );
+};
+
 const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrder, onBack }) => {
   const { pickupCoords, dropoffCoords, fitBounds, setPickupCoords, setDropoffCoords, setWaypointCoords, setRoutePolyline, setMapCenter, waypointCoords, setBottomSheetHeight } = useMapState();
   const bottomSheetRef = useRef<HTMLDivElement>(null);
@@ -89,9 +122,6 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
   const [disputeDescription, setDisputeDescription] = useState('');
   const [submittingDispute, setSubmittingDispute] = useState(false);
 
-  // ── Expiry countdown ──
-  const [expiryCountdown, setExpiryCountdown] = useState<string | null>(null);
-
   // ── Bottom sheet height reporting (map refit) ─────
   useEffect(() => {
     if (!bottomSheetRef.current || !setBottomSheetHeight) return;
@@ -135,28 +165,6 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
   const isCancelled = order.status === 'cancelled';
   const isDisputed = order.status === 'disputed';
   const hasReviewed = order.status === 'reviewed';
-
-  // ── Expiry countdown effect ──
-  useEffect(() => {
-    if (!isPending || !(order as any).expiresAt) {
-      setExpiryCountdown(null);
-      return;
-    }
-    const expiresAt = new Date((order as any).expiresAt).getTime();
-    const tick = () => {
-      const remaining = expiresAt - Date.now();
-      if (remaining <= 0) {
-        setExpiryCountdown('Expiring…');
-        return;
-      }
-      const m = Math.floor(remaining / 60000);
-      const s = Math.floor((remaining % 60000) / 1000);
-      setExpiryCountdown(`${m}:${s.toString().padStart(2, '0')}`);
-    };
-    tick();
-    const interval = setInterval(tick, 1000);
-    return () => clearInterval(interval);
-  }, [isPending, (order as any).expiresAt]);
 
   // ── Editability logic ──────────────────────────────────
   // A stop is editable if the driver hasn't started delivery to it
@@ -1307,14 +1315,8 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
         <div className={`px-5 pb-4 space-y-3 overflow-y-auto no-scrollbar flex-1 ${isCollapsed || isLocationEditing ? 'hidden' : ''}`}>
 
           {/* Expiry countdown for pending orders */}
-          {isPending && expiryCountdown && (
-            <div className={`flex items-center justify-between rounded-xl px-4 py-2.5 ${expiryCountdown === 'Expiring…' ? 'bg-red-50 border border-red-200' : 'bg-orange-50 border border-orange-200'}`}>
-              <div className="flex items-center gap-2">
-                <Clock size={14} className={expiryCountdown === 'Expiring…' ? 'text-red-500' : 'text-orange-500'} />
-                <span className="text-[11px] font-bold text-gray-600">Finding your driver…</span>
-              </div>
-              <span className={`text-sm font-black tabular-nums ${expiryCountdown === 'Expiring…' ? 'text-red-600' : 'text-orange-600'}`}>{expiryCountdown}</span>
-            </div>
+          {isPending && (order as any).expiresAt && (
+            <ExpiryCountdown expiresAt={(order as any).expiresAt} />
           )}
 
           {/* Verification PIN */}

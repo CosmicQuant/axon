@@ -67,10 +67,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             try {
               await pushNotificationService.registerToken();
               if (fcmUnsubscribeRef.current) fcmUnsubscribeRef.current();
-              fcmUnsubscribeRef.current = pushNotificationService.onMessage((payload) => {
+              const unsub = await pushNotificationService.onMessage((payload) => {
                 const n = payload?.notification || {};
                 pushNotificationService.showLocalNotification(n.title || 'Axon', n.body || '', payload?.data);
               });
+              fcmUnsubscribeRef.current = unsub;
             } catch (e) {
               console.warn('FCM registration skipped:', e);
             }

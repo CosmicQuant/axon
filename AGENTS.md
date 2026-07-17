@@ -11,7 +11,7 @@ React 19 SPA + Vite 6 + TypeScript, Firebase (Auth/Firestore/Storage/Functions),
 Two local env files are needed and neither is committed. A fresh clone will fail to boot without them:
 
 - `.env` — Firebase web config: `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID`. Read by `firebase.ts`. The README does **not** mention this file.
-- `.env.local` — `GEMINI_API_KEY`, `VITE_GOOGLE_MAPS_API_KEY`. Read by `config.ts`.
+- `.env.local` — `GEMINI_API_KEY`, `VITE_GOOGLE_MAPS_API_KEY`, `VITE_FCM_VAPID_KEY` (Firebase web push VAPID public key from Console → Project settings → Cloud Messaging → Web Push certificates). Read by `config.ts` and `services/pushNotificationService.ts`. Without `VITE_FCM_VAPID_KEY`, FCM silently skips (no crashes) but push notifications won't work.
 
 `vite.config.ts` also exposes `GEMINI_API_KEY` to client code as `process.env.API_KEY` / `process.env.GEMINI_API_KEY` via `define`. Firebase project is `axon-8b0a8` (functions in `us-central1`).
 
