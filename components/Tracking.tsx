@@ -68,6 +68,9 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
   const [payingDifference, setPayingDifference] = useState(false);
   const [paymentSettled, setPaymentSettled] = useState(false);
 
+  // ── Pending route changes (held until payment is confirmed) ──
+  const [pendingRouteUpdate, setPendingRouteUpdate] = useState<any | null>(null);
+
   // ── Bottom sheet height reporting (map refit) ─────
   useEffect(() => {
     if (!bottomSheetRef.current || !setBottomSheetHeight) return;
@@ -289,40 +292,49 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
         ? addressQuery.trim().substring(0, 20) + '…'
         : addressQuery.trim();
 
+      // Build the pending update object WITHOUT saving to Firestore yet.
+      // The map preview is updated immediately so the user sees the new route,
+      // but the order (and driver) won't see changes until payment is confirmed.
+      let pendingUpdate: any = {};
+      let requoteOverrides: any = {};
+
       if (editField === 'pickup') {
-        const updates: any = { pickup: shortAddress };
-        if (coords) updates.pickupCoords = coords;
-        await onUpdateOrder(order.id, updates);
-        // Refresh map immediately with new route
+        pendingUpdate = { pickup: shortAddress };
+        if (coords) pendingUpdate.pickupCoords = coords;
         const newPickup = coords || order.pickupCoords;
-        const newDropoff = order.dropoffCoords;
-        if (newPickup) refreshMapAfterEdit(newPickup, newDropoff || null, order.stops || []);
-        optimizeCurrentRoute();
-        requoteAfterEdit({ pickupCoords: newPickup || undefined });
+        requoteOverrides = { pickupCoords: newPickup || undefined };
+        // Refresh map preview immediately (visual only, not saved to Firestore)
+        if (newPickup) refreshMapAfterEdit(newPickup, order.dropoffCoords || null, order.stops || []);
       } else if (editField === 'dropoff') {
-        const updates: any = { dropoff: shortAddress };
-        if (coords) updates.dropoffCoords = coords;
+        pendingUpdate = { dropoff: shortAddress };
+        if (coords) pendingUpdate.dropoffCoords = coords;
         const dropoffStop = order.stops?.find(s => s.type === 'dropoff');
         const updatedStops = dropoffStop
           ? (order.stops || []).map(s =>
             s.type === 'dropoff' ? { ...s, address: shortAddress, ...(coords ? { lat: coords.lat, lng: coords.lng } : {}) } : s
           )
           : order.stops || [];
-        if (dropoffStop) updates.stops = updatedStops;
-        await onUpdateOrder(order.id, updates);
+        if (dropoffStop) pendingUpdate.stops = updatedStops;
         const newDropoff = coords || order.dropoffCoords;
+        requoteOverrides = { dropoffCoords: newDropoff || undefined, stops: updatedStops };
         if (newDropoff) refreshMapAfterEdit(order.pickupCoords || null, newDropoff, updatedStops);
-        optimizeCurrentRoute(updatedStops);
-        requoteAfterEdit({ dropoffCoords: newDropoff || undefined, stops: updatedStops });
       } else if (editField === 'stop' && editingStopId) {
         const updatedStops = (order.stops || []).map(s =>
           s.id === editingStopId ? { ...s, address: shortAddress, ...(coords ? { lat: coords.lat, lng: coords.lng } : {}) } : s
         );
-        await onUpdateOrder(order.id, { stops: updatedStops } as any);
+        pendingUpdate = { stops: updatedStops };
+        requoteOverrides = { stops: updatedStops };
         refreshMapAfterEdit(order.pickupCoords || null, order.dropoffCoords || null, updatedStops);
-        optimizeCurrentRoute(updatedStops);
-        requoteAfterEdit({ stops: updatedStops });
+      } else if (editField === 'addStop') {
+        // Adding a stop — handled by saveNewStop, not here
+        return;
       }
+
+      // Requote to get the new price (this also shows the price change banner)
+      // The requote will set priceChange state. If the price increased,
+      // the pending update is held until payment. If same or decreased, commit now.
+      setPendingRouteUpdate(pendingUpdate);
+      await requoteAfterEdit(requoteOverrides);
     } catch (e) {
       console.error('Failed to update location:', e);
     }
@@ -597,18 +609,28 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
       const etaMin = Math.ceil(durationMinutes || 0);
       const newEta = etaMin > 60 ? `${Math.floor(etaMin / 60)}h ${etaMin % 60}m` : `${etaMin} min`;
 
-      // Update order with new price and ETA
-      await onUpdateOrder(order.id, {
-        price: newPrice,
-        driverRate,
-        quoteId,
-        estimatedDuration: newEta,
-      } as any);
-
-      // Show price change banner if price actually changed (persistent until paid/dismissed)
-      if (newPrice !== oldPrice) {
+      // Determine whether to commit now or hold for payment
+      if (newPrice > oldPrice) {
+        // Price increased — hold the route update until payment is confirmed.
+        // Show the price change banner with the pay button.
         setPriceChange({ oldPrice, newPrice, newEta });
         setPaymentSettled(false);
+        // Do NOT save to Firestore yet — pendingRouteUpdate holds the changes.
+      } else {
+        // Price same or decreased (refund) — commit immediately.
+        await onUpdateOrder(order.id, {
+          price: newPrice,
+          driverRate,
+          quoteId,
+          estimatedDuration: newEta,
+          ...pendingRouteUpdate,
+        } as any);
+        setPendingRouteUpdate(null);
+
+        if (newPrice !== oldPrice) {
+          setPriceChange({ oldPrice, newPrice, newEta });
+          setPaymentSettled(true);
+        }
       }
     } catch (e) {
       console.error('Requote failed:', e);
@@ -646,10 +668,13 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
           if (status.status === 'COMPLETED') {
             setPaymentSettled(true);
             setPayingDifference(false);
+            // Commit the pending route update + new price to Firestore now that payment is confirmed
             await onUpdateOrder(order.id, {
               price: priceChange.newPrice,
               priceAdjustmentPaid: true,
+              ...pendingRouteUpdate,
             } as any);
+            setPendingRouteUpdate(null);
           } else if (status.status === 'FAILED') {
             setPayingDifference(false);
           } else if (attempts < 12) {
@@ -727,10 +752,10 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
   }
 
   return (
-    <div className="fixed bottom-0 inset-x-0 md:inset-x-auto md:right-4 md:top-4 md:bottom-4 md:w-[400px] pointer-events-none z-[100] flex flex-col justify-end mx-auto max-w-lg md:max-w-none md:mx-0">
+    <div className="fixed bottom-0 inset-x-0 md:inset-x-auto md:right-4 md:top-4 md:bottom-4 md:w-[400px] pointer-events-none z-[100] flex flex-col justify-end mx-auto max-w-lg md:max-w-none md:mx-0 pb-[env(safe-area-inset-bottom,0)]">
       <div
         ref={bottomSheetRef}
-        className={`w-full bg-white shadow-[0_-15px_40px_rgba(0,0,0,0.12)] md:shadow-2xl rounded-t-[2.5rem] md:rounded-2xl overflow-hidden pointer-events-auto border-t border-gray-100 md:border flex flex-col pb-[env(safe-area-inset-bottom,0)] transition-all duration-300 ${isLocationEditing ? 'max-h-[70vh]' : isCollapsed ? 'max-h-[180px]' : 'max-h-[90vh] md:max-h-[calc(100vh-2rem)]'}`}
+        className={`w-full bg-white shadow-[0_-15px_40px_rgba(0,0,0,0.12)] md:shadow-2xl rounded-t-[2.5rem] md:rounded-2xl overflow-hidden pointer-events-auto border-t border-gray-100 md:border flex flex-col transition-all duration-300 ${isLocationEditing ? 'max-h-[75vh]' : isCollapsed ? 'max-h-[180px]' : 'max-h-[85vh] md:max-h-[calc(100vh-2rem)]'}`}
       >
         {/* ── Colored Header with Journey Animation ────────── */}
         <div

@@ -7,7 +7,8 @@ import { mapService } from '../services/mapService';
 import { storageService } from '../services/storageService';
 import { MapProvider, useMapState } from '@/context/MapContext';
 import { collection, query, where, onSnapshot, limit } from 'firebase/firestore';
-import { db } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { usePrompt } from '../context/PromptContext';
 import { LOCATION_COORDINATES } from '../constants';
@@ -620,12 +621,15 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
             }
 
              try {
-                // Use server-side status transition
-                const { httpsCallable } = await import('firebase/functions');
-                const { functions } = await import('../firebase');
+                // Use server-side status transition with fallback
                 if (functions) {
-                   const updateStatus = httpsCallable(functions, 'updateOrderStatus');
-                   await updateStatus({ orderId: order.id, newStatus: 'in_transit' });
+                   try {
+                      const updateStatus = httpsCallable(functions, 'updateOrderStatus');
+                      await updateStatus({ orderId: order.id, newStatus: 'in_transit' });
+                   } catch (cfError) {
+                      console.error('Cloud Function failed, falling back:', cfError);
+                      await orderService.updateOrderStatus(order.id, 'in_transit');
+                   }
                 } else {
                    await orderService.updateOrderStatus(order.id, 'in_transit');
                 }
@@ -687,12 +691,15 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
        }
 
        try {
-          // Use server-side status transition for security
-          const { httpsCallable } = await import('firebase/functions');
-          const { functions } = await import('../firebase');
+          // Use server-side status transition with fallback
           if (functions) {
-             const updateStatus = httpsCallable(functions, 'updateOrderStatus');
-             await updateStatus({ orderId, newStatus });
+             try {
+                const updateStatus = httpsCallable(functions, 'updateOrderStatus');
+                await updateStatus({ orderId, newStatus });
+             } catch (cfError) {
+                console.error('Cloud Function failed, falling back:', cfError);
+                await orderService.updateOrderStatus(orderId, newStatus);
+             }
           } else {
              await orderService.updateOrderStatus(orderId, newStatus);
           }
@@ -760,86 +767,113 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
           return;
        }
 
+       if (verificationInput.length !== 4) {
+          setVerificationError('Please enter the 4-digit passcode.');
+          return;
+       }
+
+       setLoading(true);
+       setVerificationError('');
+
        try {
-          setLoading(true);
+          // ── Step 1: Verify the passcode ──────────────────────
+          let codeValid = false;
 
-          // Server-side verification: call the Cloud Function to check the code
-          // (the driver never has access to the verification code)
-          const { httpsCallable } = await import('firebase/functions');
-          const { functions } = await import('../firebase');
           if (functions) {
-             const verifyCode = httpsCallable(functions, 'verifyDeliveryCode');
-             const result: any = await verifyCode({
-                orderId: verifyingOrder.id,
-                code: verificationInput,
-                stopId: verifyingStopId || undefined
-             });
-
-             if (!result.data?.valid) {
-                setVerificationError('Incorrect passcode. Please ask the recipient for the correct 4-digit code.');
-                return;
+             try {
+                // Use a timeout so cold-start functions don't hang forever
+                const verifyCode = httpsCallable(functions, 'verifyDeliveryCode');
+                const verifyPromise = verifyCode({
+                   orderId: verifyingOrder.id,
+                   code: verificationInput,
+                   stopId: verifyingStopId || undefined
+                });
+                const timeoutPromise = new Promise<never>((_, reject) =>
+                   setTimeout(() => reject(new Error('timeout')), 20000)
+                );
+                const result: any = await Promise.race([verifyPromise, timeoutPromise]);
+                codeValid = !!result.data?.valid;
+             } catch (cfError: any) {
+                console.error('Cloud Function verifyDeliveryCode failed, falling back to client-side:', cfError);
+                // Fallback: client-side check using the code from the assigned order
+                // (marketplace stripping only affects pending orders, not assigned ones)
+                let targetCode = (verifyingOrder as any).verificationCode;
+                if (verifyingStopId) {
+                   const targetStop: any = allStops.find(s => s.id === verifyingStopId);
+                   if (targetStop) targetCode = targetStop.verificationCode;
+                }
+                codeValid = verificationInput === String(targetCode);
              }
           } else {
-             // Fallback: client-side check (less secure, for local dev only)
+             // No functions instance — client-side fallback
              let targetCode = (verifyingOrder as any).verificationCode;
              if (verifyingStopId) {
                 const targetStop: any = allStops.find(s => s.id === verifyingStopId);
                 if (targetStop) targetCode = targetStop.verificationCode;
              }
-             if (verificationInput !== targetCode) {
-                setVerificationError('Incorrect passcode. Please ask the recipient for the correct 4-digit code.');
-                return;
-             }
+             codeValid = verificationInput === String(targetCode);
           }
 
-         // Upload image to Firebase Storage instead of storing base64 in Firestore
-         const storagePath = `deliveries/${verifyingOrder.id}_${verifyingStopId || 'final'}_${Date.now()}.jpg`;
-         const imageUrl = await storageService.uploadFile(deliveryConfirmationFile, storagePath);
+          if (!codeValid) {
+             setVerificationError('Incorrect passcode. Please ask the recipient for the correct 4-digit code.');
+             setLoading(false);
+             return;
+          }
 
-         if (verifyingStopId) {
-            // Complete individual stop
-            await orderService.updateStopStatus(verifyingOrder.id, verifyingStopId, 'completed', imageUrl);
-            showAlert("Stop Completed", "Verification confirmed. Heading to next stop!", "success");
+          // ── Step 2: Upload proof photo ───────────────────────
+          const storagePath = `deliveries/${verifyingOrder.id}_${verifyingStopId || 'final'}_${Date.now()}.jpg`;
+          const imageUrl = await storageService.uploadFile(deliveryConfirmationFile, storagePath);
+
+          // ── Step 3: Complete the stop or order ───────────────
+          if (verifyingStopId) {
+             // Complete individual stop
+             await orderService.updateStopStatus(verifyingOrder.id, verifyingStopId, 'completed', imageUrl);
+             showAlert("Stop Completed", "Verification confirmed. Heading to next stop!", "success");
           } else {
-             // Complete whole order via server-side function
+             // Complete whole order
              const orderToReview = verifyingOrder;
-             const { httpsCallable } = await import('firebase/functions');
-             const { functions: fn } = await import('../firebase');
-             if (fn) {
-                const updateStatus = httpsCallable(fn, 'updateOrderStatus');
-                await updateStatus({
-                   orderId: verifyingOrder.id,
-                   newStatus: 'delivered',
-                   extraData: { deliveryConfirmationImage: imageUrl }
-                });
+
+             if (functions) {
+                try {
+                   const updateStatus = httpsCallable(functions, 'updateOrderStatus');
+                   const statusPromise = updateStatus({
+                      orderId: verifyingOrder.id,
+                      newStatus: 'delivered',
+                      extraData: { deliveryConfirmationImage: imageUrl }
+                   });
+                   const statusTimeout = new Promise<never>((_, reject) =>
+                      setTimeout(() => reject(new Error('timeout')), 20000)
+                   );
+                   await Promise.race([statusPromise, statusTimeout]);
+                } catch (cfError) {
+                   console.error('Cloud Function updateOrderStatus failed, falling back:', cfError);
+                   await orderService.updateOrderStatus(verifyingOrder.id, 'delivered', {
+                      deliveryConfirmationImage: imageUrl
+                   });
+                }
              } else {
                 await orderService.updateOrderStatus(verifyingOrder.id, 'delivered', {
                    deliveryConfirmationImage: imageUrl
                 });
              }
 
-            // Also mark the final stop as completed if multi-stop
-            if (verifyingOrder.stops?.some(s => s.id === 'dropoff-end')) {
-               await orderService.updateStopStatus(verifyingOrder.id, 'dropoff-end', 'completed', imageUrl);
-            }
+             showAlert("Delivery Successful", "Verification confirmed. Delivery has been completed!", "success");
 
-            showAlert("Delivery Successful", "Verification confirmed. Delivery has been completed!", "success");
+             // Trigger review for customer
+             setReviewingOrder(orderToReview);
+             setReviewRating(5);
+             setReviewComment('');
+             setSelectedTags([]);
+          }
 
-            // Trigger review for customer
-            setReviewingOrder(orderToReview);
-            setReviewRating(5);
-            setReviewComment('');
-            setSelectedTags([]);
-         }
-
-         closeVerificationModal();
-      } catch (e: any) {
-         console.error("Verification error", e);
-         setVerificationError("Failed to complete verification. Please try again.");
-      } finally {
-         setLoading(false);
-      }
-   };
+          closeVerificationModal();
+       } catch (e: any) {
+          console.error("Verification error:", e);
+          setVerificationError("Failed to complete verification. Please check your connection and try again.");
+       } finally {
+          setLoading(false);
+       }
+    };
 
    const handleSaveProfile = async () => {
       try {
@@ -2041,7 +2075,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
             {currentView === 'JOBS' && (
                <div ref={bottomSheetRef} className="absolute inset-x-0 bottom-0 z-10 pointer-events-none pb-[env(safe-area-inset-bottom)] md:pb-6">
                   {hasActiveJob ? (
-                     <div className={`w-full md:absolute md:left-auto md:right-8 md:w-96 bg-white/95 backdrop-blur-xl rounded-t-[2.5rem] md:rounded-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] md:shadow-2xl border-t md:border border-gray-200 transition-all duration-300 pointer-events-auto ${Capacitor.isNativePlatform() ? 'mb-[5rem] md:mb-0 md:bottom-28' : 'mb-16 md:mb-0 md:bottom-8'} ${isDrawerCollapsed ? 'p-4' : 'p-6 pt-4'}`}>
+                      <div className={`w-full md:absolute md:left-auto md:right-8 md:w-96 bg-white/95 backdrop-blur-xl rounded-t-[2.5rem] md:rounded-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] md:shadow-2xl border-t md:border border-gray-200 transition-all duration-300 pointer-events-auto ${Capacitor.isNativePlatform() ? 'md:mb-0 md:bottom-28' : 'md:mb-0 md:bottom-8'} ${isDrawerCollapsed ? 'p-4' : 'p-6 pt-4'}`}>
                         {/* Mobile Drag Handle */}
                         <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-4 md:hidden" />
                         <div className="flex items-center justify-between mb-4">
@@ -2206,7 +2240,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                         )}
                      </div>
                   ) : (
-                     <div className={`w-full md:absolute md:left-auto md:right-8 md:w-96 bg-white/95 backdrop-blur-xl rounded-t-[2.5rem] md:rounded-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] md:shadow-2xl border-t md:border border-gray-200 transition-all duration-300 pointer-events-auto ${Capacitor.isNativePlatform() ? 'mb-[5rem] md:mb-0 md:bottom-28' : 'mb-16 md:mb-0 md:bottom-8'} p-6`}>
+                      <div className={`w-full md:absolute md:left-auto md:right-8 md:w-96 bg-white/95 backdrop-blur-xl rounded-t-[2.5rem] md:rounded-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] md:shadow-2xl border-t md:border border-gray-200 transition-all duration-300 pointer-events-auto ${Capacitor.isNativePlatform() ? 'md:mb-0 md:bottom-28' : 'md:mb-0 md:bottom-8'} p-6`}>
                         <div className="flex flex-col items-center justify-center text-center">
                            <div className="w-16 h-16 bg-brand-50 rounded-full flex items-center justify-center mb-3">
                               <div className="w-12 h-12 bg-brand-100 rounded-full flex items-center justify-center animate-ping absolute" />

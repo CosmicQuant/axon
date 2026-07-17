@@ -341,12 +341,7 @@ const App = () => {
             <Navbar
               onToggleMobileMenu={() => setIsMenuOpen(true)}
               onLogin={(role, title, desc) => {
-                if (role) {
-                  setAuthModalRole(role);
-                  setAuthModalView('LOGIN');
-                } else {
-                  setAuthModalView('ROLE_SELECT');
-                }
+                if (role) setAuthModalRole(role);
                 if (title) setAuthModalTitle(title);
                 if (desc) setAuthModalDesc(desc);
                 setShowAuthModal(true);
@@ -611,13 +606,7 @@ const App = () => {
                       <li><button onClick={() => navigate('/business')} className="hover:text-brand-400 transition-colors text-left uppercase tracking-tighter">Axon for Enterprise</button></li>
                       <li>
                         <button
-                          onClick={() => {
-                            setAuthModalRole('driver');
-                            setAuthModalView('SIGNUP');
-                            setAuthModalTitle('Earn with Axon');
-                            setAuthModalDesc('Sign up to start receiving delivery requests and earning money.');
-                            setShowAuthModal(true);
-                          }}
+                          onClick={() => navigate('/fulfillment-network')}
                           className="hover:text-brand-400 transition-colors text-left"
                         >
                           Fulfillment Network
