@@ -90,7 +90,8 @@ const HistoryList: React.FC<HistoryListProps> = ({ onTrackOrder, onReorder }) =>
       await orderService.submitReview(reviewingOrder.id, target, {
         rating: reviewRating,
         comment: finalComment,
-        date: new Date().toISOString()
+        date: new Date().toISOString(),
+        submittedBy: user.role as 'customer' | 'driver',
       });
       setReviewingOrder(null);
       setSelectedTags([]);

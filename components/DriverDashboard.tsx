@@ -600,6 +600,24 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
       }
    };
 
+   const handleConfirmHeadingToPickup = async (order: DeliveryOrder) => {
+      try {
+         if (functions) {
+            try {
+               const updateStatus = httpsCallable(functions, 'updateOrderStatus');
+               await updateStatus({ orderId: order.id, newStatus: 'arriving_pickup' });
+            } catch (cfError) {
+               console.error('Cloud Function failed, falling back:', cfError);
+               await orderService.updateOrderStatus(order.id, 'arriving_pickup');
+            }
+         } else {
+            await orderService.updateOrderStatus(order.id, 'arriving_pickup');
+         }
+      } catch (e: any) {
+         showAlert("Update Failed", e.message || "Failed to update status.", "error");
+      }
+   };
+
    const handleStartDelivery = async (order: DeliveryOrder) => {
       let pickup = order.pickupCoords || activeJobCoords.pickup;
       if (!pickup) {
@@ -975,18 +993,20 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                 });
              } catch (cfError) {
                 console.error('CF submitReview failed, falling back:', cfError);
-                await orderService.submitReview(reviewingOrder.id, 'customer', {
-                   rating: reviewRating,
-                   comment: finalComment,
-                   date: new Date().toISOString()
-                });
-             }
-          } else {
-             await orderService.submitReview(reviewingOrder.id, 'customer', {
-                rating: reviewRating,
-                comment: finalComment,
-                date: new Date().toISOString()
-             });
+                 await orderService.submitReview(reviewingOrder.id, 'customer', {
+                    rating: reviewRating,
+                    comment: finalComment,
+                    date: new Date().toISOString(),
+                    submittedBy: 'customer',
+                 });
+              }
+           } else {
+              await orderService.submitReview(reviewingOrder.id, 'customer', {
+                 rating: reviewRating,
+                 comment: finalComment,
+                 date: new Date().toISOString(),
+                 submittedBy: 'customer',
+              });
           }
           setReviewingOrder(null);
           setSelectedTags([]);
@@ -2250,16 +2270,26 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                               </div>
 
                               <div className="mt-6 grid grid-cols-2 gap-3">
-                                 {/* Multi-stop Aware Contextual Buttons */}
-                                 {nextStop?.id === 'pickup-start' && (
-                                    <button
-                                       onClick={() => handleStartDelivery(activeJob)}
-                                       className="col-span-2 w-full bg-brand-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-sm hover:bg-brand-700 transition-all shadow-xl shadow-brand-500/20 flex items-center justify-center space-x-3"
-                                    >
-                                       <Package className="w-5 h-5" />
-                                       <span>Start Delivery (At Pickup)</span>
-                                    </button>
-                                 )}
+                                  {/* Multi-stop Aware Contextual Buttons */}
+                                  {nextStop?.id === 'pickup-start' && activeJob.status === 'driver_assigned' && (
+                                     <button
+                                        onClick={() => handleConfirmHeadingToPickup(activeJob)}
+                                        className="col-span-2 w-full bg-brand-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-sm hover:bg-brand-700 transition-all shadow-xl shadow-brand-500/20 flex items-center justify-center space-x-3"
+                                     >
+                                        <Navigation className="w-5 h-5" />
+                                        <span>I'm on my way to Pickup</span>
+                                     </button>
+                                  )}
+
+                                  {nextStop?.id === 'pickup-start' && activeJob.status === 'arriving_pickup' && (
+                                     <button
+                                        onClick={() => handleStartDelivery(activeJob)}
+                                        className="col-span-2 w-full bg-brand-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-sm hover:bg-brand-700 transition-all shadow-xl shadow-brand-500/20 flex items-center justify-center space-x-3"
+                                     >
+                                        <Package className="w-5 h-5" />
+                                        <span>Start Delivery (At Pickup)</span>
+                                     </button>
+                                  )}
 
                                  {nextStop && nextStop.id !== 'pickup-start' && nextStop.id !== 'dropoff-end' && (
                                     <button

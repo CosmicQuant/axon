@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import type { DeliveryOrder, Driver, RouteStop } from '../types';
-import { ChevronUp, ArrowLeft, ArrowRight, Share2, ShieldAlert, Copy, Check, Phone, X, Loader2, MapPin, Pencil, Trash2, ChevronDown, Camera, ShieldCheck, AlertTriangle, Plus, Users } from 'lucide-react';
+import { ChevronUp, ArrowLeft, ArrowRight, Share2, ShieldAlert, Copy, Check, Phone, X, Loader2, MapPin, Pencil, Trash2, ChevronDown, Camera, ShieldCheck, AlertTriangle, Plus, Users, Clock } from 'lucide-react';
 import { useMapState } from '@/context/MapContext';
 import { DriverCard } from './tracking/DriverCard';
 import { PostDelivery } from './tracking/PostDelivery';
@@ -35,7 +35,7 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
   const [suggestions, setSuggestions] = useState<Array<{ label: string; lat: number; lng: number }>>([]);
   const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lng: number } | null>(null);
   const addressInputRef = useRef<HTMLInputElement>(null);
-  const suggestionsTimer = useRef<ReturnType<typeof setTimeout>>();
+  const suggestionsTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // ── Receiver edit state ────────────────────────────────
   const [editReceiverName, setEditReceiverName] = useState('');
@@ -70,12 +70,27 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
 
   // ── Pending route changes (held until payment is confirmed) ──
   const [pendingRouteUpdate, setPendingRouteUpdate] = useState<any | null>(null);
+  const [proposingEdit, setProposingEdit] = useState(false);
+
+  // Distance between two coords in km (haversine)
+  const haversineKm = (a: { lat: number; lng: number }, b: { lat: number; lng: number }): number => {
+    const R = 6371;
+    const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+    const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+    const la1 = (a.lat * Math.PI) / 180;
+    const la2 = (b.lat * Math.PI) / 180;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.asin(Math.sqrt(h));
+  };
 
   // ── Dispute state ──
   const [showDisputeModal, setShowDisputeModal] = useState(false);
   const [disputeReason, setDisputeReason] = useState('');
   const [disputeDescription, setDisputeDescription] = useState('');
   const [submittingDispute, setSubmittingDispute] = useState(false);
+
+  // ── Expiry countdown ──
+  const [expiryCountdown, setExpiryCountdown] = useState<string | null>(null);
 
   // ── Bottom sheet height reporting (map refit) ─────
   useEffect(() => {
@@ -120,6 +135,28 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
   const isCancelled = order.status === 'cancelled';
   const isDisputed = order.status === 'disputed';
   const hasReviewed = order.status === 'reviewed';
+
+  // ── Expiry countdown effect ──
+  useEffect(() => {
+    if (!isPending || !(order as any).expiresAt) {
+      setExpiryCountdown(null);
+      return;
+    }
+    const expiresAt = new Date((order as any).expiresAt).getTime();
+    const tick = () => {
+      const remaining = expiresAt - Date.now();
+      if (remaining <= 0) {
+        setExpiryCountdown('Expiring…');
+        return;
+      }
+      const m = Math.floor(remaining / 60000);
+      const s = Math.floor((remaining % 60000) / 1000);
+      setExpiryCountdown(`${m}:${s.toString().padStart(2, '0')}`);
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [isPending, (order as any).expiresAt]);
 
   // ── Editability logic ──────────────────────────────────
   // A stop is editable if the driver hasn't started delivery to it
@@ -642,8 +679,46 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
       const etaMin = Math.ceil(durationMinutes || 0);
       const newEta = etaMin > 60 ? `${Math.floor(etaMin / 60)}h ${etaMin % 60}m` : `${etaMin} min`;
 
-      // Determine whether to commit now or hold for payment
-      if (newPrice > oldPrice) {
+      // When a driver is assigned/in-transit, route edits go through the driver approval flow
+      const needsDriverApproval = isAssigned || isInTransit;
+
+      if (needsDriverApproval) {
+        // Compute distance change for the driver notification
+        let distanceChangeKm = 0;
+        if (routeUpdate?.pickupCoords && order.pickupCoords) {
+          distanceChangeKm = Math.max(distanceChangeKm, haversineKm(routeUpdate.pickupCoords, order.pickupCoords));
+        }
+        if (routeUpdate?.dropoffCoords && order.dropoffCoords) {
+          distanceChangeKm = Math.max(distanceChangeKm, haversineKm(routeUpdate.dropoffCoords, order.dropoffCoords));
+        }
+
+        setProposingEdit(true);
+        try {
+          const proposeFn = httpsCallable(functions, 'proposeOrderEdit');
+          await proposeFn({
+            orderId: order.id,
+            changes: {
+              ...routeUpdate,
+              price: newPrice,
+              driverRate,
+              quoteId,
+              estimatedDuration: newEta,
+            },
+            newPrice,
+            newDriverRate: driverRate,
+            distanceChangeKm,
+            reason: 'Customer edited route',
+          });
+          // Show "waiting for driver approval" — the order's pendingEdit will update via Firestore listener
+          setPriceChange({ oldPrice, newPrice, newEta });
+          setPaymentSettled(false);
+        } catch (e: any) {
+          console.error('proposeOrderEdit failed:', e);
+          const msg = e?.message || 'Failed to send edit to driver.';
+          setPriceChange({ oldPrice: oldPrice, newPrice: oldPrice, newEta: `${msg}` });
+        }
+        setProposingEdit(false);
+      } else if (newPrice > oldPrice) {
         // Price increased — hold the route update until payment is confirmed.
         // Show the price change banner with the pay button.
         setPriceChange({ oldPrice, newPrice, newEta });
@@ -702,12 +777,18 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
           if (status.status === 'COMPLETED') {
             setPaymentSettled(true);
             setPayingDifference(false);
-            // Commit the pending route update + new price to Firestore now that payment is confirmed
-            await onUpdateOrder(order.id, {
-              price: priceChange.newPrice,
-              priceAdjustmentPaid: true,
-              ...pendingRouteUpdate,
-            } as any);
+            // If the driver already accepted the edit (CF applied route changes),
+            // just mark as paid. Otherwise commit the pending route update + new price.
+            const driverAccepted = (order as any).pendingEdit?.status === 'accepted';
+            if (driverAccepted) {
+              await onUpdateOrder(order.id, { priceAdjustmentPaid: true } as any);
+            } else {
+              await onUpdateOrder(order.id, {
+                price: priceChange.newPrice,
+                priceAdjustmentPaid: true,
+                ...pendingRouteUpdate,
+              } as any);
+            }
             setPendingRouteUpdate(null);
           } else if (status.status === 'FAILED') {
             setPayingDifference(false);
@@ -1225,6 +1306,17 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
         {/* ── Expanded content ──────────────────────────────── */}
         <div className={`px-5 pb-4 space-y-3 overflow-y-auto no-scrollbar flex-1 ${isCollapsed || isLocationEditing ? 'hidden' : ''}`}>
 
+          {/* Expiry countdown for pending orders */}
+          {isPending && expiryCountdown && (
+            <div className={`flex items-center justify-between rounded-xl px-4 py-2.5 ${expiryCountdown === 'Expiring…' ? 'bg-red-50 border border-red-200' : 'bg-orange-50 border border-orange-200'}`}>
+              <div className="flex items-center gap-2">
+                <Clock size={14} className={expiryCountdown === 'Expiring…' ? 'text-red-500' : 'text-orange-500'} />
+                <span className="text-[11px] font-bold text-gray-600">Finding your driver…</span>
+              </div>
+              <span className={`text-sm font-black tabular-nums ${expiryCountdown === 'Expiring…' ? 'text-red-600' : 'text-orange-600'}`}>{expiryCountdown}</span>
+            </div>
+          )}
+
           {/* Verification PIN */}
           {order.verificationCode && (isAssigned || isInTransit) && (
             <div className="flex items-center justify-between bg-gray-900 rounded-xl px-4 py-3">
@@ -1268,8 +1360,24 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
                     <div className="text-[9px] font-bold text-gray-400">ETA: {priceChange.newEta}</div>
                   </div>
                 </div>
+                {/* Waiting for driver approval notice */}
+                {(order as any).pendingEdit?.status === 'proposed' && (
+                  <div className="mt-2 pt-2 border-t border-amber-100">
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-600">
+                      <Loader2 size={12} className="animate-spin" /> Waiting for your driver to approve the route change…
+                    </div>
+                  </div>
+                )}
+                {/* Driver declined the edit */}
+                {(order as any).pendingEdit?.status === 'rejected' && (
+                  <div className="mt-2 pt-2 border-t border-red-100">
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-red-600">
+                      <ShieldAlert size={12} /> Your driver declined the route change. The original route will be used.
+                    </div>
+                  </div>
+                )}
                 {/* Pay difference or refund notice */}
-                {priceChange.newPrice > priceChange.oldPrice && (
+                {priceChange.newPrice > priceChange.oldPrice && (order as any).pendingEdit?.status !== 'proposed' && (
                   <div className="mt-2 pt-2 border-t border-amber-100">
                     {paymentSettled ? (
                       <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600">

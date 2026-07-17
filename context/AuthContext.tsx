@@ -1,10 +1,11 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { User } from '../types';
 import { VehicleType } from '../types';
 import { authService } from '../services/authService';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { pushNotificationService } from '../services/pushNotificationService';
 
 interface ProfileDetails {
   phone?: string;
@@ -36,6 +37,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const fcmUnsubscribeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -61,6 +63,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
 
             setUser(userData);
+
+            try {
+              await pushNotificationService.registerToken();
+              if (fcmUnsubscribeRef.current) fcmUnsubscribeRef.current();
+              fcmUnsubscribeRef.current = pushNotificationService.onMessage((payload) => {
+                const n = payload?.notification || {};
+                pushNotificationService.showLocalNotification(n.title || 'Axon', n.body || '', payload?.data);
+              });
+            } catch (e) {
+              console.warn('FCM registration skipped:', e);
+            }
           } else {
             // Fallback if firestore doc doesn't exist yet (e.g. just created)
             // This might happen if onAuthStateChanged fires before signup completes writing to DB
@@ -70,12 +83,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.error("Error fetching user profile:", error);
         }
       } else {
+        if (fcmUnsubscribeRef.current) {
+          fcmUnsubscribeRef.current();
+          fcmUnsubscribeRef.current = null;
+        }
         setUser(null);
       }
       setIsLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (fcmUnsubscribeRef.current) fcmUnsubscribeRef.current();
+    };
   }, []);
 
   const switchRole = async (role: 'customer' | 'driver' | 'business') => {

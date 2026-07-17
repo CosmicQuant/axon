@@ -1,29 +1,39 @@
-import { getMessaging, getToken, onMessage } from 'firebase/messaging';
+import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messaging';
 import { httpsCallable } from 'firebase/functions';
 import { app, functions } from '../firebase';
 import { Capacitor } from '@capacitor/core';
 
+const FCM_VAPID_KEY = import.meta.env?.VITE_FCM_VAPID_KEY || '';
+
 let messagingInstance: any = null;
 
-try {
-    messagingInstance = getMessaging(app);
-} catch (e) {
-    console.error('FCM init failed:', e);
-}
+isSupported()
+    .then((supported) => {
+        if (supported) {
+            messagingInstance = getMessaging(app);
+        }
+    })
+    .catch((e) => {
+        console.warn('FCM not supported on this browser:', e);
+    });
 
 export const pushNotificationService = {
-    // Request permission and get FCM token
     async registerToken(): Promise<string | null> {
         if (!messagingInstance) return null;
+        if (typeof Notification === 'undefined') return null;
+        if (!FCM_VAPID_KEY) {
+            console.warn('VITE_FCM_VAPID_KEY not set; FCM token registration skipped.');
+            return null;
+        }
 
         try {
             const permission = await Notification.requestPermission();
             if (permission !== 'granted') return null;
 
-            const vapidKey = 'BEl62iUYgUivxI0q5Z5vJzYN7w7p3Y5n5Z5vJzYN7w7p3Y5n5Z5vJzYN7w7p3Y5n5Z5vJzYN';
+            const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
             const token = await getToken(messagingInstance, {
-                vapidKey: 'BEl62iUYgUivxI0q5Z5vJzYN7w7p3Y5n5Z5vJzYN7w7p3Y5n5Z5vJzYN7w7p3Y5n5Z5vJzYN',
-                serviceWorkerRegistration: await navigator.serviceWorker.register('/firebase-messaging-sw.js'),
+                vapidKey: FCM_VAPID_KEY,
+                serviceWorkerRegistration: swReg,
             });
 
             if (token && functions) {
@@ -41,20 +51,22 @@ export const pushNotificationService = {
         }
     },
 
-    // Listen for foreground messages
     onMessage(callback: (payload: any) => void): (() => void) | null {
         if (!messagingInstance) return null;
         return onMessage(messagingInstance, callback);
     },
 
-    // Show a local notification (fallback for when FCM isn't available)
     showLocalNotification(title: string, body: string, data?: any): void {
-        if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification(title, {
-                body,
-                icon: '/icons3d/logo.png',
-                data,
-            });
+        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+            try {
+                new Notification(title, {
+                    body,
+                    icon: '/icons3d/logo.png',
+                    data,
+                });
+            } catch (e) {
+                console.warn('Local notification failed:', e);
+            }
         }
     },
 };
