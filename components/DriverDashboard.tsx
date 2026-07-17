@@ -208,6 +208,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
    const [deliveryConfirmationImage, setDeliveryConfirmationImage] = useState<string | null>(null);
    const [deliveryConfirmationFile, setDeliveryConfirmationFile] = useState<File | null>(null);
    const deliveryPhotoInputRef = useRef<HTMLInputElement>(null);
+   const [respondingToEdit, setRespondingToEdit] = useState(false);
 
    // Review State
    const [reviewingOrder, setReviewingOrder] = useState<DeliveryOrder | null>(null);
@@ -952,31 +953,77 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
        }
     };
 
-   const handleReviewSubmit = async () => {
-      if (!reviewingOrder) return;
+    const handleReviewSubmit = async () => {
+       if (!reviewingOrder) return;
 
-      try {
-         setLoading(true);
-         const finalComment = selectedTags.length > 0
-            ? `${selectedTags.join(', ')}${reviewComment ? ': ' : ''}${reviewComment}`.trim()
-            : reviewComment;
+       try {
+          setLoading(true);
+          const finalComment = selectedTags.length > 0
+             ? `${selectedTags.join(', ')}${reviewComment ? ': ' : ''}${reviewComment}`.trim()
+             : reviewComment;
 
-         await orderService.submitReview(reviewingOrder.id, 'customer', {
-            rating: reviewRating,
-            comment: finalComment,
-            date: new Date().toISOString()
-         });
-         setReviewingOrder(null);
-         setSelectedTags([]);
-         showAlert("Review Submitted", "Thank you for rating the customer!", "success");
-      } catch (e) {
-         showAlert("Error", "Failed to submit review.", "error");
-      } finally {
-         setLoading(false);
-      }
-   };
+          // Use the submitReview Cloud Function for double-blind reviews
+          if (functions) {
+             try {
+                const submitReview = httpsCallable(functions, 'submitReview');
+                await submitReview({
+                   orderId: reviewingOrder.id,
+                   rating: reviewRating,
+                   comment: finalComment,
+                   tags: selectedTags,
+                   reviewedRole: 'customer',
+                });
+             } catch (cfError) {
+                console.error('CF submitReview failed, falling back:', cfError);
+                await orderService.submitReview(reviewingOrder.id, 'customer', {
+                   rating: reviewRating,
+                   comment: finalComment,
+                   date: new Date().toISOString()
+                });
+             }
+          } else {
+             await orderService.submitReview(reviewingOrder.id, 'customer', {
+                rating: reviewRating,
+                comment: finalComment,
+                date: new Date().toISOString()
+             });
+          }
+          setReviewingOrder(null);
+          setSelectedTags([]);
+          showAlert("Review Submitted", "Thank you for rating the customer!", "success");
+       } catch (e) {
+          showAlert("Error", "Failed to submit review.", "error");
+       } finally {
+          setLoading(false);
+       }
+    };
 
-   const closeVerificationModal = () => {
+    const handleRespondToEdit = async (accepted: boolean) => {
+       if (!activeJob?.pendingEdit) return;
+       setRespondingToEdit(true);
+       try {
+          if (functions) {
+             try {
+                const respondFn = httpsCallable(functions, 'respondToEdit');
+                await respondFn({ orderId: activeJob.id, accepted });
+             } catch (cfError) {
+                console.error('CF respondToEdit failed:', cfError);
+                showAlert("Error", "Failed to respond. Please try again.", "error");
+             }
+          }
+          showAlert(
+             accepted ? "Edit Accepted" : "Edit Declined",
+             accepted ? "Route change applied." : "Original route will be used.",
+             accepted ? "success" : "info"
+          );
+       } catch (e) {
+          showAlert("Error", "Failed to respond to edit request.", "error");
+       } finally {
+          setRespondingToEdit(false);
+       }
+    };
+
+    const closeVerificationModal = () => {
       setVerifyingOrder(null);
       setVerifyingStopId(null);
       setVerificationInput('');
@@ -2078,13 +2125,51 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                       <div className={`w-full md:absolute md:left-auto md:right-8 md:w-96 bg-white/95 backdrop-blur-xl rounded-t-[2.5rem] md:rounded-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] md:shadow-2xl border-t md:border border-gray-200 transition-all duration-300 pointer-events-auto ${Capacitor.isNativePlatform() ? 'md:mb-0 md:bottom-28' : 'md:mb-0 md:bottom-8'} ${isDrawerCollapsed ? 'p-4' : 'p-6 pt-4'}`}>
                         {/* Mobile Drag Handle */}
                         <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-4 md:hidden" />
+
+                        {/* Pending Edit Request Banner */}
+                        {activeJob.pendingEdit?.status === 'proposed' && (
+                           <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+                              <div className="flex items-start gap-2 mb-3">
+                                 <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                                 <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-black text-amber-900 uppercase tracking-wider mb-1">Route Change Requested</p>
+                                    <p className="text-[11px] font-bold text-amber-700">
+                                       Customer wants to change the route{activeJob.pendingEdit.distanceChangeKm > 1 ? ` (${activeJob.pendingEdit.distanceChangeKm.toFixed(1)}km difference)` : ''}.
+                                       New price: KES {activeJob.pendingEdit.newPrice?.toLocaleString()}
+                                       {activeJob.pendingEdit.priceDifference !== 0 && (
+                                          <span className={activeJob.pendingEdit.priceDifference > 0 ? ' text-emerald-700' : ' text-red-700'}>
+                                             {' '}({activeJob.pendingEdit.priceDifference > 0 ? '+' : ''}KES {activeJob.pendingEdit.priceDifference?.toLocaleString()})
+                                          </span>
+                                       )}
+                                    </p>
+                                 </div>
+                              </div>
+                              <div className="flex gap-2">
+                                 <button
+                                    onClick={() => handleRespondToEdit(true)}
+                                    disabled={respondingToEdit}
+                                    className="flex-1 py-2.5 bg-emerald-500 text-white rounded-xl text-xs font-bold hover:bg-emerald-600 disabled:opacity-50 transition-all"
+                                 >
+                                    Accept
+                                 </button>
+                                 <button
+                                    onClick={() => handleRespondToEdit(false)}
+                                    disabled={respondingToEdit}
+                                    className="flex-1 py-2.5 bg-gray-200 text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-300 disabled:opacity-50 transition-all"
+                                 >
+                                    Decline
+                                 </button>
+                              </div>
+                           </div>
+                        )}
+
                         <div className="flex items-center justify-between mb-4">
                            <div className="flex items-center space-x-2">
                               <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border shadow-sm ${activeJob.status === 'in_transit'
                                  ? 'bg-emerald-500 text-white border-emerald-400'
                                  : 'bg-brand-600 text-white border-brand-500'
                                  }`}>
-                                 {activeJob.status === 'driver_assigned' ? 'Heading to Pickup' : 'Delivering'}
+                                 {activeJob.status === 'driver_assigned' || activeJob.status === 'arriving_pickup' ? 'Heading to Pickup' : 'Delivering'}
                               </span>
                               {routeDuration !== null && (
                                  <span className="bg-emerald-500 text-white text-sm font-black px-3 py-1.5 rounded-xl flex items-center shadow-lg border border-emerald-400 animate-pulse">
@@ -2207,7 +2292,28 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                                   >
                                      <MessageSquare className="w-4 h-4 mr-2" /> Chat
                                   </button>
-                              </div>
+                               </div>
+
+                               {/* Driver cancel — only before in_transit */}
+                               {(activeJob.status === 'driver_assigned' || activeJob.status === 'arriving_pickup') && (
+                                  <button
+                                     onClick={async () => {
+                                        if (!confirm('Cancel this delivery? The customer will be notified.')) return;
+                                        try {
+                                           if (functions) {
+                                              const cancelFn = httpsCallable(functions, 'cancelOrder');
+                                              await cancelFn({ orderId: activeJob.id, reason: 'Driver cancelled' });
+                                           }
+                                           showAlert('Order Cancelled', 'The customer has been notified.', 'info');
+                                        } catch (e: any) {
+                                           showAlert('Error', e.message || 'Failed to cancel order.', 'error');
+                                        }
+                                     }}
+                                     className="w-full mt-3 py-2.5 bg-red-50 border border-red-100 rounded-xl text-xs font-bold text-red-600 hover:bg-red-100 transition-all"
+                                  >
+                                     Cancel Delivery
+                                  </button>
+                               )}
                            </>
                         ) : (
                            <div className="flex items-center justify-between animate-in fade-in slide-in-from-bottom-2">

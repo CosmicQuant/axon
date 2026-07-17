@@ -71,6 +71,12 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
   // ── Pending route changes (held until payment is confirmed) ──
   const [pendingRouteUpdate, setPendingRouteUpdate] = useState<any | null>(null);
 
+  // ── Dispute state ──
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
+  const [disputeReason, setDisputeReason] = useState('');
+  const [disputeDescription, setDisputeDescription] = useState('');
+  const [submittingDispute, setSubmittingDispute] = useState(false);
+
   // ── Bottom sheet height reporting (map refit) ─────
   useEffect(() => {
     if (!bottomSheetRef.current || !setBottomSheetHeight) return;
@@ -106,9 +112,14 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
   };
 
   const isPending = order.status === 'pending';
-  const isAssigned = order.status === 'driver_assigned';
+  const isAssigned = order.status === 'driver_assigned' || order.status === 'arriving_pickup';
+  const isArrivingPickup = order.status === 'arriving_pickup';
   const isInTransit = order.status === 'in_transit';
-  const isDelivered = order.status === 'delivered';
+  const isDelivered = order.status === 'delivered' || order.status === 'reviewed';
+  const isExpired = order.status === 'expired';
+  const isCancelled = order.status === 'cancelled';
+  const isDisputed = order.status === 'disputed';
+  const hasReviewed = order.status === 'reviewed';
 
   // ── Editability logic ──────────────────────────────────
   // A stop is editable if the driver hasn't started delivery to it
@@ -162,15 +173,25 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
 
   const getStatusText = () => {
     if (isPending) return 'Finding your driver...';
-    if (isAssigned) return 'Driver en route to pickup';
+    if (isArrivingPickup) return 'Driver en route to pickup';
+    if (isAssigned) return 'Driver assigned, heading to pickup';
     if (isInTransit) return 'Package in transit';
+    if (isDisputed) return 'Dispute under review';
+    if (isDelivered) return 'Delivered';
+    if (isExpired) return 'No driver found';
+    if (isCancelled) return 'Cancelled';
     return 'Processing';
   };
 
   const getStatusColor = () => {
     if (isPending) return 'bg-amber-500';
+    if (isArrivingPickup) return 'bg-blue-500';
     if (isAssigned) return 'bg-blue-500';
     if (isInTransit) return 'bg-brand-600';
+    if (isDisputed) return 'bg-orange-500';
+    if (isDelivered) return 'bg-emerald-500';
+    if (isExpired) return 'bg-gray-500';
+    if (isCancelled) return 'bg-red-500';
     return 'bg-gray-400';
   };
 
@@ -179,8 +200,13 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
   // ── Journey step info for header ───────────────────────
   const getJourneyStep = () => {
     if (isPending) return { label: 'Order Placed', sublabel: 'Finding your driver...', gradient: 'from-amber-500 to-amber-600', textColor: 'text-amber-100', dotColor: 'bg-white', step: 1 };
-    if (isAssigned) return { label: 'Driver En Route', sublabel: `Heading to ${order.pickup.split(',')[0]}`, gradient: 'from-blue-500 to-blue-600', textColor: 'text-blue-100', dotColor: 'bg-white', step: 2 };
+    if (isExpired) return { label: 'No Driver Found', sublabel: 'No driver accepted in time', gradient: 'from-gray-500 to-gray-600', textColor: 'text-gray-100', dotColor: 'bg-white', step: 1 };
+    if (isCancelled) return { label: 'Cancelled', sublabel: 'This order was cancelled', gradient: 'from-red-500 to-red-600', textColor: 'text-red-100', dotColor: 'bg-white', step: 1 };
+    if (isDisputed) return { label: 'Dispute Open', sublabel: 'Under review by Axon support', gradient: 'from-orange-500 to-orange-600', textColor: 'text-orange-100', dotColor: 'bg-white', step: 4 };
+    if (isArrivingPickup) return { label: 'Driver En Route', sublabel: `Heading to ${order.pickup.split(',')[0]}`, gradient: 'from-blue-500 to-blue-600', textColor: 'text-blue-100', dotColor: 'bg-white', step: 2 };
+    if (isAssigned) return { label: 'Driver Assigned', sublabel: `Heading to ${order.pickup.split(',')[0]}`, gradient: 'from-blue-500 to-blue-600', textColor: 'text-blue-100', dotColor: 'bg-white', step: 2 };
     if (isInTransit) return { label: 'In Transit', sublabel: `To ${order.dropoff.split(',')[0]}`, gradient: 'from-brand-600 to-emerald-600', textColor: 'text-emerald-100', dotColor: 'bg-white', step: 4 };
+    if (isDelivered) return { label: 'Delivered', sublabel: hasReviewed ? 'Order complete' : 'Rate your experience', gradient: 'from-emerald-500 to-emerald-600', textColor: 'text-emerald-100', dotColor: 'bg-white', step: 5 };
     return { label: 'Processing', sublabel: '', gradient: 'from-gray-500 to-gray-600', textColor: 'text-gray-200', dotColor: 'bg-white', step: 0 };
   };
   const journeyStep = getJourneyStep();
@@ -751,6 +777,33 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
     }
   };
 
+  // ── Raise dispute ──────────────────────────────────────
+  const handleRaiseDispute = async () => {
+    if (!disputeReason.trim()) return;
+    setSubmittingDispute(true);
+    try {
+      const { functions } = await import('../firebase');
+      if (functions) {
+        const raiseDispute = httpsCallable(functions, 'raiseDispute');
+        await raiseDispute({
+          orderId: order.id,
+          reason: disputeReason,
+          description: disputeDescription,
+        });
+      }
+      setShowDisputeModal(false);
+      setDisputeReason('');
+      setDisputeDescription('');
+      // Redirect to WhatsApp for immediate support
+      const msg = encodeURIComponent(`Hello Axon, I've raised a dispute for order #${order.id.substring(0, 8)}. Reason: ${disputeReason}. Please assist.`);
+      window.open(`https://wa.me/254725720837?text=${msg}`, '_blank', 'noopener,noreferrer');
+    } catch (e: any) {
+      console.error('Dispute failed:', e);
+    } finally {
+      setSubmittingDispute(false);
+    }
+  };
+
   // ── Helpers for route display ──────────────────────────
   const getStopStatusBadge = (stop: RouteStop) => {
     if (stop.status === 'completed') return { text: 'Done', color: 'bg-emerald-100 text-emerald-700' };
@@ -762,17 +815,30 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
   const waypoints = sortedStops.filter(s => s.type === 'waypoint');
   const hasEditableRoute = canEditPickup() || canEditDropoff() || waypoints.some(s => canEditStop(s));
 
-  // Delivered → PostDelivery
+  // Delivered → PostDelivery (customer reviews driver)
   if (isDelivered) {
     return (
-      <div className="fixed bottom-0 inset-x-0 md:inset-x-auto md:right-4 md:top-4 md:bottom-4 md:w-[400px] pointer-events-none z-[100] flex flex-col justify-end mx-auto max-w-lg md:max-w-none md:mx-0">
-        <div className="pointer-events-auto bg-white rounded-t-[2.5rem] md:rounded-2xl shadow-[0_-15px_40px_rgba(0,0,0,0.12)] md:shadow-2xl border-t border-gray-100 md:border overflow-hidden pb-[env(safe-area-inset-bottom,0)]">
+      <div className="fixed bottom-0 inset-x-0 md:inset-x-auto md:right-4 md:top-4 md:bottom-4 md:w-[400px] pointer-events-none z-[100] flex flex-col justify-end mx-auto max-w-lg md:max-w-none md:mx-0 pb-[env(safe-area-inset-bottom,0)]">
+        <div className="pointer-events-auto bg-white rounded-t-[2.5rem] md:rounded-2xl shadow-[0_-15px_40px_rgba(0,0,0,0.12)] md:shadow-2xl border-t border-gray-100 md:border overflow-hidden">
           <PostDelivery
             orderId={order.id}
             driverName={order.driver?.name}
+            hasReview={!!order.reviewForDriver}
             onComplete={onBack}
           />
         </div>
+
+        {/* Dispute button for delivered orders */}
+        {!order.reviewForDriver && (
+          <div className="pointer-events-auto px-4 pb-4">
+            <button
+              onClick={() => setShowDisputeModal(true)}
+              className="w-full py-2.5 bg-orange-50 border border-orange-100 rounded-xl text-[11px] font-bold text-orange-600 hover:bg-orange-100 transition-all flex items-center justify-center gap-1.5"
+            >
+              <AlertTriangle size={12} /> Report a Problem
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -1438,6 +1504,14 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
                 <X size={14} /> Cancel
               </button>
             )}
+            {(isInTransit || isDelivered) && !isDisputed && (
+              <button
+                onClick={() => setShowDisputeModal(true)}
+                className="flex items-center justify-center gap-2 py-3 px-4 bg-orange-50 border border-orange-100 rounded-xl text-xs font-bold text-orange-600 hover:bg-orange-100 active:scale-95 transition-all"
+              >
+                <AlertTriangle size={14} /> Report
+              </button>
+            )}
             <button
               onClick={() => openKifaru(true)}
               className="flex items-center justify-center gap-2 py-3 px-4 bg-red-50 border border-red-100 rounded-xl text-xs font-bold text-red-600 hover:bg-red-100 active:scale-95 transition-all"
@@ -1796,6 +1870,76 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
                   </div>
                 </div>
               )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Dispute Modal ──────────────────────────────────── */}
+      <AnimatePresence>
+        {showDisputeModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 pointer-events-auto"
+          >
+            <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-md" onClick={() => setShowDisputeModal(false)}></div>
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative z-10 bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-y-auto max-h-[90vh] border border-gray-100"
+            >
+              <div className="bg-orange-50 p-6 text-gray-900 text-center border-b border-orange-100">
+                <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-3 border border-orange-200">
+                  <AlertTriangle className="w-7 h-7 text-orange-600" />
+                </div>
+                <h3 className="text-lg font-bold">Report a Problem</h3>
+                <p className="text-gray-500 text-sm mt-1">Tell us what went wrong. We'll review and contact you on WhatsApp.</p>
+              </div>
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Reason</label>
+                  <select
+                    value={disputeReason}
+                    onChange={(e) => setDisputeReason(e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl font-bold text-sm outline-none focus:border-brand-500"
+                  >
+                    <option value="">Select a reason...</option>
+                    <option value="Package damaged">Package was damaged</option>
+                    <option value="Package not delivered">Package was not delivered</option>
+                    <option value="Wrong item delivered">Wrong item delivered</option>
+                    <option value="Driver behaviour">Driver behaviour issue</option>
+                    <option value="Overcharged">Charged incorrectly</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Description (optional)</label>
+                  <textarea
+                    value={disputeDescription}
+                    onChange={(e) => setDisputeDescription(e.target.value)}
+                    placeholder="Tell us more about what happened..."
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl font-bold text-sm outline-none focus:border-brand-500 min-h-[80px] resize-none"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <button
+                    onClick={() => setShowDisputeModal(false)}
+                    className="py-3 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 border border-gray-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleRaiseDispute}
+                    disabled={!disputeReason.trim() || submittingDispute}
+                    className="py-3 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 disabled:opacity-50 shadow-lg shadow-orange-500/20"
+                  >
+                    {submittingDispute ? <Loader2 size={16} className="animate-spin mx-auto" /> : 'Submit & WhatsApp'}
+                  </button>
+                </div>
+              </div>
             </motion.div>
           </motion.div>
         )}

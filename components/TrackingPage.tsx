@@ -4,7 +4,7 @@ import Tracking from './Tracking';
 import { useAuth } from '../context/AuthContext';
 import { usePrompt } from '../context/PromptContext';
 import { useUpdateOrderStatus, useUpdateOrder } from '../hooks/useOrders';
-import { Loader, XCircle, Navigation, ArrowLeft, Search, AlertCircle } from 'lucide-react';
+import { Loader, XCircle, Navigation, ArrowLeft, Search, AlertCircle, Clock, AlertTriangle } from 'lucide-react';
 import { doc, onSnapshot, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { DeliveryOrder } from '../types';
@@ -291,7 +291,59 @@ const TrackingPageContent: React.FC = () => {
                         <XCircle className="w-8 h-8 text-red-500" />
                     </div>
                     <h2 className="text-2xl font-extrabold text-gray-900 mb-2">Order Cancelled</h2>
-                    <p className="text-gray-500 font-bold text-sm mb-6">This delivery has been cancelled. If this was a mistake, please place a new order.</p>
+                    <p className="text-gray-500 font-bold text-sm mb-6">{order.cancellationReason || 'This delivery has been cancelled.'}</p>
+                    <button
+                        onClick={() => navigate('/book')}
+                        className="w-full bg-brand-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-brand-700 transition-all mb-3"
+                    >
+                        Place New Order
+                    </button>
+                    <button
+                        onClick={() => navigate(user?.role === 'business' ? '/business-dashboard' : (user ? '/customer-dashboard' : '/'))}
+                        className="w-full bg-gray-100 text-gray-700 py-4 rounded-2xl font-bold hover:bg-gray-200 transition-all"
+                    >
+                        Back to Dashboard
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (order.status === 'expired') {
+        return (
+            <div className="min-h-screen flex items-center justify-center pointer-events-none p-4">
+                <div className="bg-white/80 backdrop-blur-xl p-8 rounded-[2.5rem] shadow-2xl border border-white/50 text-center max-w-sm pointer-events-auto animate-in zoom-in duration-300">
+                    <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <Clock className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <h2 className="text-2xl font-extrabold text-gray-900 mb-2">No Driver Found</h2>
+                    <p className="text-gray-500 font-bold text-sm mb-6">No driver accepted your order in time. Would you like to rebook?</p>
+                    <button
+                        onClick={() => navigate('/book')}
+                        className="w-full bg-brand-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-brand-700 transition-all mb-3"
+                    >
+                        Rebook Delivery
+                    </button>
+                    <button
+                        onClick={() => navigate(user?.role === 'business' ? '/business-dashboard' : (user ? '/customer-dashboard' : '/'))}
+                        className="w-full bg-gray-100 text-gray-700 py-4 rounded-2xl font-bold hover:bg-gray-200 transition-all"
+                    >
+                        Back to Dashboard
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (order.status === 'disputed') {
+        return (
+            <div className="min-h-screen flex items-center justify-center pointer-events-none p-4">
+                <div className="bg-white/80 backdrop-blur-xl p-8 rounded-[2.5rem] shadow-2xl border border-white/50 text-center max-w-sm pointer-events-auto animate-in zoom-in duration-300">
+                    <div className="w-16 h-16 bg-orange-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <AlertTriangle className="w-8 h-8 text-orange-500" />
+                    </div>
+                    <h2 className="text-2xl font-extrabold text-gray-900 mb-2">Dispute Under Review</h2>
+                    <p className="text-gray-500 font-bold text-sm mb-6">Your dispute has been recorded. Our team is reviewing it and will contact you via WhatsApp shortly.</p>
                     <button
                         onClick={() => navigate(user?.role === 'business' ? '/business-dashboard' : (user ? '/customer-dashboard' : '/'))}
                         className="w-full bg-brand-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-brand-700 transition-all"
