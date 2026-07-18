@@ -234,7 +234,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
             id: 'pickup-start',
             address: activeJob.pickup,
             type: 'pickup' as const,
-            status: (activeJob.status === 'driver_assigned') ? 'pending' : 'completed',
+            status: (activeJob.status === 'driver_assigned' || activeJob.status === 'arriving_pickup') ? 'pending' : 'completed',
             lat: activeJob.pickupCoords?.lat || activeJobCoords.pickup?.lat || 0,
             lng: activeJob.pickupCoords?.lng || activeJobCoords.pickup?.lng || 0,
             coords: activeJob.pickupCoords || activeJobCoords.pickup || { lat: 0, lng: 0 },
