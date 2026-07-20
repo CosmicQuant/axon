@@ -3,12 +3,12 @@ import { Capacitor } from '@capacitor/core';
 import type { DeliveryOrder, Driver, DriverMetrics, User } from '../types';
 import { VehicleType } from '../types';
 import { orderService } from '../services/orderService';
+import { orderApi } from '../services/orderApi';
 import { mapService } from '../services/mapService';
 import { storageService } from '../services/storageService';
 import { MapProvider, useMapState } from '@/context/MapContext';
 import { collection, query, where, onSnapshot, limit } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
-import { db, functions } from '../firebase';
+import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { usePrompt } from '../context/PromptContext';
 import { LOCATION_COORDINATES } from '../constants';
@@ -82,7 +82,7 @@ interface DashboardContentProps extends DriverDashboardProps {
 
 const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHome, onViewChange, currentView: propCurrentView }) => {
    const { logout, updateUser, deleteAccount } = useAuth();
-   const { showAlert } = usePrompt();
+   const { showAlert, showConfirm } = usePrompt();
    const { isLoaded, setPickupCoords, setDropoffCoords, setWaypointCoords, setOrderState, fitBounds, setDriverCoords, setDriverBearing, setDriverVehicleType, setRoutePolyline, requestUserLocation, driverCoords, setBottomSheetHeight } = useMapState();
 
    const [internalView, setInternalView] = useState<DashboardView>('JOBS');
@@ -239,14 +239,12 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
             lng: activeJob.pickupCoords?.lng || activeJobCoords.pickup?.lng || 0,
             coords: activeJob.pickupCoords || activeJobCoords.pickup || { lat: 0, lng: 0 },
             label: 'Pickup',
-            verificationCode: activeJob.verificationCode, // Main order code for pickup
             sequenceOrder: 0
          },
          ...(activeJob.stops || []).map(s => ({
             ...s,
             coords: { lat: s.lat, lng: s.lng },
-            label: s.type === 'dropoff' ? 'Final Dropoff' : `Stop ${s.sequenceOrder || ''}`,
-            verificationCode: s.verificationCode || activeJob.verificationCode
+            label: s.type === 'dropoff' ? 'Final Dropoff' : `Stop ${s.sequenceOrder || ''}`
          }))
       ];
 
@@ -261,7 +259,6 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
             lng: activeJob.dropoffCoords?.lng || activeJobCoords.dropoff?.lng || 0,
             coords: activeJob.dropoffCoords || activeJobCoords.dropoff || { lat: 0, lng: 0 },
             label: 'Final Dropoff',
-            verificationCode: activeJob.verificationCode,
             sequenceOrder: 999
          });
       }
@@ -901,34 +898,13 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
              ? `${selectedTags.join(', ')}${reviewComment ? ': ' : ''}${reviewComment}`.trim()
              : reviewComment;
 
-          // Use the submitReview Cloud Function for double-blind reviews
-          if (functions) {
-             try {
-                const submitReview = httpsCallable(functions, 'submitReview');
-                await submitReview({
-                   orderId: reviewingOrder.id,
-                   rating: reviewRating,
-                   comment: finalComment,
-                   tags: selectedTags,
-                   reviewedRole: 'customer',
-                });
-             } catch (cfError) {
-                console.error('CF submitReview failed, falling back:', cfError);
-                 await orderService.submitReview(reviewingOrder.id, 'customer', {
-                    rating: reviewRating,
-                    comment: finalComment,
-                    date: new Date().toISOString(),
-                    submittedBy: 'customer',
-                 });
-              }
-           } else {
-              await orderService.submitReview(reviewingOrder.id, 'customer', {
-                 rating: reviewRating,
-                 comment: finalComment,
-                 date: new Date().toISOString(),
-                 submittedBy: 'customer',
-              });
-          }
+// Server-authoritative double-blind review (no client fallback)
+          await orderApi.submitReview(reviewingOrder.id, {
+             rating: reviewRating,
+             comment: finalComment,
+             tags: selectedTags,
+             reviewedRole: 'customer',
+          });
           setReviewingOrder(null);
           setSelectedTags([]);
           showAlert("Review Submitted", "Thank you for rating the customer!", "success");
@@ -2186,17 +2162,15 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                                {/* Driver cancel — only before in_transit */}
                                {(activeJob.status === 'driver_assigned' || activeJob.status === 'arriving_pickup') && (
                                   <button
-                                     onClick={async () => {
-                                        if (!confirm('Cancel this delivery? The customer will be notified.')) return;
-                                        try {
-                                           if (functions) {
-                                              const cancelFn = httpsCallable(functions, 'cancelOrder');
-                                              await cancelFn({ orderId: activeJob.id, reason: 'Driver cancelled' });
+                                     onClick={() => {
+                                        showConfirm('Cancel this delivery?', 'The customer will be notified.', async () => {
+                                           try {
+                                              await orderApi.cancel(activeJob.id, 'Driver cancelled');
+                                              showAlert('Order Cancelled', 'The customer has been notified.', 'info');
+                                           } catch (e: any) {
+                                              showAlert('Error', e.message || 'Failed to cancel order.', 'error');
                                            }
-                                           showAlert('Order Cancelled', 'The customer has been notified.', 'info');
-                                        } catch (e: any) {
-                                           showAlert('Error', e.message || 'Failed to cancel order.', 'error');
-                                        }
+                                        }, 'warning');
                                      }}
                                      className="w-full mt-3 py-2.5 bg-red-50 border border-red-100 rounded-xl text-xs font-bold text-red-600 hover:bg-red-100 transition-all"
                                   >

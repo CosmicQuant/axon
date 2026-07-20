@@ -50,42 +50,78 @@ service cloud.firestore {
     }
 
     match /orders/{orderId} {
-      // Create: Any authenticated user
+      // Create: Any authenticated user (customer creating a booking)
       allow create: if request.auth != null;
 
-      // Read access:
+      // Read access: customer, assigned driver, or any driver browsing pending orders
       allow read: if request.auth != null && (
         resource.data.userId == request.auth.uid ||
         (resource.data.driver != null && resource.data.driver.id == request.auth.uid) ||
         (resource.data.status == 'pending' && isDriver())
       );
 
-      // Update access:
+      function changedKeys() {
+        return request.resource.data.diff(resource.data).affectedKeys();
+      }
+
+      // Customer: draft edits ONLY while the order is still pending.
+      // Once a driver accepts, the order is locked — cancel-only via Cloud Functions.
+      // Status, driver, codes, and review fields can never be client-written.
+      function isCustomerDraftEdit() {
+        return resource.data.userId == request.auth.uid
+          && resource.data.status == 'pending'
+          && request.resource.data.status == resource.data.status
+          && changedKeys().hasOnly([
+            'pickup', 'dropoff', 'pickupCoords', 'dropoffCoords', 'stops', 'items',
+            'recipient', 'vehicle', 'serviceType', 'helpersCount', 'price', 'driverRate',
+            'quoteId', 'estimatedDuration', 'routeGeometry', 'editHistory', 'updatedAt'
+          ]);
+      }
+
+      // Driver: self-assign a pending order (acceptOrder transaction)
+      function isDriverAccept() {
+        return resource.data.status == 'pending'
+          && isDriver()
+          && request.resource.data.status == 'driver_assigned'
+          && request.resource.data.driver.id == request.auth.uid
+          && changedKeys().hasOnly(['status', 'driver', 'assignedAt', 'updatedAt']);
+      }
+
+      // Assigned driver: location telemetry + stop completion only.
+      // Status transitions go through the updateOrderStatus Cloud Function.
+      function isDriverTelemetry() {
+        return resource.data.driver != null
+          && resource.data.driver.id == request.auth.uid
+          && request.resource.data.status == resource.data.status
+          && changedKeys().hasOnly([
+            'driverLocation', 'remainingDistance', 'remainingDuration',
+            'totalRemainingDistance', 'totalRemainingDuration', 'routeGeometry',
+            'stops', 'updatedAt'
+          ]);
+      }
+
       allow update: if request.auth != null && (
-        resource.data.userId == request.auth.uid ||
-        (resource.data.driver != null && resource.data.driver.id == request.auth.uid) ||
-        (
-          resource.data.status == 'pending' &&
-          isDriver()
-        )
+        isCustomerDraftEdit() || isDriverAccept() || isDriverTelemetry()
       );
 
       // Delete: REMOVED for audit trail preservation.
+
+      // Private order data (delivery verification codes).
+      // Only the customer can read/write; drivers must prove knowledge of the
+      // code via the verifyDeliveryCode Cloud Function (Admin SDK bypasses rules).
+      match /private/{docId} {
+        allow read, write: if request.auth != null
+          && get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid;
+      }
     }
 
     match /disputes/{disputeId} {
-      allow create: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow read: if isAuthenticated() && (
         resource.data.userId == request.auth.uid ||
-        (resource.data.driver != null && resource.data.driver.id == request.auth.uid)
+        resource.data.driverId == request.auth.uid
       );
       // Disputes are resolved server-side only
-      allow update, delete: if false;
-    }
-
-    match /reviews/{reviewId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow update, delete: if false;
     }
   }

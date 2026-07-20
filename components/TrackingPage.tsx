@@ -25,6 +25,7 @@ const TrackingPageContent: React.FC = () => {
     const [order, setOrder] = React.useState<DeliveryOrder | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
     const [retryId, setRetryId] = React.useState('');
+    const [orderCodes, setOrderCodes] = React.useState<{ orderCode?: string; stopCodes?: Record<string, string> }>({});
     const lastRouteUpdate = React.useRef<number>(0);
     const updateStatusMutation = useUpdateOrderStatus();
     const updateOrderMutation = useUpdateOrder();
@@ -183,6 +184,7 @@ const TrackingPageContent: React.FC = () => {
         }
 
         let unsub: (() => void) | null = null;
+        let unsubCodes: (() => void) | null = null;
 
         const initTracking = async () => {
             setIsLoading(true);
@@ -212,6 +214,18 @@ const TrackingPageContent: React.FC = () => {
                         setIsLoading(false);
                     }
                 );
+
+                // Listen to the customer-only private codes subcollection
+                // (verification PINs live here, not on the public order doc)
+                unsubCodes = onSnapshot(
+                    doc(db, 'orders', orderId, 'private', 'codes'),
+                    (codesSnap) => {
+                        if (codesSnap.exists()) {
+                            setOrderCodes(codesSnap.data() as any);
+                        }
+                    },
+                    () => { /* legacy orders have no codes doc — fall back to order fields */ }
+                );
             } catch (error) {
                 console.error("Error initializing tracking:", error);
                 setIsLoading(false);
@@ -222,6 +236,7 @@ const TrackingPageContent: React.FC = () => {
 
         return () => {
             if (unsub) unsub();
+            if (unsubCodes) unsubCodes();
         };
     }, [orderId]);
 

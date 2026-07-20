@@ -303,27 +303,48 @@ export const orderService = {
   },
 
   /**
-   * Create a new order
+   * Create a new order.
+   * Delivery verification codes are stored in orders/{id}/private/codes
+   * (customer-only per Firestore rules) so drivers can never read them —
+   * they must prove knowledge of the code via the verifyDeliveryCode CF.
    */
   createOrder: async (order: Omit<DeliveryOrder, 'id'>): Promise<DeliveryOrder> => {
     try {
-      // Use provided verification code or generate a new one
-      const verificationCode = (order as any).verificationCode || Math.floor(1000 + Math.random() * 9000).toString();
+      const orderCode = (order as any).verificationCode || Math.floor(1000 + Math.random() * 9000).toString();
+
+      // Extract per-stop codes into the private doc; strip them from the public order doc
+      const stopCodes: Record<string, string> = {};
+      const sanitizedStops = (order.stops || []).map((stop: any) => {
+        const code = stop.verificationCode || Math.floor(1000 + Math.random() * 9000).toString();
+        stopCodes[stop.id] = code;
+        const { verificationCode, ...rest } = stop;
+        return rest;
+      });
 
       // Clean undefined values for Firestore
       const now = new Date().toISOString();
       const cleanOrder = JSON.parse(JSON.stringify({
         ...order,
+        stops: sanitizedStops,
         date: now,
         createdAt: now,
         updatedAt: now,
         status: 'pending',
-        verificationCode: verificationCode,
         driverRate: Math.floor(Number(order.price || 0) * 0.8)
       }));
+      delete cleanOrder.verificationCode;
 
       const docRef = await addDoc(collection(db, ORDERS_COLLECTION), cleanOrder);
-      return { ...order, id: docRef.id, verificationCode } as DeliveryOrder;
+
+      // Write codes to the customer-only private subcollection
+      const { setDoc } = await import('firebase/firestore');
+      await setDoc(doc(db, ORDERS_COLLECTION, docRef.id, 'private', 'codes'), {
+        orderCode,
+        stopCodes,
+        createdAt: now,
+      });
+
+      return { ...order, id: docRef.id, verificationCode: orderCode } as DeliveryOrder;
     } catch (error) {
       console.error("Error creating order:", error);
       throw error;

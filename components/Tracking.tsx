@@ -9,6 +9,8 @@ import { VEHICLES } from './booking/constants';
 import { useChat } from '../context/ChatContext';
 import { usePrompt } from '../context/PromptContext';
 import { orderApi } from '../services/orderApi';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 interface TrackingProps {
   order: DeliveryOrder;
@@ -253,27 +255,29 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
     setTimeout(() => addressInputRef.current?.focus(), 150);
   };
 
-  const handleRemoveStop = async (stopId: string) => {
+  const handleRemoveStop = (stopId: string) => {
     const stop = order.stops?.find(s => s.id === stopId);
     if (!stop || !canRemoveStop(stop)) return;
-    if (!confirm(`Remove stop "${stop.address.split(',')[0]}"?`)) return;
 
-    setSaving(true);
-    try {
-      const updatedStops = (order.stops || [])
-        .filter(s => s.id !== stopId)
-        .map((s, idx) => ({ ...s, sequenceOrder: idx + 1 }));
-      await onUpdateOrder(order.id, { stops: updatedStops } as any);
-      // Refresh map immediately
-      refreshMapAfterEdit(order.pickupCoords || null, order.dropoffCoords || null, updatedStops);
-      // Auto-optimize after removal
-      optimizeCurrentRoute(updatedStops);
-      // Requote with fewer stops
-      requoteAfterEdit({ stops: updatedStops });
-    } catch (e) {
-      console.error('Failed to remove stop:', e);
-    }
-    setSaving(false);
+    showConfirm('Remove stop?', `"${stop.address.split(',')[0]}" will be removed from the route.`, async () => {
+      setSaving(true);
+      try {
+        const updatedStops = (order.stops || [])
+          .filter(s => s.id !== stopId)
+          .map((s, idx) => ({ ...s, sequenceOrder: idx + 1 }));
+        await removeStopCode(stopId);
+        await onUpdateOrder(order.id, { stops: updatedStops } as any);
+        // Refresh map immediately
+        refreshMapAfterEdit(order.pickupCoords || null, order.dropoffCoords || null, updatedStops);
+        // Auto-optimize after removal
+        optimizeCurrentRoute(updatedStops);
+        // Requote with fewer stops
+        requoteAfterEdit({ stops: updatedStops });
+      } catch (e) {
+        console.error('Failed to remove stop:', e);
+      }
+      setSaving(false);
+    }, 'warning');
   };
 
   // ── Refresh map markers & route after location edits ───
@@ -482,7 +486,6 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
         lng: selectedCoords.lng,
         type: 'waypoint',
         status: 'pending',
-        verificationCode: generateCode(),
         sequenceOrder: nonDropoffStops.length + 1,
       };
 
@@ -492,6 +495,8 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
         ...(dropoffStop ? [{ ...dropoffStop, sequenceOrder: nonDropoffStops.length + 2 }] : []),
       ];
 
+      // Store the stop's PIN in the private subcollection (never on the public order doc)
+      await addStopCode(newStop.id, generateCode());
       await onUpdateOrder(order.id, { stops: updatedStops } as any);
       // Refresh map immediately
       refreshMapAfterEdit(order.pickupCoords || null, order.dropoffCoords || null, updatedStops);
@@ -650,6 +655,25 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
   const deliveryCode = codeProp || order.verificationCode || '';
   const stopCode = (stopId: string): string | undefined =>
     stopCodes?.[stopId] || order.stops?.find(s => s.id === stopId)?.verificationCode;
+
+  // Sync stop codes to the customer-only private subcollection
+  const codesDocRef = () => doc(db, 'orders', order.id, 'private', 'codes');
+  const addStopCode = async (stopId: string, code: string) => {
+    const snap = await getDoc(codesDocRef());
+    const current = snap.exists() ? snap.data() : { orderCode: order.verificationCode || '', stopCodes: {} };
+    await setDoc(codesDocRef(), {
+      ...current,
+      stopCodes: { ...(current.stopCodes || {}), [stopId]: code },
+    });
+  };
+  const removeStopCode = async (stopId: string) => {
+    const snap = await getDoc(codesDocRef());
+    if (!snap.exists()) return;
+    const current = snap.data();
+    const stopCodesMap = { ...(current.stopCodes || {}) };
+    delete stopCodesMap[stopId];
+    await setDoc(codesDocRef(), { ...current, stopCodes: stopCodesMap });
+  };
 
   const copyCode = () => {
     if (deliveryCode) {
