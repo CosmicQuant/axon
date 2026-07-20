@@ -31,9 +31,19 @@ No `lint`, `test`, or `typecheck` scripts exist. No ESLint/Prettier/CI config. T
 - Path alias `@/*` -> repo root (configured in both `tsconfig.json` and `vite.config.ts`). Code mostly uses relative imports anyway.
 - `config.ts` `USE_MOCK_BACKEND` toggles simulated M-Pesa vs real STK Push via Firebase Functions.
 - Firestore is initialized with `experimentalForceLongPolling: true` (`firebase.ts`) — do not remove without testing on the target network.
-- Pricing source of truth is `VEHICLE_RATES` in `functions/index.js` (KES, server-side). Client pricing must match it.
+- Pricing source of truth is `functions/lib/pricing.js` (`VEHICLE_RATES`, `computePrice`, KES, server-side). There is intentionally **no client-side pricing table** — `services/orderApi.ts` `calculateQuote` is the only quote path.
 - Contexts live in `context/` (Auth, Map, Chat, Prompt); booking flow in `components/booking/` (wizard + `BookingContext`). Services in `services/` wrap Firebase/Gemini/Maps.
 - Capacitor `appId` is `com.axon.kenya`, `webDir: dist`. Native Google Auth client ID is hardcoded in `capacitor.config.ts` and `App.tsx`.
+
+## Order lifecycle (server-authoritative)
+
+- **Cloud Functions are the only authority for order mutations.** All client order mutations go through `services/orderApi.ts` (typed CF wrappers, no Firestore fallbacks). Do not add client-side `updateDoc` paths to orders outside the Firestore-rules allowlist.
+- Status machine (forward-only, driver-only, in `functions/lib/orders.js`): `driver_assigned → arriving_pickup → in_transit → delivered`. Side transitions each have a single authority: `cancelOrder` (pre-transit only), `raiseDispute` (in_transit/delivered), `submitReview` (delivered → reviewed), `expirePendingOrders` (pending → expired, 1-min cron).
+- **Orders are locked once a driver accepts.** Customers can edit route/package/receiver/vehicle only while `status === 'pending'`; after acceptance the only options are cancel or dispute. The old `proposeOrderEdit`/`respondToEdit` CFs and price-adjustment payment flow were removed (pendingEdit type is deprecated, kept for historical docs).
+- **Delivery verification codes live in `orders/{id}/private/codes`** (Firestore rules: customer-only read/write; drivers cannot read them). `verifyDeliveryCode` CF checks the PIN server-side. `createOrder` strips codes from the public doc automatically. Legacy orders still carry codes on the main doc — all readers fall back gracefully.
+- Firestore rules (`firestore.rules`) use a **field allowlist** for order updates: customer draft edits (pending only), driver self-assign (pending only), driver telemetry (`driverLocation`/`stops`/route fields only). Everything else is CF-only.
+- Cloud Functions are split into `functions/lib/`: `admin.js` (shared init), `pricing.js` (rates + geo + Routes API), `notifications.js` (FCM + stale-token pruning), `quotes.js`, `orders.js`, `reviews.js`, `disputes.js`, `tokens.js`, `scheduled.js`. `functions/index.js` only wires exports — export names are deployed endpoints, do not rename. `functions/v1/api.js` is the separate business API (API-key auth).
+- Push notifications: FCM tokens registered via `registerFcmToken` CF (called from `AuthContext` after login); stale tokens pruned automatically on send failures.
 
 ## Repo hygiene gotchas
 
