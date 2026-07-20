@@ -256,6 +256,10 @@ export interface Review {
 }
 
 // ── Pending edit proposed by customer after driver assignment ──
+// @deprecated Post-acceptance editing was removed — orders are locked once a
+// driver accepts (cancel-only). Kept for reading historical order docs that
+// still carry a `pendingEdit` field. The proposeOrderEdit/respondToEdit
+// Cloud Functions no longer exist.
 export interface PendingEdit {
   proposedBy: 'customer' | 'driver';
   changes: Record<string, any>;

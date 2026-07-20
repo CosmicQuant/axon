@@ -269,6 +269,17 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
 
    const nextStop = allStops.find(s => s.status !== 'completed');
 
+   // Refs for values consumed inside the GPS watch callback — prevents
+   // re-subscribing watchPosition on every stop/order update
+   const allStopsRef = useRef(allStops);
+   const nextStopRef = useRef(nextStop);
+   const activeJobRef = useRef(activeJob);
+   useEffect(() => {
+      allStopsRef.current = allStops;
+      nextStopRef.current = nextStop;
+      activeJobRef.current = activeJob;
+   });
+
     // Geocode Active Job and Sync with Global Map
     useEffect(() => {
        const syncMap = async () => {
@@ -380,14 +391,15 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                   }
                }
 
-                // 3. Proximity Geofencing (Tight Radius Stabilization)
-                // Only snap when coords are valid (non-zero) to prevent snapping to (0,0)
-                if (nextStop?.coords && nextStop.coords.lat !== 0 && nextStop.coords.lng !== 0) {
-                   const distanceToStop = mapService.calculateDistance(currentCoords, nextStop.coords);
-                   if (distanceToStop <= 0.03) {
-                      currentCoords = nextStop.coords;
-                   }
-                }
+                 // 3. Proximity Geofencing (Tight Radius Stabilization)
+                 // Only snap when coords are valid (non-zero) to prevent snapping to (0,0)
+                 const stopCoords = nextStopRef.current?.coords;
+                 if (stopCoords && stopCoords.lat !== 0 && stopCoords.lng !== 0) {
+                    const distanceToStop = mapService.calculateDistance(currentCoords, stopCoords);
+                    if (distanceToStop <= 0.03) {
+                       currentCoords = stopCoords;
+                    }
+                 }
 
                // Update last known valid coords
                lastValidCoordsRef.current = currentCoords;
@@ -404,22 +416,20 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                    let totalDur: number | undefined;
                    let currentRouteGeometry: string | undefined;
 
-                   if (now - lastRouteUpdateRef.current > ROUTE_UPDATE_INTERVAL) {
-                     lastRouteUpdateRef.current = now;
+                    if (now - lastRouteUpdateRef.current > ROUTE_UPDATE_INTERVAL) {
+                      lastRouteUpdateRef.current = now;
 
-                     // Determine destination based on status and stops
-                     const remainingStops = allStops.filter(s => s.status !== 'completed');
-                     if (remainingStops.length > 0) {
-                        const endPoint = remainingStops[remainingStops.length - 1].coords;
-                        const waypoints = remainingStops.slice(0, -1).map(s => s.coords);
+                      // Determine destination based on status and stops
+                      const remainingStops = allStopsRef.current.filter(s => s.status !== 'completed');
+                      if (remainingStops.length > 0) {
+                         const endPoint = remainingStops[remainingStops.length - 1].coords;
+                         const waypoints = remainingStops.slice(0, -1).map(s => s.coords);
 
-                        if (endPoint) {
-                           console.log("[Diagnostic: DriverDashboard] Requesting route to:", endPoint, "via:", waypoints);
-                           const route = await mapService.getRoute(currentCoords, endPoint, waypoints, activeJob.vehicle);
-                           if (route) {
-                              console.log("[Diagnostic: DriverDashboard] Route Received:", { nextLegDist: route.nextLegDistance, nextLegDur: route.nextLegDuration });
-                              currentRouteGeometry = route.geometry;
-                              setRoutePolyline(route.geometry);
+                         if (endPoint) {
+                            const route = await mapService.getRoute(currentCoords, endPoint, waypoints, activeJob.vehicle);
+                            if (route) {
+                               currentRouteGeometry = route.geometry;
+                               setRoutePolyline(route.geometry);
 
                               remDur = route.nextLegDuration;
                               remDist = Math.round(((route.nextLegDistance || 0) / 1000) * 10) / 10;
@@ -452,7 +462,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
          );
          return () => navigator.geolocation.clearWatch(watchId);
       }
-    }, [hasActiveJob, isLoaded, setDriverCoords, setDriverBearing, activeJob?.id, activeJob?.status, activeJobCoords.pickup, activeJobCoords.dropoff, setRoutePolyline, nextStop?.coords, allStops, setRouteDuration, setRouteDistance, setTotalRouteDuration, setTotalRouteDistance]);
+     }, [hasActiveJob, isLoaded, setDriverCoords, setDriverBearing, activeJob?.id, activeJob?.status, activeJobCoords.pickup, activeJobCoords.dropoff, setRoutePolyline, setRouteDuration, setRouteDistance, setTotalRouteDuration, setTotalRouteDistance]);
 
    // Normalize VehicleType enum display names to lowercase vehicle IDs used in orders
    const normalizeVehicle = (vt?: string): string | null => {
@@ -857,19 +867,18 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
        }
    };
 
-    const handleDeactivateAccount = async () => {
-       const confirmed = window.confirm('Are you sure you want to deactivate your driver account? You can reactivate anytime by logging back in.');
-       if (!confirmed) return;
-
-       try {
-          await orderService.updateDriverStatus(user.id, 'offline');
-          await updateUser({ status: 'suspended' });
-          showAlert('Account Deactivated', 'Your account has been deactivated. You can reactivate by logging back in.', 'info');
-          logout();
-          navigate('/');
-       } catch (error) {
-          showAlert('Error', 'Failed to deactivate account. Please try again.', 'error');
-       }
+    const handleDeactivateAccount = () => {
+       showConfirm('Deactivate Account', 'Are you sure you want to deactivate your driver account? You can reactivate anytime by logging back in.', async () => {
+          try {
+             await orderService.updateDriverStatus(user.id, 'offline');
+             await updateUser({ status: 'suspended' });
+             showAlert('Account Deactivated', 'Your account has been deactivated. You can reactivate by logging back in.', 'info');
+             logout();
+             navigate('/');
+          } catch (error) {
+             showAlert('Error', 'Failed to deactivate account. Please try again.', 'error');
+          }
+       }, 'warning');
     };
 
     const handleDeleteAccount = async () => {

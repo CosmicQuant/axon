@@ -377,6 +377,8 @@ const TrackingPageContent: React.FC = () => {
                     order={order}
                     onUpdateStatus={handleUpdateStatus}
                     onUpdateOrder={handleUpdateOrder}
+                    verificationCode={orderCodes.orderCode}
+                    stopCodes={orderCodes.stopCodes}
                     onBack={() => {
                         if (user?.role === 'business') navigate('/business-dashboard');
                         else if (user?.role === 'driver') navigate('/driver');

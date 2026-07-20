@@ -6,7 +6,7 @@ import { VehicleType, ServiceType } from '../types';
 import { Package, Clock, CheckCircle, MapPin, Truck, ChevronRight, User, Bike, Car, Loader, Shield, XCircle, Star, AlertCircle, ArrowRight, Box, Scale, Zap, Rocket, Navigation, RefreshCw, FileText, Download, Copy, Check, Send } from 'lucide-react';
 import { useUserOrders } from '../hooks/useOrders';
 import { useAuth } from '../context/AuthContext';
-import { orderService } from '../services/orderService';
+import { orderApi } from '../services/orderApi';
 import { usePrompt } from '../context/PromptContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -87,11 +87,11 @@ const HistoryList: React.FC<HistoryListProps> = ({ onTrackOrder, onReorder }) =>
       const target = user.role === 'driver' ? 'customer' : 'driver';
       const targetLabel = user.role === 'driver' ? 'customer' : 'driver';
 
-      await orderService.submitReview(reviewingOrder.id, target, {
+      await orderApi.submitReview(reviewingOrder.id, {
         rating: reviewRating,
         comment: finalComment,
-        date: new Date().toISOString(),
-        submittedBy: user.role as 'customer' | 'driver',
+        tags: selectedTags,
+        reviewedRole: target,
       });
       setReviewingOrder(null);
       setSelectedTags([]);

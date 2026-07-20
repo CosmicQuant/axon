@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { Star, ThumbsUp, Wallet, ArrowRight, Loader2, MessageCircle, Check } from 'lucide-react';
+import { Star, ThumbsUp, ArrowRight, Loader2, MessageCircle, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '../../firebase';
+import { orderApi } from '../../services/orderApi';
 
 interface PostDeliveryProps {
   orderId: string;
@@ -19,13 +18,10 @@ const REVIEW_TAGS = [
 export const PostDelivery: React.FC<PostDeliveryProps> = ({ orderId, driverName, hasReview, onComplete }) => {
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
-  const [tip, setTip] = useState<number | null>(null);
   const [comment, setComment] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-
-  const tips = [50, 100, 200, 500];
 
   const toggleTag = (tag: string) => {
     setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
@@ -35,16 +31,12 @@ export const PostDelivery: React.FC<PostDeliveryProps> = ({ orderId, driverName,
     if (rating === 0) return;
     setIsSubmitting(true);
     try {
-      if (functions) {
-        const submitReview = httpsCallable(functions, 'submitReview');
-        await submitReview({
-          orderId,
-          rating,
-          comment: comment || (selectedTags.length > 0 ? selectedTags.join(', ') : ''),
-          tags: selectedTags,
-          reviewedRole: 'driver',
-        });
-      }
+      await orderApi.submitReview(orderId, {
+        rating,
+        comment: comment || (selectedTags.length > 0 ? selectedTags.join(', ') : ''),
+        tags: selectedTags,
+        reviewedRole: 'driver',
+      });
       setSubmitted(true);
       setTimeout(() => onComplete(), 2000);
     } catch (e) {
@@ -147,27 +139,6 @@ export const PostDelivery: React.FC<PostDeliveryProps> = ({ orderId, driverName,
           className="w-full bg-gray-50 border-none rounded-2xl p-4 text-xs font-bold focus:ring-2 focus:ring-brand-500/20 transition-all resize-none min-h-[80px]"
         />
         <MessageCircle size={14} className="absolute right-4 bottom-4 text-gray-300" />
-      </div>
-
-      {/* Tipping Section */}
-      <div className="space-y-3 pt-1">
-        <div className="flex items-center justify-center gap-2 text-gray-400">
-          <Wallet size={14} />
-          <span className="text-[10px] font-black uppercase tracking-widest">Support your driver</span>
-        </div>
-        <div className="flex flex-wrap justify-center gap-2">
-          {tips.map((amount) => (
-            <button
-              key={amount}
-              onClick={() => setTip(tip === amount ? null : amount)}
-              className={`px-4 py-2 rounded-xl text-xs font-black transition-all border ${
-                tip === amount ? 'bg-brand-600 border-brand-600 text-white shadow-lg' : 'bg-gray-50 border-gray-100 text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              KES {amount}
-            </button>
-          ))}
-        </div>
       </div>
 
       <button
