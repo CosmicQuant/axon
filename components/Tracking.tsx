@@ -2,19 +2,23 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import type { DeliveryOrder, Driver, RouteStop } from '../types';
 import { ChevronUp, ArrowLeft, ArrowRight, Share2, ShieldAlert, Copy, Check, Phone, X, Loader2, MapPin, Pencil, Trash2, ChevronDown, Camera, ShieldCheck, AlertTriangle, Plus, Users, Clock } from 'lucide-react';
 import { useMapState } from '@/context/MapContext';
-import { DriverCard } from './tracking/DriverCard';
 import { PostDelivery } from './tracking/PostDelivery';
 import { motion, AnimatePresence } from 'framer-motion';
 import { mapService } from '@/services/mapService';
 import { VEHICLES } from './booking/constants';
 import { useChat } from '../context/ChatContext';
-import { httpsCallable } from 'firebase/functions';
+import { usePrompt } from '../context/PromptContext';
+import { orderApi } from '../services/orderApi';
 
 interface TrackingProps {
   order: DeliveryOrder;
   onUpdateStatus: (orderId: string, status: DeliveryOrder['status'], driverDetails?: Driver) => void;
   onUpdateOrder: (orderId: string, updates: Partial<DeliveryOrder>) => void;
   onBack: () => void;
+  /** Delivery PIN from orders/{id}/private/codes (falls back to legacy order.verificationCode) */
+  verificationCode?: string;
+  /** Per-stop PINs from orders/{id}/private/codes */
+  stopCodes?: Record<string, string>;
 }
 
 const ExpiryCountdown: React.FC<{ expiresAt: string }> = ({ expiresAt }) => {
@@ -50,10 +54,11 @@ const ExpiryCountdown: React.FC<{ expiresAt: string }> = ({ expiresAt }) => {
   );
 };
 
-const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrder, onBack }) => {
+const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrder, onBack, verificationCode: codeProp, stopCodes }) => {
   const { pickupCoords, dropoffCoords, fitBounds, setPickupCoords, setDropoffCoords, setWaypointCoords, setRoutePolyline, setMapCenter, waypointCoords, setBottomSheetHeight } = useMapState();
   const bottomSheetRef = useRef<HTMLDivElement>(null);
   const { setIsOpen: openKifaru } = useChat();
+  const { showConfirm, showAlert } = usePrompt();
 
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [copiedCode, setCopiedCode] = useState(false);
@@ -95,26 +100,9 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
   const [editServiceType, setEditServiceType] = useState('');
   const [editHelpersCount, setEditHelpersCount] = useState(0);
 
-  // ── Price change state ─────────────────────────────────
+  // ── Price change notice (pre-acceptance edits only — info display) ──
   const [priceChange, setPriceChange] = useState<{ oldPrice: number; newPrice: number; newEta: string } | null>(null);
   const [requoting, setRequoting] = useState(false);
-  const [payingDifference, setPayingDifference] = useState(false);
-  const [paymentSettled, setPaymentSettled] = useState(false);
-
-  // ── Pending route changes (held until payment is confirmed) ──
-  const [pendingRouteUpdate, setPendingRouteUpdate] = useState<any | null>(null);
-  const [proposingEdit, setProposingEdit] = useState(false);
-
-  // Distance between two coords in km (haversine)
-  const haversineKm = (a: { lat: number; lng: number }, b: { lat: number; lng: number }): number => {
-    const R = 6371;
-    const dLat = ((b.lat - a.lat) * Math.PI) / 180;
-    const dLng = ((b.lng - a.lng) * Math.PI) / 180;
-    const la1 = (a.lat * Math.PI) / 180;
-    const la2 = (b.lat * Math.PI) / 180;
-    const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
-    return R * 2 * Math.asin(Math.sqrt(h));
-  };
 
   // ── Dispute state ──
   const [showDisputeModal, setShowDisputeModal] = useState(false);
@@ -167,54 +155,14 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
   const hasReviewed = order.status === 'reviewed';
 
   // ── Editability logic ──────────────────────────────────
-  // A stop is editable if the driver hasn't started delivery to it
-  const canEditStop = (stop: RouteStop): boolean => {
-    if (isPending) return true;
-    if (isDelivered || order.status === 'cancelled' || order.status === 'expired') return false;
-    // After driver assigned: only stops still pending (minor changes auto-apply, major need driver consent)
-    return stop.status === 'pending';
-  };
-
-  const canEditPickup = (): boolean => {
-    return isPending; // pickup only editable before driver assigned
-  };
-
-  const canEditDropoff = (): boolean => {
-    if (isPending) return true;
-    if (isDelivered || order.status === 'cancelled' || order.status === 'expired') return false;
-    if (order.status === 'driver_assigned' || order.status === 'arriving_pickup') return true; // needs driver consent if >1km change
-    if (isInTransit) {
-      // In transit: only if dropoff stop is still pending AND distance change < 1km (auto-apply)
-      const dropoffStop = order.stops?.find(s => s.type === 'dropoff');
-      return !dropoffStop || dropoffStop.status === 'pending';
-    }
-    return false;
-  };
-
-  const canEditField = (field: string) => {
-    if (isPending) return true;
-    if (order.status === 'cancelled' || order.status === 'expired') return false;
-    // After driver assigned: receiver details always editable (no price impact)
-    if ((order.status === 'driver_assigned' || order.status === 'arriving_pickup') && field === 'receiver') return true;
-    // Item details editable before pickup (requires requote)
-    if ((order.status === 'driver_assigned' || order.status === 'arriving_pickup') && field === 'items') return true;
-    // Vehicle/service locked once driver is assigned
-    if (field === 'vehicle') return isPending;
-    // In transit: receiver still editable (phone might change)
-    if (isInTransit && field === 'receiver') return true;
-    return false;
-  };
-
-  const canRemoveStop = (stop: RouteStop): boolean => {
-    if (stop.type === 'dropoff') return false; // can't remove final dropoff
-    return canEditStop(stop);
-  };
-
-  const canAddStop = (): boolean => {
-    if (isDelivered) return false;
-    const totalStops = (order.stops || []).length;
-    return totalStops < 5 && (isPending || isAssigned);
-  };
+  // Orders are only editable while pending (no driver assigned yet).
+  // Once a driver accepts, the order is locked — the customer can only cancel.
+  const canEditStop = (_stop: RouteStop): boolean => isPending;
+  const canEditPickup = (): boolean => isPending;
+  const canEditDropoff = (): boolean => isPending;
+  const canEditField = (_field: string): boolean => isPending;
+  const canRemoveStop = (stop: RouteStop): boolean => stop.type !== 'dropoff' && isPending;
+  const canAddStop = (): boolean => isPending && (order.stops || []).length < 5;
 
   const getStatusText = () => {
     if (isPending) return 'Finding your driver...';
@@ -370,29 +318,26 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
         ? addressQuery.trim().substring(0, 20) + '…'
         : addressQuery.trim();
 
-      // Build the pending update object WITHOUT saving to Firestore yet.
-      // The map preview is updated immediately so the user sees the new route,
-      // but the order (and driver) won't see changes until payment is confirmed.
-      let pendingUpdate: any = {};
+      // Build the route update (applied directly — order is still pending, no driver yet).
+      let routeUpdate: any = {};
       let requoteOverrides: any = {};
 
       if (editField === 'pickup') {
-        pendingUpdate = { pickup: shortAddress };
-        if (coords) pendingUpdate.pickupCoords = coords;
+        routeUpdate = { pickup: shortAddress };
+        if (coords) routeUpdate.pickupCoords = coords;
         const newPickup = coords || order.pickupCoords;
         requoteOverrides = { pickupCoords: newPickup || undefined };
-        // Refresh map preview immediately (visual only, not saved to Firestore)
         if (newPickup) refreshMapAfterEdit(newPickup, order.dropoffCoords || null, order.stops || []);
       } else if (editField === 'dropoff') {
-        pendingUpdate = { dropoff: shortAddress };
-        if (coords) pendingUpdate.dropoffCoords = coords;
+        routeUpdate = { dropoff: shortAddress };
+        if (coords) routeUpdate.dropoffCoords = coords;
         const dropoffStop = order.stops?.find(s => s.type === 'dropoff');
         const updatedStops = dropoffStop
           ? (order.stops || []).map(s =>
             s.type === 'dropoff' ? { ...s, address: shortAddress, ...(coords ? { lat: coords.lat, lng: coords.lng } : {}) } : s
           )
           : order.stops || [];
-        if (dropoffStop) pendingUpdate.stops = updatedStops;
+        if (dropoffStop) routeUpdate.stops = updatedStops;
         const newDropoff = coords || order.dropoffCoords;
         requoteOverrides = { dropoffCoords: newDropoff || undefined, stops: updatedStops };
         if (newDropoff) refreshMapAfterEdit(order.pickupCoords || null, newDropoff, updatedStops);
@@ -400,7 +345,7 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
         const updatedStops = (order.stops || []).map(s =>
           s.id === editingStopId ? { ...s, address: shortAddress, ...(coords ? { lat: coords.lat, lng: coords.lng } : {}) } : s
         );
-        pendingUpdate = { stops: updatedStops };
+        routeUpdate = { stops: updatedStops };
         requoteOverrides = { stops: updatedStops };
         refreshMapAfterEdit(order.pickupCoords || null, order.dropoffCoords || null, updatedStops);
       } else if (editField === 'addStop') {
@@ -408,11 +353,8 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
         return;
       }
 
-      // Requote to get the new price (this also shows the price change banner)
-      // The requote will set priceChange state. If the price increased,
-      // the pending update is held until payment. If same or decreased, commit now.
-      setPendingRouteUpdate(pendingUpdate);
-      await requoteAfterEdit(requoteOverrides, pendingUpdate);
+      // Requote + commit directly (no payment has occurred yet at this stage)
+      await requoteAfterEdit(requoteOverrides, routeUpdate);
     } catch (e) {
       console.error('Failed to update location:', e);
     }
@@ -666,10 +608,7 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
 
     setRequoting(true);
     try {
-      const { functions } = await import('../firebase');
-      if (!functions) return;
-      const calculateQuote = httpsCallable(functions, 'calculateQuote');
-      const response: any = await calculateQuote({
+      const response = await orderApi.calculateQuote({
         pickupCoords: pCoords,
         dropoffCoords: dCoords,
         waypoints,
@@ -682,72 +621,23 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
         subCategory,
       });
 
-      const { price: newPrice, driverRate, durationMinutes, quoteId } = response.data;
+      const { price: newPrice, driverRate, durationMinutes, quoteId } = response;
       const oldPrice = order.price || 0;
       const etaMin = Math.ceil(durationMinutes || 0);
       const newEta = etaMin > 60 ? `${Math.floor(etaMin / 60)}h ${etaMin % 60}m` : `${etaMin} min`;
 
-      // When a driver is assigned/in-transit, route edits go through the driver approval flow
-      const needsDriverApproval = isAssigned || isInTransit;
+      // Pre-acceptance edit: commit the new price + route directly.
+      // No payment has occurred at this stage, so no adjustment flow is needed.
+      await onUpdateOrder(order.id, {
+        price: newPrice,
+        driverRate,
+        quoteId,
+        estimatedDuration: newEta,
+        ...(routeUpdate || {}),
+      } as any);
 
-      if (needsDriverApproval) {
-        // Compute distance change for the driver notification
-        let distanceChangeKm = 0;
-        if (routeUpdate?.pickupCoords && order.pickupCoords) {
-          distanceChangeKm = Math.max(distanceChangeKm, haversineKm(routeUpdate.pickupCoords, order.pickupCoords));
-        }
-        if (routeUpdate?.dropoffCoords && order.dropoffCoords) {
-          distanceChangeKm = Math.max(distanceChangeKm, haversineKm(routeUpdate.dropoffCoords, order.dropoffCoords));
-        }
-
-        setProposingEdit(true);
-        try {
-          const proposeFn = httpsCallable(functions, 'proposeOrderEdit');
-          await proposeFn({
-            orderId: order.id,
-            changes: {
-              ...routeUpdate,
-              price: newPrice,
-              driverRate,
-              quoteId,
-              estimatedDuration: newEta,
-            },
-            newPrice,
-            newDriverRate: driverRate,
-            distanceChangeKm,
-            reason: 'Customer edited route',
-          });
-          // Show "waiting for driver approval" — the order's pendingEdit will update via Firestore listener
-          setPriceChange({ oldPrice, newPrice, newEta });
-          setPaymentSettled(false);
-        } catch (e: any) {
-          console.error('proposeOrderEdit failed:', e);
-          const msg = e?.message || 'Failed to send edit to driver.';
-          setPriceChange({ oldPrice: oldPrice, newPrice: oldPrice, newEta: `${msg}` });
-        }
-        setProposingEdit(false);
-      } else if (newPrice > oldPrice) {
-        // Price increased — hold the route update until payment is confirmed.
-        // Show the price change banner with the pay button.
+      if (newPrice !== oldPrice) {
         setPriceChange({ oldPrice, newPrice, newEta });
-        setPaymentSettled(false);
-        // Do NOT save to Firestore yet — pendingRouteUpdate holds the changes.
-      } else {
-        // Price same or decreased (refund) — commit immediately.
-        // Use the routeUpdate parameter (not state, which may be stale)
-        await onUpdateOrder(order.id, {
-          price: newPrice,
-          driverRate,
-          quoteId,
-          estimatedDuration: newEta,
-          ...(routeUpdate || {}),
-        } as any);
-        setPendingRouteUpdate(null);
-
-        if (newPrice !== oldPrice) {
-          setPriceChange({ oldPrice, newPrice, newEta });
-          setPaymentSettled(true);
-        }
       }
     } catch (e) {
       console.error('Requote failed:', e);
@@ -755,69 +645,15 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
     setRequoting(false);
   };
 
-  // ── Pay the price difference after an edit ─────────────
-  const handlePayDifference = async () => {
-    if (!priceChange || !order) return;
-    const difference = priceChange.newPrice - priceChange.oldPrice;
-    if (difference <= 0) return;
-
-    const paymentPhone = order.sender?.phone || (order as any).paymentPhone || '';
-    if (!paymentPhone) {
-      setPriceChange({ ...priceChange, newEta: priceChange.newEta + ' (Add phone to pay)' });
-      return;
-    }
-
-    setPayingDifference(true);
-    try {
-      const { paymentService } = await import('../services/paymentService');
-      const response = await paymentService.initiateMpesaPayment(
-        paymentPhone,
-        difference,
-        `${order.id}-adjust`
-      );
-
-      if (response.success && response.checkoutRequestId) {
-        // Poll for completion
-        let attempts = 0;
-        const poll = async () => {
-          attempts++;
-          const status = await paymentService.checkPaymentStatus(response.checkoutRequestId!);
-          if (status.status === 'COMPLETED') {
-            setPaymentSettled(true);
-            setPayingDifference(false);
-            // If the driver already accepted the edit (CF applied route changes),
-            // just mark as paid. Otherwise commit the pending route update + new price.
-            const driverAccepted = (order as any).pendingEdit?.status === 'accepted';
-            if (driverAccepted) {
-              await onUpdateOrder(order.id, { priceAdjustmentPaid: true } as any);
-            } else {
-              await onUpdateOrder(order.id, {
-                price: priceChange.newPrice,
-                priceAdjustmentPaid: true,
-                ...pendingRouteUpdate,
-              } as any);
-            }
-            setPendingRouteUpdate(null);
-          } else if (status.status === 'FAILED') {
-            setPayingDifference(false);
-          } else if (attempts < 12) {
-            setTimeout(poll, 3000);
-          } else {
-            setPayingDifference(false);
-          }
-        };
-        setTimeout(poll, 3000);
-      }
-    } catch (e) {
-      console.error('Payment difference failed:', e);
-      setPayingDifference(false);
-    }
-  };
-
   // ── Other handlers ─────────────────────────────────────
+  // Delivery PIN: private subcollection (new orders) with legacy fallback
+  const deliveryCode = codeProp || order.verificationCode || '';
+  const stopCode = (stopId: string): string | undefined =>
+    stopCodes?.[stopId] || order.stops?.find(s => s.id === stopId)?.verificationCode;
+
   const copyCode = () => {
-    if (order.verificationCode) {
-      navigator.clipboard.writeText(order.verificationCode);
+    if (deliveryCode) {
+      navigator.clipboard.writeText(deliveryCode);
       setCopiedCode(true);
       setTimeout(() => setCopiedCode(false), 2000);
     }
@@ -841,29 +677,22 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
     }
   };
 
-  const handleCancel = async () => {
+  const handleCancel = () => {
     if (isDelivered || order.status === 'cancelled' || order.status === 'expired') return;
 
     const isAssignedStatus = order.status === 'driver_assigned' || order.status === 'arriving_pickup';
     const cancelMsg = isAssignedStatus
-      ? 'Cancel this order? A 100 KES cancellation fee will be charged to compensate your driver. This cannot be undone.'
-      : 'Cancel this order? This cannot be undone.';
+      ? 'A 100 KES cancellation fee will be charged to compensate your driver. This cannot be undone.'
+      : 'This cannot be undone.';
 
-    if (!confirm(cancelMsg)) return;
-
-    try {
-      // Use the cancelOrder Cloud Function for structured cancel + refund
-      const { httpsCallable } = await import('firebase/functions');
-      const { functions } = await import('../firebase');
-      if (functions) {
-        const cancelFn = httpsCallable(functions, 'cancelOrder');
-        await cancelFn({ orderId: order.id, reason: 'Customer cancelled from tracking' });
-      } else {
-        await onUpdateStatus(order.id, 'cancelled');
+    showConfirm('Cancel this order?', cancelMsg, async () => {
+      try {
+        await orderApi.cancel(order.id, 'Customer cancelled from tracking');
+      } catch (e: any) {
+        console.error('Cancel failed:', e);
+        showAlert('Cancel Failed', e?.message || 'Could not cancel the order. Please try again.', 'error');
       }
-    } catch (e: any) {
-      console.error('Cancel failed:', e);
-    }
+    }, 'warning');
   };
 
   // ── Raise dispute ──────────────────────────────────────
@@ -871,15 +700,7 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
     if (!disputeReason.trim()) return;
     setSubmittingDispute(true);
     try {
-      const { functions } = await import('../firebase');
-      if (functions) {
-        const raiseDispute = httpsCallable(functions, 'raiseDispute');
-        await raiseDispute({
-          orderId: order.id,
-          reason: disputeReason,
-          description: disputeDescription,
-        });
-      }
+      await orderApi.raiseDispute(order.id, disputeReason, disputeDescription);
       setShowDisputeModal(false);
       setDisputeReason('');
       setDisputeDescription('');
@@ -888,6 +709,7 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
       window.open(`https://wa.me/254725720837?text=${msg}`, '_blank', 'noopener,noreferrer');
     } catch (e: any) {
       console.error('Dispute failed:', e);
+      showAlert('Dispute Failed', e?.message || 'Could not submit the dispute. Please try again.', 'error');
     } finally {
       setSubmittingDispute(false);
     }
@@ -1320,11 +1142,11 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
           )}
 
           {/* Verification PIN */}
-          {order.verificationCode && (isAssigned || isInTransit) && (
+          {deliveryCode && (isAssigned || isInTransit) && (
             <div className="flex items-center justify-between bg-gray-900 rounded-xl px-4 py-3">
               <div>
                 <div className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Delivery PIN</div>
-                <div className="text-xl font-black text-white tracking-[0.3em]">{order.verificationCode}</div>
+                <div className="text-xl font-black text-white tracking-[0.3em]">{deliveryCode}</div>
               </div>
               <button onClick={copyCode} className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors">
                 {copiedCode ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} className="text-gray-400" />}
@@ -1362,50 +1184,11 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
                     <div className="text-[9px] font-bold text-gray-400">ETA: {priceChange.newEta}</div>
                   </div>
                 </div>
-                {/* Waiting for driver approval notice */}
-                {(order as any).pendingEdit?.status === 'proposed' && (
-                  <div className="mt-2 pt-2 border-t border-amber-100">
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-600">
-                      <Loader2 size={12} className="animate-spin" /> Waiting for your driver to approve the route change…
-                    </div>
+                <div className="mt-2 pt-2 border-t border-gray-100">
+                  <div className="text-[11px] font-bold text-gray-500">
+                    Order updated with the new price.
                   </div>
-                )}
-                {/* Driver declined the edit */}
-                {(order as any).pendingEdit?.status === 'rejected' && (
-                  <div className="mt-2 pt-2 border-t border-red-100">
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-red-600">
-                      <ShieldAlert size={12} /> Your driver declined the route change. The original route will be used.
-                    </div>
-                  </div>
-                )}
-                {/* Pay difference or refund notice */}
-                {priceChange.newPrice > priceChange.oldPrice && (order as any).pendingEdit?.status !== 'proposed' && (
-                  <div className="mt-2 pt-2 border-t border-amber-100">
-                    {paymentSettled ? (
-                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600">
-                        <Check size={12} /> Difference paid — order updated
-                      </div>
-                    ) : payingDifference ? (
-                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-600">
-                        <Loader2 size={12} className="animate-spin" /> M-Pesa STK push sent — check your phone...
-                      </div>
-                    ) : (
-                      <button
-                        onClick={handlePayDifference}
-                        className="w-full py-2 bg-amber-500 text-white rounded-lg text-[11px] font-bold hover:bg-amber-600 transition-colors flex items-center justify-center gap-1.5"
-                      >
-                        Pay KES {(priceChange.newPrice - priceChange.oldPrice).toLocaleString()} via M-Pesa
-                      </button>
-                    )}
-                  </div>
-                )}
-                {priceChange.newPrice < priceChange.oldPrice && (
-                  <div className="mt-2 pt-2 border-t border-emerald-100">
-                    <div className="text-[11px] font-bold text-emerald-600">
-                      Refund of KES {(priceChange.oldPrice - priceChange.newPrice).toLocaleString()} will be sent to your M-Pesa
-                    </div>
-                  </div>
-                )}
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -1484,8 +1267,8 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
                                       <div className="flex items-center gap-1.5">
                                         <span className="text-[8px] font-black text-amber-500 uppercase tracking-wider">Stop {idx + 1}</span>
                                         {badge && <span className={`text-[7px] font-black px-1 py-0.5 rounded ${badge.color}`}>{badge.text}</span>}
-                                        {stop.verificationCode && stop.status !== 'completed' && (
-                                          <span className="text-[7px] font-mono font-bold text-gray-400">PIN: {stop.verificationCode}</span>
+                                        {stopCode(stop.id) && stop.status !== 'completed' && (
+                                          <span className="text-[7px] font-mono font-bold text-gray-400">PIN: {stopCode(stop.id)}</span>
                                         )}
                                       </div>
                                       <div className="text-[11px] font-bold text-gray-900 truncate">{stop.address}</div>
@@ -1513,9 +1296,9 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-1.5">
                                     <span className="text-[8px] font-black text-red-500 uppercase tracking-wider">Dropoff</span>
-                                    {order.verificationCode && (isAssigned || isInTransit) && (
+                                    {deliveryCode && (isAssigned || isInTransit) && (
                                       <button onClick={(e) => { e.stopPropagation(); copyCode(); }} className="flex items-center gap-1 text-[7px] font-mono font-bold text-gray-400 hover:text-gray-600 transition-colors">
-                                        PIN: {order.verificationCode}
+                                        PIN: {deliveryCode}
                                         {copiedCode ? <Check size={8} className="text-emerald-400" /> : <Copy size={8} className="text-gray-300" />}
                                       </button>
                                     )}

@@ -208,7 +208,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
    const [deliveryConfirmationImage, setDeliveryConfirmationImage] = useState<string | null>(null);
    const [deliveryConfirmationFile, setDeliveryConfirmationFile] = useState<File | null>(null);
    const deliveryPhotoInputRef = useRef<HTMLInputElement>(null);
-   const [respondingToEdit, setRespondingToEdit] = useState(false);
+
 
    // Review State
    const [reviewingOrder, setReviewingOrder] = useState<DeliveryOrder | null>(null);
@@ -542,7 +542,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
        // 2. Listen for My Active Jobs (driver.id == user.id, status not delivered/cancelled)
        const qJobs = query(collection(db, 'orders'),
           where('driver.id', '==', user.id),
-          where('status', 'in', ['driver_assigned', 'in_transit'])
+          where('status', 'in', ['driver_assigned', 'arriving_pickup', 'in_transit'])
        );
        const unsubJobs = onSnapshot(qJobs, async (snapshot) => {
           const jobs = snapshot.docs.map(doc => ({ ...doc.data() as any, id: doc.id } as DeliveryOrder));
@@ -602,17 +602,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
 
    const handleConfirmHeadingToPickup = async (order: DeliveryOrder) => {
       try {
-         if (functions) {
-            try {
-               const updateStatus = httpsCallable(functions, 'updateOrderStatus');
-               await updateStatus({ orderId: order.id, newStatus: 'arriving_pickup' });
-            } catch (cfError) {
-               console.error('Cloud Function failed, falling back:', cfError);
-               await orderService.updateOrderStatus(order.id, 'arriving_pickup');
-            }
-         } else {
-            await orderService.updateOrderStatus(order.id, 'arriving_pickup');
-         }
+         await orderApi.transition(order.id, 'arriving_pickup');
       } catch (e: any) {
          showAlert("Update Failed", e.message || "Failed to update status.", "error");
       }
@@ -639,21 +629,10 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                return;
             }
 
-             try {
-                // Use server-side status transition with fallback
-                if (functions) {
-                   try {
-                      const updateStatus = httpsCallable(functions, 'updateOrderStatus');
-                      await updateStatus({ orderId: order.id, newStatus: 'in_transit' });
-                   } catch (cfError) {
-                      console.error('Cloud Function failed, falling back:', cfError);
-                      await orderService.updateOrderStatus(order.id, 'in_transit');
-                   }
-                } else {
-                   await orderService.updateOrderStatus(order.id, 'in_transit');
-                }
-            } catch (e) {
-               showAlert("Update Failed", "Failed to start delivery. Please try again.", "error");
+              try {
+                 await orderApi.transition(order.id, 'in_transit');
+            } catch (e: any) {
+               showAlert("Update Failed", e.message || "Failed to start delivery. Please try again.", "error");
             }
          },
          (error) => {
@@ -710,18 +689,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
        }
 
        try {
-          // Use server-side status transition with fallback
-          if (functions) {
-             try {
-                const updateStatus = httpsCallable(functions, 'updateOrderStatus');
-                await updateStatus({ orderId, newStatus });
-             } catch (cfError) {
-                console.error('Cloud Function failed, falling back:', cfError);
-                await orderService.updateOrderStatus(orderId, newStatus);
-             }
-          } else {
-             await orderService.updateOrderStatus(orderId, newStatus);
-          }
+          await orderApi.transition(orderId, newStatus);
        } catch (e: any) {
           console.error("Failed to update status", e);
           const msg = e.message || "Failed to update order status. Please try again.";
@@ -794,105 +762,58 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
        setLoading(true);
        setVerificationError('');
 
-       try {
-          // ── Step 1: Verify the passcode ──────────────────────
-          let codeValid = false;
+        try {
+           // ── Step 1: Verify the passcode (server-side only — the driver
+           // never has access to the code; no client-side fallback) ──
+           let codeValid = false;
+           try {
+              const result = await orderApi.verifyCode(verifyingOrder.id, verificationInput, verifyingStopId || undefined);
+              codeValid = !!result?.valid;
+           } catch (cfError: any) {
+              console.error('verifyDeliveryCode failed:', cfError);
+              setVerificationError(cfError?.message || 'Verification service unavailable. Please try again.');
+              setLoading(false);
+              return;
+           }
 
-          if (functions) {
-             try {
-                // Use a timeout so cold-start functions don't hang forever
-                const verifyCode = httpsCallable(functions, 'verifyDeliveryCode');
-                const verifyPromise = verifyCode({
-                   orderId: verifyingOrder.id,
-                   code: verificationInput,
-                   stopId: verifyingStopId || undefined
-                });
-                const timeoutPromise = new Promise<never>((_, reject) =>
-                   setTimeout(() => reject(new Error('timeout')), 20000)
-                );
-                const result: any = await Promise.race([verifyPromise, timeoutPromise]);
-                codeValid = !!result.data?.valid;
-             } catch (cfError: any) {
-                console.error('Cloud Function verifyDeliveryCode failed, falling back to client-side:', cfError);
-                // Fallback: client-side check using the code from the assigned order
-                // (marketplace stripping only affects pending orders, not assigned ones)
-                let targetCode = (verifyingOrder as any).verificationCode;
-                if (verifyingStopId) {
-                   const targetStop: any = allStops.find(s => s.id === verifyingStopId);
-                   if (targetStop) targetCode = targetStop.verificationCode;
-                }
-                codeValid = verificationInput === String(targetCode);
-             }
-          } else {
-             // No functions instance — client-side fallback
-             let targetCode = (verifyingOrder as any).verificationCode;
-             if (verifyingStopId) {
-                const targetStop: any = allStops.find(s => s.id === verifyingStopId);
-                if (targetStop) targetCode = targetStop.verificationCode;
-             }
-             codeValid = verificationInput === String(targetCode);
-          }
+           if (!codeValid) {
+              setVerificationError('Incorrect passcode. Please ask the recipient for the correct 4-digit code.');
+              setLoading(false);
+              return;
+           }
 
-          if (!codeValid) {
-             setVerificationError('Incorrect passcode. Please ask the recipient for the correct 4-digit code.');
-             setLoading(false);
-             return;
-          }
+           // ── Step 2: Upload proof photo ───────────────────────
+           const storagePath = `deliveries/${verifyingOrder.id}_${verifyingStopId || 'final'}_${Date.now()}.jpg`;
+           const imageUrl = await storageService.uploadFile(deliveryConfirmationFile, storagePath);
 
-          // ── Step 2: Upload proof photo ───────────────────────
-          const storagePath = `deliveries/${verifyingOrder.id}_${verifyingStopId || 'final'}_${Date.now()}.jpg`;
-          const imageUrl = await storageService.uploadFile(deliveryConfirmationFile, storagePath);
+           // ── Step 3: Complete the stop or order ───────────────
+           if (verifyingStopId) {
+              // Complete individual stop
+              await orderService.updateStopStatus(verifyingOrder.id, verifyingStopId, 'completed', imageUrl);
+              showAlert("Stop Completed", "Verification confirmed. Heading to next stop!", "success");
+           } else {
+              // Complete whole order
+              const orderToReview = verifyingOrder;
 
-          // ── Step 3: Complete the stop or order ───────────────
-          if (verifyingStopId) {
-             // Complete individual stop
-             await orderService.updateStopStatus(verifyingOrder.id, verifyingStopId, 'completed', imageUrl);
-             showAlert("Stop Completed", "Verification confirmed. Heading to next stop!", "success");
-          } else {
-             // Complete whole order
-             const orderToReview = verifyingOrder;
+              await orderApi.transition(verifyingOrder.id, 'delivered', { deliveryConfirmationImage: imageUrl });
 
-             if (functions) {
-                try {
-                   const updateStatus = httpsCallable(functions, 'updateOrderStatus');
-                   const statusPromise = updateStatus({
-                      orderId: verifyingOrder.id,
-                      newStatus: 'delivered',
-                      extraData: { deliveryConfirmationImage: imageUrl }
-                   });
-                   const statusTimeout = new Promise<never>((_, reject) =>
-                      setTimeout(() => reject(new Error('timeout')), 20000)
-                   );
-                   await Promise.race([statusPromise, statusTimeout]);
-                } catch (cfError) {
-                   console.error('Cloud Function updateOrderStatus failed, falling back:', cfError);
-                   await orderService.updateOrderStatus(verifyingOrder.id, 'delivered', {
-                      deliveryConfirmationImage: imageUrl
-                   });
-                }
-             } else {
-                await orderService.updateOrderStatus(verifyingOrder.id, 'delivered', {
-                   deliveryConfirmationImage: imageUrl
-                });
-             }
+              showAlert("Delivery Successful", "Verification confirmed. Delivery has been completed!", "success");
 
-             showAlert("Delivery Successful", "Verification confirmed. Delivery has been completed!", "success");
+              // Trigger review for customer
+              setReviewingOrder(orderToReview);
+              setReviewRating(5);
+              setReviewComment('');
+              setSelectedTags([]);
+           }
 
-             // Trigger review for customer
-             setReviewingOrder(orderToReview);
-             setReviewRating(5);
-             setReviewComment('');
-             setSelectedTags([]);
-          }
-
-          closeVerificationModal();
-       } catch (e: any) {
-          console.error("Verification error:", e);
-          setVerificationError("Failed to complete verification. Please check your connection and try again.");
-       } finally {
-          setLoading(false);
-       }
-    };
+           closeVerificationModal();
+        } catch (e: any) {
+           console.error("Verification error:", e);
+           setVerificationError("Failed to complete verification. Please check your connection and try again.");
+        } finally {
+           setLoading(false);
+        }
+     };
 
    const handleSaveProfile = async () => {
       try {
@@ -1015,31 +936,6 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
           showAlert("Error", "Failed to submit review.", "error");
        } finally {
           setLoading(false);
-       }
-    };
-
-    const handleRespondToEdit = async (accepted: boolean) => {
-       if (!activeJob?.pendingEdit) return;
-       setRespondingToEdit(true);
-       try {
-          if (functions) {
-             try {
-                const respondFn = httpsCallable(functions, 'respondToEdit');
-                await respondFn({ orderId: activeJob.id, accepted });
-             } catch (cfError) {
-                console.error('CF respondToEdit failed:', cfError);
-                showAlert("Error", "Failed to respond. Please try again.", "error");
-             }
-          }
-          showAlert(
-             accepted ? "Edit Accepted" : "Edit Declined",
-             accepted ? "Route change applied." : "Original route will be used.",
-             accepted ? "success" : "info"
-          );
-       } catch (e) {
-          showAlert("Error", "Failed to respond to edit request.", "error");
-       } finally {
-          setRespondingToEdit(false);
        }
     };
 
@@ -2145,43 +2041,6 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                       <div className={`w-full md:absolute md:left-auto md:right-8 md:w-96 bg-white/95 backdrop-blur-xl rounded-t-[2.5rem] md:rounded-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] md:shadow-2xl border-t md:border border-gray-200 transition-all duration-300 pointer-events-auto ${Capacitor.isNativePlatform() ? 'md:mb-0 md:bottom-28' : 'md:mb-0 md:bottom-8'} ${isDrawerCollapsed ? 'p-4' : 'p-6 pt-4'}`}>
                         {/* Mobile Drag Handle */}
                         <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-4 md:hidden" />
-
-                        {/* Pending Edit Request Banner */}
-                        {activeJob.pendingEdit?.status === 'proposed' && (
-                           <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-2xl">
-                              <div className="flex items-start gap-2 mb-3">
-                                 <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                                 <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-black text-amber-900 uppercase tracking-wider mb-1">Route Change Requested</p>
-                                    <p className="text-[11px] font-bold text-amber-700">
-                                       Customer wants to change the route{activeJob.pendingEdit.distanceChangeKm > 1 ? ` (${activeJob.pendingEdit.distanceChangeKm.toFixed(1)}km difference)` : ''}.
-                                       New price: KES {activeJob.pendingEdit.newPrice?.toLocaleString()}
-                                       {activeJob.pendingEdit.priceDifference !== 0 && (
-                                          <span className={activeJob.pendingEdit.priceDifference > 0 ? ' text-emerald-700' : ' text-red-700'}>
-                                             {' '}({activeJob.pendingEdit.priceDifference > 0 ? '+' : ''}KES {activeJob.pendingEdit.priceDifference?.toLocaleString()})
-                                          </span>
-                                       )}
-                                    </p>
-                                 </div>
-                              </div>
-                              <div className="flex gap-2">
-                                 <button
-                                    onClick={() => handleRespondToEdit(true)}
-                                    disabled={respondingToEdit}
-                                    className="flex-1 py-2.5 bg-emerald-500 text-white rounded-xl text-xs font-bold hover:bg-emerald-600 disabled:opacity-50 transition-all"
-                                 >
-                                    Accept
-                                 </button>
-                                 <button
-                                    onClick={() => handleRespondToEdit(false)}
-                                    disabled={respondingToEdit}
-                                    className="flex-1 py-2.5 bg-gray-200 text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-300 disabled:opacity-50 transition-all"
-                                 >
-                                    Decline
-                                 </button>
-                              </div>
-                           </div>
-                        )}
 
                         <div className="flex items-center justify-between mb-4">
                            <div className="flex items-center space-x-2">
