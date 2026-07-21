@@ -46,6 +46,10 @@ export const orderApi = {
     transition: (orderId: string, newStatus: string, extraData?: Record<string, any>) =>
         call('updateOrderStatus', { orderId, newStatus, extraData }),
 
+    /** Attach the delivery proof photo after delivery (background, best-effort). */
+    attachPhoto: (orderId: string, imageUrl: string) =>
+        call('attachDeliveryPhoto', { orderId, imageUrl }),
+
     /** Verify the 4-digit delivery PIN. Driver-only. */
     verifyCode: (orderId: string, code: string, stopId?: string) =>
         call<{ valid: boolean }>('verifyDeliveryCode', { orderId, code, stopId }),

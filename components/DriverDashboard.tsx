@@ -67,6 +67,35 @@ const StatCard = ({ title, value, icon: Icon, color, trend, onClick }: any) => (
    </div>
 );
 
+// Compress a phone-camera photo (often 5–12 MB) to a small JPEG (~150–400 KB)
+// before uploading — prevents Storage uploads from hanging on slow networks.
+const compressImage = (file: File | Blob, maxDim = 1280, quality = 0.75): Promise<Blob> => {
+   return new Promise((resolve, reject) => {
+      const img = document.createElement('img');
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+         URL.revokeObjectURL(url);
+         const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+         const canvas = document.createElement('canvas');
+         canvas.width = Math.round(img.width * scale);
+         canvas.height = Math.round(img.height * scale);
+         const ctx = canvas.getContext('2d');
+         if (!ctx) { reject(new Error('Canvas unavailable')); return; }
+         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+         canvas.toBlob(
+            (blob) => blob ? resolve(blob) : reject(new Error('Compression failed')),
+            'image/jpeg',
+            quality
+         );
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };
+      img.src = url;
+   });
+};
+
+const withTimeout = <T,>(promise: Promise<T>, ms: number, message: string): Promise<T> =>
+   Promise.race([promise, new Promise<never>((_, reject) => setTimeout(() => reject(new Error(message)), ms))]);
+
 interface DriverDashboardProps {
    user: User;
    onGoHome: () => void;
@@ -204,7 +233,8 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
    const [verifyingOrder, setVerifyingOrder] = useState<DeliveryOrder | null>(null);
    const [verifyingStopId, setVerifyingStopId] = useState<string | null>(null);
    const [verificationInput, setVerificationInput] = useState('');
-   const [verificationError, setVerificationError] = useState('');
+    const [verificationError, setVerificationError] = useState('');
+    const [verifyStep, setVerifyStep] = useState('');
    const [deliveryConfirmationImage, setDeliveryConfirmationImage] = useState<string | null>(null);
    const [deliveryConfirmationFile, setDeliveryConfirmationFile] = useState<File | null>(null);
    const deliveryPhotoInputRef = useRef<HTMLInputElement>(null);
@@ -766,59 +796,91 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
           return;
        }
 
-       setLoading(true);
-       setVerificationError('');
+        setLoading(true);
+        setVerificationError('');
+        setVerifyStep('Checking code…');
 
-        try {
-           // ── Step 1: Verify the passcode (server-side only — the driver
-           // never has access to the code; no client-side fallback) ──
-           let codeValid = false;
-           try {
-              const result = await orderApi.verifyCode(verifyingOrder.id, verificationInput, verifyingStopId || undefined);
-              codeValid = !!result?.valid;
-           } catch (cfError: any) {
-              console.error('verifyDeliveryCode failed:', cfError);
-              setVerificationError(cfError?.message || 'Verification service unavailable. Please try again.');
-              setLoading(false);
-              return;
-           }
+         try {
+            // ── Step 1: Verify the passcode (server-side only — the driver
+            // never has access to the code; no client-side fallback) ──
+            let codeValid = false;
+            try {
+               const result = await orderApi.verifyCode(verifyingOrder.id, verificationInput, verifyingStopId || undefined);
+               codeValid = !!result?.valid;
+            } catch (cfError: any) {
+               console.error('verifyDeliveryCode failed:', cfError);
+               setVerificationError(cfError?.message || 'Verification service unavailable. Please try again.');
+               setLoading(false);
+               setVerifyStep('');
+               return;
+            }
 
-           if (!codeValid) {
-              setVerificationError('Incorrect passcode. Please ask the recipient for the correct 4-digit code.');
-              setLoading(false);
-              return;
-           }
+            if (!codeValid) {
+               setVerificationError('Incorrect passcode. Please ask the recipient for the correct 4-digit code.');
+               setLoading(false);
+               setVerifyStep('');
+               return;
+            }
 
-           // ── Step 2: Upload proof photo ───────────────────────
-           const storagePath = `deliveries/${verifyingOrder.id}_${verifyingStopId || 'final'}_${Date.now()}.jpg`;
-           const imageUrl = await storageService.uploadFile(deliveryConfirmationFile, storagePath);
+            // ── Step 2: Complete the stop or order IMMEDIATELY (critical path).
+            // Photo uploads happen in the background afterwards — a slow or
+            // failed upload must never block completing a delivery. ──
+            setVerifyStep('Confirming delivery…');
+            const orderToReview = verifyingOrder;
+            const completedOrderId = verifyingOrder.id;
+            const completedStopId = verifyingStopId;
+            const photoFile = deliveryConfirmationFile;
 
-           // ── Step 3: Complete the stop or order ───────────────
-           if (verifyingStopId) {
-              // Complete individual stop
-              await orderService.updateStopStatus(verifyingOrder.id, verifyingStopId, 'completed', imageUrl);
-              showAlert("Stop Completed", "Verification confirmed. Heading to next stop!", "success");
-           } else {
-              // Complete whole order
-              const orderToReview = verifyingOrder;
+            if (completedStopId) {
+               // Complete individual stop now; attach proof photo in background
+               await orderService.updateStopStatus(completedOrderId, completedStopId, 'completed');
+               showAlert("Stop Completed", "Verification confirmed. Heading to next stop!", "success");
+            } else {
+               // Complete whole order now; attach proof photo in background
+               await orderApi.transition(completedOrderId, 'delivered');
 
-              await orderApi.transition(verifyingOrder.id, 'delivered', { deliveryConfirmationImage: imageUrl });
+               showAlert("Delivery Successful", "Verification confirmed. Delivery has been completed!", "success");
 
-              showAlert("Delivery Successful", "Verification confirmed. Delivery has been completed!", "success");
+               // Trigger review for customer
+               setReviewingOrder(orderToReview);
+               setReviewRating(5);
+               setReviewComment('');
+               setSelectedTags([]);
+            }
 
-              // Trigger review for customer
-              setReviewingOrder(orderToReview);
-              setReviewRating(5);
-              setReviewComment('');
-              setSelectedTags([]);
-           }
+            closeVerificationModal();
 
-           closeVerificationModal();
+            // ── Step 3: Background photo upload (best-effort proof) ──
+            (async () => {
+               try {
+                  let uploadBlob: Blob = photoFile;
+                  try {
+                     uploadBlob = await compressImage(photoFile);
+                  } catch (compressErr) {
+                     console.warn('Image compression failed, uploading original:', compressErr);
+                  }
+                  const storagePath = `deliveries/${completedOrderId}_${completedStopId || 'final'}_${Date.now()}.jpg`;
+                  const imageUrl = await withTimeout(
+                     storageService.uploadFile(uploadBlob, storagePath),
+                     60000,
+                     'upload-timeout'
+                  );
+                  if (completedStopId) {
+                     await orderService.updateStopStatus(completedOrderId, completedStopId, 'completed', imageUrl);
+                  } else {
+                     await orderApi.attachPhoto(completedOrderId, imageUrl);
+                  }
+               } catch (uploadErr) {
+                  // Delivery already completed — photo is proof-only. Log and move on.
+                  console.error('Background proof photo upload failed:', uploadErr);
+               }
+            })();
         } catch (e: any) {
            console.error("Verification error:", e);
-           setVerificationError("Failed to complete verification. Please check your connection and try again.");
+           setVerificationError(e?.message || "Failed to complete verification. Please check your connection and try again.");
         } finally {
            setLoading(false);
+           setVerifyStep('');
         }
      };
 
@@ -929,6 +991,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
       setVerifyingStopId(null);
       setVerificationInput('');
       setVerificationError('');
+      setVerifyStep('');
       setDeliveryConfirmationImage(null);
       setDeliveryConfirmationFile(null);
    };
@@ -2331,7 +2394,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                             disabled={verificationInput.length !== 4 || loading}
                             className="py-3 px-4 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-brand-600/20"
                          >
-                            {loading ? 'Verifying...' : 'Verify & Finish'}
+                            {loading ? (verifyStep || 'Verifying...') : 'Verify & Finish'}
                          </button>
                       </div>
                    </div>

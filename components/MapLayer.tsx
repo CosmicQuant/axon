@@ -329,6 +329,21 @@ const MapLayer: React.FC = () => {
         animationFrameRef.current = requestAnimationFrame(tick);
     }, [map, cancelCamera]);
 
+    // ── Driver-follow camera (navigation mode) ────────────────────
+    // While a delivery is active (IN_TRANSIT), keep the camera centered on
+    // the driver's live position — Bolt/Uber-style navigation. Pan only, no
+    // zoom change. Pauses while the user is dragging or a flyTo is running;
+    // resumes automatically on the next position update after the drag ends.
+    const lastFollowPanRef = useRef(0);
+    useEffect(() => {
+        if (!map || !driverCoords || isPanning || isMapAnimatingRef.current) return;
+        if (orderState !== 'IN_TRANSIT') return;
+        const now = Date.now();
+        if (now - lastFollowPanRef.current < 3000) return; // throttle follow pans
+        lastFollowPanRef.current = now;
+        map.panTo(driverCoords);
+    }, [map, driverCoords, isPanning, orderState]);
+
     useEffect(() => {
         if (routePolyline) {
             console.log("[Diagnostic: MapLayer] routePolyline updated:",

@@ -213,4 +213,43 @@ const cancelOrderHandler = async (data, context) => {
     return { success: true };
 };
 
-module.exports = { verifyDeliveryCodeHandler, updateOrderStatusHandler, cancelOrderHandler };
+// ── ATTACH DELIVERY PHOTO ───────────────────────────────────────
+// Called after delivery completes to attach the proof photo URL.
+// The delivery itself is never blocked on the photo upload.
+const attachDeliveryPhotoHandler = async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'You must be signed in.');
+    }
+
+    const { orderId, imageUrl } = data;
+    if (!orderId || !imageUrl) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing orderId or imageUrl.');
+    }
+
+    const orderRef = admin.firestore().doc(`orders/${orderId}`);
+    const orderDoc = await orderRef.get();
+    if (!orderDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'Order not found.');
+    }
+
+    const orderData = orderDoc.data();
+
+    // Only the assigned driver can attach the photo
+    if (!orderData.driver || orderData.driver.id !== context.auth.uid) {
+        throw new functions.https.HttpsError('permission-denied', 'You are not assigned to this order.');
+    }
+
+    // Only after delivery (photo attaches post-completion by design)
+    if (!['delivered', 'reviewed'].includes(orderData.status)) {
+        throw new functions.https.HttpsError('failed-precondition', 'Can only attach a photo after delivery.');
+    }
+
+    await orderRef.update({
+        deliveryConfirmationImage: imageUrl,
+        updatedAt: new Date().toISOString(),
+    });
+
+    return { success: true };
+};
+
+module.exports = { verifyDeliveryCodeHandler, updateOrderStatusHandler, cancelOrderHandler, attachDeliveryPhotoHandler };
