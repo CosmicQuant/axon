@@ -10,10 +10,26 @@ import { generateSecureCode } from '../utils/crypto';
 
 const ROUTE_CACHE_TTL = 60 * 1000; // 60 seconds
 const GEOCODE_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+const MAX_CACHE_ENTRIES = 200; // Evict oldest when exceeded (prevents unbounded memory growth)
 
 const routeCache = new Map<string, { result: any; expires: number }>();
 const geocodeCache = new Map<string, { result: any; expires: number }>();
 const reverseGeocodeCache = new Map<string, { result: any; expires: number }>();
+
+// LRU-style eviction: when a cache exceeds MAX_CACHE_ENTRIES, delete the
+// oldest-inserted entries. Map preserves insertion order in JS.
+const evictCache = <T>(cache: Map<string, T>) => {
+    while (cache.size > MAX_CACHE_ENTRIES) {
+        const firstKey = cache.keys().next().value;
+        if (firstKey === undefined) break;
+        cache.delete(firstKey);
+    }
+};
+
+const setCacheEntry = <T>(cache: Map<string, T>, key: string, value: T) => {
+    cache.set(key, value);
+    evictCache(cache);
+};
 
 const routeCacheKey = (start: Coordinates, end: Coordinates, waypoints: Coordinates[], vehicleType?: string, optimize?: boolean) =>
     `${start.lat.toFixed(5)},${start.lng.toFixed(5)}|${end.lat.toFixed(5)},${end.lng.toFixed(5)}|${waypoints.map(w => `${w.lat.toFixed(5)},${w.lng.toFixed(5)}`).join(';')}|${vehicleType || ''}|${optimize || false}`;
@@ -91,7 +107,7 @@ export const mapService = {
                         formattedAddress: results[0].formatted_address
                     };
                     // Cache the result
-                    geocodeCache.set(cacheKey, { result, expires: Date.now() + GEOCODE_CACHE_TTL });
+                    setCacheEntry(geocodeCache, cacheKey, { result, expires: Date.now() + GEOCODE_CACHE_TTL });
                     resolve(result);
                 } else {
                     console.error(`Geocoding failed for address: "${address}" (translated: "${translatedAddress}") due to ${status}`);
@@ -187,7 +203,7 @@ export const mapService = {
 
                     const address = bestResult.formatted_address;
                     // Cache the result
-                    reverseGeocodeCache.set(cacheKey, { result: address, expires: Date.now() + GEOCODE_CACHE_TTL });
+                    setCacheEntry(reverseGeocodeCache, cacheKey, { result: address, expires: Date.now() + GEOCODE_CACHE_TTL });
                     resolve(address);
                 } else {
                     console.error("Reverse geocoding failed due to " + status);
@@ -336,7 +352,7 @@ export const mapService = {
             const result = await mapService.getRouteV2(start, end, waypoints, vehicleType, optimize);
             // Cache the result
             if (result) {
-                routeCache.set(cKey, { result, expires: Date.now() + ROUTE_CACHE_TTL });
+                setCacheEntry(routeCache, cKey, { result, expires: Date.now() + ROUTE_CACHE_TTL });
             }
             return result;
         } catch (error) {

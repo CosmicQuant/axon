@@ -222,7 +222,7 @@ export const orderService = {
             performance: {
               tripsCompleted: dData.deliveredCount || 0,
               acceptanceRate: 100,
-          rating: Math.round(slowAvgRating * 10) / 10,
+          rating: Math.round(avgRating * 10) / 10,
               hoursOnline,
               totalDistanceKm
             },
@@ -346,7 +346,7 @@ export const orderService = {
         performance: {
           tripsCompleted: deliveredOrders.length,
           acceptanceRate: 100, // Placeholder
-          rating: Math.round(avgRating * 10) / 10,
+          rating: Math.round(slowAvgRating * 10) / 10,
           hoursOnline: hoursOnline,
           totalDistanceKm: totalDistanceKm
         },

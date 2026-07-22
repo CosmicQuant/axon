@@ -107,6 +107,7 @@ interface MapContextType {
     // follow mode pauses for 8 seconds. Maps to a timestamp.
     userInteractedAt: number;
     markUserInteraction: () => void;
+    clearUserInteraction: () => void;
 
     // Internal state for triggering map actions
     boundsToFit: Coordinates[] | null;
@@ -379,6 +380,10 @@ export const MapProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setUserInteractedAt(Date.now());
     }, []);
 
+    const clearUserInteraction = useCallback(() => {
+        setUserInteractedAt(0);
+    }, []);
+
     const requestUserLocation = useCallback(async (): Promise<Coordinates | null> => {
         try {
             const coords = await mapService.getCurrentLocation();
@@ -538,6 +543,7 @@ export const MapProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setCameraMode,
             userInteractedAt,
             markUserInteraction,
+            clearUserInteraction,
             userLocation,
             locationAccuracy,
             requestUserLocation,

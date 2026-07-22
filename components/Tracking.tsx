@@ -9,6 +9,7 @@ import { VEHICLES } from './booking/constants';
 import { useChat } from '../context/ChatContext';
 import { usePrompt } from '../context/PromptContext';
 import { orderApi } from '../services/orderApi';
+import { generateSecureCode } from '../utils/crypto';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -474,7 +475,7 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
     if (!addressQuery.trim() || !selectedCoords) return;
     setSaving(true);
     try {
-      const generateCode = () => Math.floor(1000 + Math.random() * 9000).toString();
+      const generateCode = () => generateSecureCode(6);
       const currentStops = order.stops || [];
       const dropoffStop = currentStops.find(s => s.type === 'dropoff');
       const nonDropoffStops = currentStops.filter(s => s.type !== 'dropoff');

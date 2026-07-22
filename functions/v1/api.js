@@ -15,8 +15,10 @@ app.use(express.json({ limit: '100kb' })); // Prevent large payload DoS
 
 // ── Rate limiting (in-memory, per API key) ──────────────────────
 // Tracks request timestamps per key. Sliding window: max 100 req/min.
+// Evicts inactive keys every 5 minutes to prevent unbounded memory growth.
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX = 100;
+const RATE_LIMIT_EVICT_MS = 5 * 60 * 1000; // 5 minutes
 const rateLimitMap = new Map();
 
 const rateLimit = (req, res, next) => {
@@ -34,9 +36,18 @@ const rateLimit = (req, res, next) => {
         });
     }
     recent.push(now);
-    rateLimitMap.get(token) ? rateLimitMap.set(token, recent) : rateLimitMap.set(token, recent);
+    rateLimitMap.set(token, recent);
     next();
 };
+
+// Periodic eviction of stale rate-limit entries (prevents memory DoS)
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, timestamps] of rateLimitMap) {
+        const hasRecent = timestamps.some(t => now - t < RATE_LIMIT_EVICT_MS);
+        if (!hasRecent) rateLimitMap.delete(key);
+    }
+}, RATE_LIMIT_EVICT_MS);
 
 app.use(rateLimit);
 

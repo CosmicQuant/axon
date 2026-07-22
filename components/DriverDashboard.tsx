@@ -455,9 +455,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                       const movedSinceLastFetch = lastRouteFetchCoordsRef.current
                         ? mapService.calculateDistance(lastRouteFetchCoordsRef.current, currentCoords) >= 0.05
                         : true; // first fetch always runs
-                      if (!movedSinceLastFetch) {
-                         // Skip route re-fetch but still continue to write location below
-                      } else {
+                      if (movedSinceLastFetch) {
                       lastRouteFetchCoordsRef.current = currentCoords;
                       lastRouteUpdateRef.current = now;
 
@@ -486,10 +484,10 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                            }
                         }
                       }
-                   }
-                   } // end movement check else block
+                      }
+                       } // end movement check + ROUTE_UPDATE_INTERVAL
 
-                    // Throttle Firestore writes — only write every 5s to reduce cost/battery
+                     // Throttle Firestore writes — only write every 5s to reduce cost/battery
                    if (now - lastLocationWrite > LOCATION_WRITE_INTERVAL) {
                       lastLocationWrite = now;
                       orderService.updateDriverLocation(activeJob.id, {

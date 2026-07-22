@@ -269,7 +269,8 @@ const MapLayer: React.FC = () => {
         cameraMode,
         setCameraMode,
         userInteractedAt,
-        markUserInteraction
+        markUserInteraction,
+        clearUserInteraction
     } = useMapState();
 
     const isMapAnimatingRef = useRef(false);
@@ -923,9 +924,7 @@ const MapLayer: React.FC = () => {
                             <button
                                 onClick={() => {
                                     setCameraMode('follow');
-                                    markUserInteraction();
-                                    // Reset interaction timestamp so follow resumes immediately
-                                    setTimeout(() => markUserInteraction(), 0);
+                                    clearUserInteraction();
                                 }}
                                 className="w-12 h-12 bg-brand-600 rounded-2xl shadow-2xl flex items-center justify-center text-white hover:bg-brand-700 active:scale-95 transition-all border border-brand-500"
                                 title="Recenter on driver"

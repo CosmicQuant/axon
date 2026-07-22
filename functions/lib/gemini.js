@@ -1,12 +1,23 @@
 // ── Gemini AI handlers (server-side key, never exposed to client) ──
 const functions = require('firebase-functions/v1');
 const { GoogleGenAI, Type } = require('@google/genai');
+const { VEHICLE_RATES } = require('./pricing');
 
 // Initialize with server-side env var (set via Firebase CLI: 
 // firebase functions:secrets:set GEMINI_API_KEY)
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 const GEMINI_MODEL = 'gemini-2.5-flash';
+
+// Build a pricing summary from the authoritative VEHICLE_RATES table
+// so the AI prompt never drifts out of sync with the actual pricing logic.
+const buildPricingRules = () => {
+    const lines = Object.entries(VEHICLE_RATES)
+        .filter(([id]) => !['standard'].includes(id)) // exclude consolidated rate
+        .map(([id, r]) => `- ${id}: Base ${r.base} + ${r.perKm} per km`)
+        .join('\n');
+    return `PRICING RULES (in KES, from authoritative pricing table):\n${lines}\n\nWhen asked about price, estimate the distance between the locations (if known) and apply these formulas. Round to the nearest 10.`;
+};
 
 // ── Analyze a delivery request and recommend vehicle/price/packaging ──
 const analyzeDeliveryRequestHandler = async (data, context) => {
@@ -128,15 +139,7 @@ const chatWithAssistantHandler = async (data, context) => {
             config: {
                 systemInstruction: `You are 'Kifaru', a helpful, witty Kenyan logistics assistant for the app Axon.
                 
-                PRICING RULES (in KES):
-                - Boda Boda: Base 100 + 40 per km
-                - Tuk-Tuk: Base 250 + 60 per km
-                - Pickup Truck: Base 800 + 120 per km
-                - Cargo Van: Base 1500 + 180 per km
-                - 3T Lorry: Base 3500 + 350 per km
-                - Container Trailer: Base 12000 + 850 per km
-                
-                When asked about price, estimate the distance between the locations (if known) and apply these formulas. Round to the nearest 10.
+                ${buildPricingRules()}
                 
                 Tone: Use local Kenyan slang occasionally (like 'Sawa', 'Haina shida', 'Niko rada') but remain professional.
                 Role: Help users decide how to ship items, check if items are legal to ship, and give general distance estimates between Kenyan towns.`

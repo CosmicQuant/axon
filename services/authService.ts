@@ -11,7 +11,7 @@ import {
   GoogleAuthProvider,
   signInWithCredential
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
 import type { User, SignupProfileDetails } from '../types';
 import { VehicleType } from '../types';
@@ -428,31 +428,6 @@ export const authService = {
       // In a real app, you'd use verifyBeforeUpdateEmail
     } catch (error) {
       console.error("Failed to update email in Firestore", error);
-      throw error;
-    }
-  },
-
-  deleteAccount: async (userId: string): Promise<void> => {
-    const user = auth.currentUser;
-    if (!user || user.uid !== userId) throw new Error("Unauthorized or no user logged in");
-
-    try {
-      // 1. Delete from Firestore
-      const userDocRef = doc(db, 'users', userId);
-      const userSnap = await getDoc(userDocRef);
-      const role = userSnap.data()?.role;
-
-      if (role === 'driver') {
-        await deleteDoc(doc(db, 'drivers', userId));
-      } else if (role === 'business') {
-        await deleteDoc(doc(db, 'businesses', userId));
-      }
-      await deleteDoc(userDocRef);
-
-      // 2. Delete from Firebase Auth
-      await user.delete();
-    } catch (error) {
-      console.error("Service: Delete Account Error", error);
       throw error;
     }
   }

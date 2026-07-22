@@ -34,23 +34,52 @@ const deleteAccountHandler = async (data, context) => {
         }
         await Promise.all(roleDocDeletes);
 
-        // 3. Anonymize user's orders (strip PII, keep for audit)
-        const ordersSnap = await db.collection('orders').where('userId', '==', uid).get();
-        const orderUpdates = [];
-        const privateDeletes = [];
-        ordersSnap.forEach(doc => {
-            // Anonymize sender/recipient PII but keep the order for audit
+    // 3. Anonymize user's orders (strip PII, keep for audit)
+    //    A user can appear as the customer (userId) OR as the driver (driver.id).
+    //    Both must be anonymized to comply with GDPR / Kenya DPA.
+    const ordersAsCustomerSnap = await db.collection('orders').where('userId', '==', uid).get();
+    const ordersAsDriverSnap = await db.collection('orders').where('driver.id', '==', uid).get();
+
+    // Merge both result sets (dedup by doc ref)
+    const orderDocsMap = new Map();
+    ordersAsCustomerSnap.forEach(doc => orderDocsMap.set(doc.ref.path, doc));
+    ordersAsDriverSnap.forEach(doc => orderDocsMap.set(doc.ref.path, doc));
+
+    const orderUpdates = [];
+    const privateDeletes = [];
+    const deliveryPhotoPaths = [];
+    for (const doc of orderDocsMap.values()) {
+        const data = doc.data();
+        const isDriver = data.driver && data.driver.id === uid;
+        if (isDriver) {
+            // Anonymize driver PII on the order
+            orderUpdates.push(doc.ref.update({
+                driver: { id: uid, name: '[Deleted Driver]', phone: '', plate: '' },
+                driverPiiDeleted: true,
+                updatedAt: new Date().toISOString()
+            }));
+        } else {
+            // Anonymize customer/sender/recipient PII
             orderUpdates.push(doc.ref.update({
                 sender: { name: '[Deleted User]', phone: '' },
                 recipient: { name: '[Deleted User]', phone: '', id: '' },
                 recipientPiiDeleted: true,
                 updatedAt: new Date().toISOString()
             }));
-            // Delete verification codes (security-sensitive)
-            privateDeletes.push(doc.ref.collection('private').doc('codes').delete());
-            privateDeletes.push(doc.ref.collection('private').doc('attempts').delete());
-        });
-        await Promise.all([...orderUpdates, ...privateDeletes]);
+        }
+        // Delete verification codes (security-sensitive)
+        privateDeletes.push(doc.ref.collection('private').doc('codes').delete());
+        privateDeletes.push(doc.ref.collection('private').doc('attempts').delete());
+        // Collect delivery proof photo paths for Storage cleanup
+        if (data.deliveryConfirmationImage) {
+            try {
+                const url = new URL(data.deliveryConfirmationImage);
+                const pathMatch = url.pathname.match(/\/o\/(.+)$/);
+                if (pathMatch) deliveryPhotoPaths.push(decodeURIComponent(pathMatch[1]));
+            } catch { /* not a URL, skip */ }
+        }
+    }
+    await Promise.all([...orderUpdates, ...privateDeletes]);
 
         // 4. Delete disputes created by the user
         const disputesSnap = await db.collection('disputes').where('userId', '==', uid).get();
@@ -65,7 +94,15 @@ const deleteAccountHandler = async (data, context) => {
         // 6. Delete user's Storage files (profile photos, documents, delivery photos)
         try {
             const [userFiles] = await bucket.getFiles({ prefix: `users/${uid}/` });
-            const fileDeletes = userFiles.map(file => file.delete());
+            const [deliveryFiles] = await bucket.getFiles({ prefix: `deliveries/` });
+            // Filter delivery files to those belonging to this user's orders
+            const userDeliveryFiles = deliveryFiles.filter(file => {
+                const name = file.name;
+                return deliveryPhotoPaths.some(p => p === name) ||
+                    name.includes(`_${uid}_`);
+            });
+            const allFiles = [...userFiles, ...userDeliveryFiles];
+            const fileDeletes = allFiles.map(file => file.delete());
             await Promise.all(fileDeletes);
         } catch (storageErr) {
             console.warn('Storage cleanup failed (non-fatal):', storageErr);
