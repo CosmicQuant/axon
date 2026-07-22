@@ -1,6 +1,24 @@
 import { APP_CONFIG } from '../config';
 import { Geolocation } from '@capacitor/geolocation'; // Import Capacitor Geolocation
 import { Capacitor } from '@capacitor/core';
+import { generateSecureCode } from '../utils/crypto';
+
+// ── Caching layer (reduces Google Maps API costs) ───────────────
+// Route results cached for 60s (traffic changes make longer TTLs stale).
+// Geocode results cached for 24h (addresses don't move).
+// Reverse-geocode results cached for 24h keyed by rounded coords.
+
+const ROUTE_CACHE_TTL = 60 * 1000; // 60 seconds
+const GEOCODE_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+const routeCache = new Map<string, { result: any; expires: number }>();
+const geocodeCache = new Map<string, { result: any; expires: number }>();
+const reverseGeocodeCache = new Map<string, { result: any; expires: number }>();
+
+const routeCacheKey = (start: Coordinates, end: Coordinates, waypoints: Coordinates[], vehicleType?: string, optimize?: boolean) =>
+    `${start.lat.toFixed(5)},${start.lng.toFixed(5)}|${end.lat.toFixed(5)},${end.lng.toFixed(5)}|${waypoints.map(w => `${w.lat.toFixed(5)},${w.lng.toFixed(5)}`).join(';')}|${vehicleType || ''}|${optimize || false}`;
+
+const roundCoord = (lat: number, lng: number) => `${lat.toFixed(4)},${lng.toFixed(4)}`;
 
 interface Coordinates {
     lat: number;
@@ -50,6 +68,11 @@ export const mapService = {
     geocodeAddress: async (address: string): Promise<{ lat: number, lng: number, formattedAddress: string } | null> => {
         if (!address) return null;
 
+        // Check cache first
+        const cacheKey = address.toLowerCase().trim();
+        const cached = geocodeCache.get(cacheKey);
+        if (cached && Date.now() < cached.expires) return cached.result;
+
         const translatedAddress = translateSlang(address);
 
         if (typeof google === 'undefined' || !google.maps) {
@@ -62,11 +85,14 @@ export const mapService = {
             geocoder.geocode({ address: translatedAddress }, (results, status) => {
                 if (status === google.maps.GeocoderStatus.OK && results && results.length > 0) {
                     const location = results[0].geometry.location;
-                    resolve({
+                    const result = {
                         lat: location.lat(),
                         lng: location.lng(),
                         formattedAddress: results[0].formatted_address
-                    });
+                    };
+                    // Cache the result
+                    geocodeCache.set(cacheKey, { result, expires: Date.now() + GEOCODE_CACHE_TTL });
+                    resolve(result);
                 } else {
                     console.error(`Geocoding failed for address: "${address}" (translated: "${translatedAddress}") due to ${status}`);
                     resolve(null);
@@ -135,6 +161,11 @@ export const mapService = {
      * Reverse geocode coordinates to an address string using Google Maps Geocoder (JS SDK)
      */
     reverseGeocode: async (lat: number, lng: number): Promise<string | null> => {
+        // Check cache first (keyed by rounded coords — ~11m precision)
+        const cacheKey = roundCoord(lat, lng);
+        const cached = reverseGeocodeCache.get(cacheKey);
+        if (cached && Date.now() < cached.expires) return cached.result;
+
         if (typeof google === 'undefined' || !google.maps) {
             console.warn("Google Maps not loaded yet");
             return null;
@@ -154,7 +185,10 @@ export const mapService = {
                         || validResults[0]
                         || results[0]; // Absolute fallback
 
-                    resolve(bestResult.formatted_address);
+                    const address = bestResult.formatted_address;
+                    // Cache the result
+                    reverseGeocodeCache.set(cacheKey, { result: address, expires: Date.now() + GEOCODE_CACHE_TTL });
+                    resolve(address);
                 } else {
                     console.error("Reverse geocoding failed due to " + status);
                     resolve(null);
@@ -276,7 +310,13 @@ export const mapService = {
      * Get routing data between points using Google Maps Directions Service (JS SDK)
      */
     getRoute: async (start: Coordinates, end: Coordinates, waypoints: Coordinates[] = [], vehicleType?: string, optimize: boolean = false): Promise<any> => {
-        console.log("[Diagnostic: mapService.getRoute] Called with:", { start, end, waypointsCount: waypoints.length, vehicleType, optimize });
+        // Check route cache — eliminates redundant API calls when driver hasn't moved
+        const cKey = routeCacheKey(start, end, waypoints, vehicleType, optimize);
+        const cached = routeCache.get(cKey);
+        if (cached && Date.now() < cached.expires) {
+            return cached.result;
+        }
+
         if (typeof google === 'undefined' || !google.maps) {
             console.warn("Google Maps not loaded yet");
             return null;
@@ -293,7 +333,12 @@ export const mapService = {
         try {
             // New Plan: EXCLUSIVELY use Routes API (V2) for all specialized routing (Boda, Trucks)
             // Directions Service (V1) is deprecated as of Feb 2026 and should not even be initialized to avoid warnings.
-            return await mapService.getRouteV2(start, end, waypoints, vehicleType, optimize);
+            const result = await mapService.getRouteV2(start, end, waypoints, vehicleType, optimize);
+            // Cache the result
+            if (result) {
+                routeCache.set(cKey, { result, expires: Date.now() + ROUTE_CACHE_TTL });
+            }
+            return result;
         } catch (error) {
             console.error("Axon Routing Error (V2):", error);
             return null;
@@ -304,7 +349,7 @@ export const mapService = {
      * Fallback routing using Google Routes API (V2)
      */
     getRouteV2: async (start: Coordinates, end: Coordinates, waypoints: Coordinates[] = [], vehicleType?: string, optimize: boolean = false): Promise<any> => {
-        console.log("[Diagnostic: mapService.getRouteV2] Using REST API (fetch) for Routes V2...");
+        if (import.meta.env.DEV) console.log("[Diagnostic: mapService.getRouteV2] Using REST API (fetch) for Routes V2...");
         try {
             // Map vehicle type to V2 travel mode and routing preferences
             let travelMode = 'DRIVE';
@@ -405,13 +450,13 @@ export const mapService = {
                     nextLegDuration = Math.round(parseDuration(firstLeg.duration) * speedMultiplier);
                 }
 
-                console.log(`[Diagnostic: mapService] V2 REST Success (${travelMode}):`, {
+                if (import.meta.env.DEV) console.log(`[Diagnostic: mapService] V2 REST Success (${travelMode}):`, {
                     distance: totalDistance,
                     duration,
                     multiplier: speedMultiplier
                 });
 
-                if (route.optimizedIntermediateWaypointIndex) {
+                if (import.meta.env.DEV && route.optimizedIntermediateWaypointIndex) {
                     console.log("[Diagnostic: mapService] V2 Optimization Index Found:", route.optimizedIntermediateWaypointIndex);
                 }
 
@@ -464,7 +509,7 @@ export const mapService = {
         routeGeometry: string | null;
     }> => {
         // Generate a 4-digit verification code
-        const generateCode = () => Math.floor(1000 + Math.random() * 9000).toString();
+        const generateCode = () => generateSecureCode(6);
 
         // If no waypoints, just return pickup and dropoff with codes
         if (!waypoints || waypoints.length === 0) {
@@ -535,7 +580,7 @@ export const mapService = {
         });
 
         // Reorder waypoints based on Google's full optimization
-        console.log("[Diagnostic: Post-Optimization] Axon Map Engine: Raw Waypoint Order Response:", route?.full_optimized_order);
+        if (import.meta.env.DEV) console.log("[Diagnostic: Post-Optimization] Axon Map Engine: Raw Waypoint Order Response:", route?.full_optimized_order);
 
         // Generate an initial linear array mapping to 0..N including the final dropoff
         let fullOrder = [...waypoints.map((_, i) => i), waypoints.length];
@@ -546,7 +591,7 @@ export const mapService = {
             console.warn("Axon Map Engine: No route or missing full_optimized_order. Preserving original sequence.");
         }
 
-        console.log("[Diagnostic: Post-Optimization] Axon Map Engine: Final Waypoint Order to use:", fullOrder);
+        if (import.meta.env.DEV) console.log("[Diagnostic: Post-Optimization] Axon Map Engine: Final Waypoint Order to use:", fullOrder);
 
         // Separate the reordered points into new waypoints and the final new dropoff
         const reorderedWaypoints = [];
@@ -585,7 +630,7 @@ export const mapService = {
             });
         });
 
-        console.log("Axon Map Engine: Waypoints processed into stops. Count:", optimizedStops.length - 1); // -1 for pickup
+        if (import.meta.env.DEV) console.log("Axon Map Engine: Waypoints processed into stops. Count:", optimizedStops.length - 1); // -1 for pickup
 
         // The final item in the optimized list becomes the actual 'dropoff'
         let finalDropoffData;

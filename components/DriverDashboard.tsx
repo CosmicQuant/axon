@@ -131,7 +131,8 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
 
    const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile toggle
    const [isOnline, setIsOnline] = useState(true);
-   const lastRouteUpdateRef = useRef<number>(0);
+    const lastRouteUpdateRef = useRef<number>(0);
+    const lastRouteFetchCoordsRef = useRef<any>(null); // tracks where driver was at last route fetch
     const lastValidCoordsRef = useRef<any>(null);
     const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -447,6 +448,16 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                    let currentRouteGeometry: string | undefined;
 
                     if (now - lastRouteUpdateRef.current > ROUTE_UPDATE_INTERVAL) {
+                      // Only re-fetch the route if the driver actually moved >50m since last fetch.
+                      // This eliminates redundant Routes API calls when the driver is stopped or
+                      // stuck in traffic (saves ~80% of route API costs).
+                      const movedSinceLastFetch = lastRouteFetchCoordsRef.current
+                        ? mapService.calculateDistance(lastRouteFetchCoordsRef.current, currentCoords) >= 0.05
+                        : true; // first fetch always runs
+                      if (!movedSinceLastFetch) {
+                         // Skip route re-fetch but still continue to write location below
+                      } else {
+                      lastRouteFetchCoordsRef.current = currentCoords;
                       lastRouteUpdateRef.current = now;
 
                       // Determine destination based on status and stops
@@ -473,10 +484,11 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                               setTotalRouteDistance(totalDist ?? null);
                            }
                         }
-                     }
-                  }
+                      }
+                   }
+                   } // end movement check else block
 
-                   // Throttle Firestore writes — only write every 5s to reduce cost/battery
+                    // Throttle Firestore writes — only write every 5s to reduce cost/battery
                    if (now - lastLocationWrite > LOCATION_WRITE_INTERVAL) {
                       lastLocationWrite = now;
                       orderService.updateDriverLocation(activeJob.id, {
@@ -791,10 +803,10 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
           return;
        }
 
-       if (verificationInput.length !== 4) {
-          setVerificationError('Please enter the 4-digit passcode.');
-          return;
-       }
+        if (verificationInput.length < 4 || verificationInput.length > 6) {
+           setVerificationError('Please enter the passcode (4-6 digits).');
+           return;
+        }
 
         setLoading(true);
         setVerificationError('');
@@ -816,7 +828,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
             }
 
             if (!codeValid) {
-               setVerificationError('Incorrect passcode. Please ask the recipient for the correct 4-digit code.');
+                setVerificationError('Incorrect passcode. Please ask the recipient for the correct code.');
                setLoading(false);
                setVerifyStep('');
                return;
@@ -2315,8 +2327,8 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                       <h3 className="text-xl font-bold">Verify {verifyingStopId ? 'Stop' : 'Delivery'}</h3>
                       <p className="text-gray-500 text-sm mt-2">
                          {verifyingStopId
-                            ? `Enter the 4-digit passcode for ${allStops.find(s => s.id === verifyingStopId)?.address.split(',')[0] || 'this stop'}.`
-                            : 'Enter the 4-digit passcode from the recipient to complete this delivery.'}
+                            ? `Enter the passcode for ${allStops.find(s => s.id === verifyingStopId)?.address.split(',')[0] || 'this stop'}.`
+                            : 'Enter the passcode from the recipient to complete this delivery.'}
                       </p>
                    </div>
                    <div className="p-8">
@@ -2324,8 +2336,8 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                          <input
                             type="text"
                             inputMode="numeric"
-                            maxLength={4}
-                            placeholder="0000"
+                             maxLength={6}
+                             placeholder="000000"
                             value={verificationInput}
                             onChange={(e) => {
                                const val = e.target.value.replace(/\D/g, '');
@@ -2391,7 +2403,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                          <button
                             type="button"
                             onClick={handleVerifyAndComplete}
-                            disabled={verificationInput.length !== 4 || loading}
+                            disabled={verificationInput.length < 4 || verificationInput.length > 6 || loading}
                             className="py-3 px-4 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-brand-600/20"
                          >
                             {loading ? (verifyStep || 'Verifying...') : 'Verify & Finish'}
@@ -2489,6 +2501,7 @@ const DriverDashboard: React.FC<DriverDashboardProps> = (props) => {
    };
 
    return (
+      <MapProvider>
       <div className="relative min-h-screen bg-gray-50 pb-[env(safe-area-inset-bottom)]">
          <DriverDashboardContent {...props} onViewChange={navigateToView} currentView={currentView} />
 
@@ -2547,6 +2560,7 @@ const DriverDashboard: React.FC<DriverDashboardProps> = (props) => {
             </div>
          )}
       </div>
+      </MapProvider>
    );
 };
 

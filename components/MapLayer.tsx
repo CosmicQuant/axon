@@ -259,12 +259,17 @@ const MapLayer: React.FC = () => {
         setIsPanning,
         boundsToFit,
         resetBoundsTrigger,
+        fitBounds,
         allowMarkerClick,
         setActiveInput,
         waypointCoords,
         setWaypointCoords,
         driverLabel,
-        bottomSheetHeight
+        bottomSheetHeight,
+        cameraMode,
+        setCameraMode,
+        userInteractedAt,
+        markUserInteraction
     } = useMapState();
 
     const isMapAnimatingRef = useRef(false);
@@ -329,24 +334,9 @@ const MapLayer: React.FC = () => {
         animationFrameRef.current = requestAnimationFrame(tick);
     }, [map, cancelCamera]);
 
-    // ── Driver-follow camera (navigation mode) ────────────────────
-    // While a delivery is active (IN_TRANSIT), keep the camera centered on
-    // the driver's live position — Bolt/Uber-style navigation. Pan only, no
-    // zoom change. Pauses while the user is dragging or a flyTo is running;
-    // resumes automatically on the next position update after the drag ends.
-    const lastFollowPanRef = useRef(0);
-    useEffect(() => {
-        if (!map || !driverCoords || isPanning || isMapAnimatingRef.current) return;
-        if (orderState !== 'IN_TRANSIT') return;
-        const now = Date.now();
-        if (now - lastFollowPanRef.current < 3000) return; // throttle follow pans
-        lastFollowPanRef.current = now;
-        map.panTo(driverCoords);
-    }, [map, driverCoords, isPanning, orderState]);
-
     useEffect(() => {
         if (routePolyline) {
-            console.log("[Diagnostic: MapLayer] routePolyline updated:",
+        if (import.meta.env.DEV) console.log("[Diagnostic: MapLayer] routePolyline updated:",
                 typeof routePolyline === 'string' ? `String (length: ${routePolyline.length})` : "Object");
         }
         if (typeof routePolyline === 'string' && routePolyline.length > 0) {
@@ -561,17 +551,39 @@ const MapLayer: React.FC = () => {
         if (orderState === 'IDLE' && prevOrderStateRef.current !== 'IDLE' && userLocation) {
             flyTo(userLocation, CAMERA.RETURN_HOME_ZOOM, CAMERA.FLY_RETURN_HOME_MS, easeInOutCubic);
         }
+        // Auto-set camera mode based on order state transitions
+        if (orderState === 'IN_TRANSIT' && prevOrderStateRef.current !== 'IN_TRANSIT') {
+            setCameraMode('follow');
+        } else if (orderState === 'IDLE' || orderState === 'DRAFTING') {
+            setCameraMode('idle');
+        }
         prevOrderStateRef.current = orderState;
-    }, [map, orderState, userLocation, flyTo]);
+    }, [map, orderState, userLocation, flyTo, setCameraMode]);
 
     // ── Effect: Follow driver at navigation-level zoom ─────────────
+    // State-machine driven: only follows when cameraMode is 'follow' or 'arriving'.
+    // Pauses for 8s after user interaction (pan/zoom), like Bolt/Uber.
+    const USER_INTERACTION_PAUSE_MS = 8000;
     useEffect(() => {
         if (!map || !driverCoords) {
             prevDriverCoordsRef.current = driverCoords;
             return;
         }
-        // Only follow when actively tracking (TRACKING state or when driver coords are set with order in transit)
+        // Only follow when actively tracking
         if (orderState === 'IDLE' || orderState === 'DRAFTING') {
+            prevDriverCoordsRef.current = driverCoords;
+            return;
+        }
+
+        // Skip if camera mode is 'overview' or 'idle' — user is browsing
+        if (cameraMode === 'overview' || cameraMode === 'idle') {
+            prevDriverCoordsRef.current = driverCoords;
+            return;
+        }
+
+        // ── User interaction pause window ──
+        // If the user recently panned/zoomed, don't auto-follow for 8s
+        if (userInteractedAt && Date.now() - userInteractedAt < USER_INTERACTION_PAUSE_MS) {
             prevDriverCoordsRef.current = driverCoords;
             return;
         }
@@ -581,7 +593,7 @@ const MapLayer: React.FC = () => {
 
         // Skip if driver hasn't moved
         if (prev && Math.abs(driverCoords.lat - prev.lat) < 0.00005 && Math.abs(driverCoords.lng - prev.lng) < 0.00005) return;
-        // Skip if user is currently panning or another animation is mid-flight from a fitBounds call
+        // Skip if another animation is mid-flight from a fitBounds call
         if (isMapAnimatingRef.current) return;
 
         const padding = computePadding(bottomSheetHeight);
@@ -589,8 +601,11 @@ const MapLayer: React.FC = () => {
         const padded = computeBoundsTarget([driverCoords], padding);
         const target = padded ? padded.target : driverCoords;
 
-        flyTo(target, CAMERA.DRIVER_FOLLOW_ZOOM, CAMERA.DRIVER_FOLLOW_MS, easeInOutCubic);
-    }, [map, driverCoords, orderState, flyTo, computeBoundsTarget, bottomSheetHeight]);
+        // Use a tighter zoom for 'arriving' mode (closer to destination)
+        const zoom = cameraMode === 'arriving' ? CAMERA.DRIVER_FOLLOW_ZOOM + 1 : CAMERA.DRIVER_FOLLOW_ZOOM;
+
+        flyTo(target, zoom, CAMERA.DRIVER_FOLLOW_MS, easeInOutCubic);
+    }, [map, driverCoords, orderState, cameraMode, userInteractedAt, flyTo, computeBoundsTarget, bottomSheetHeight]);
 
     // ── Effect: Re-fit route when bottom sheet resizes ──────────────
     useEffect(() => {
@@ -673,6 +688,7 @@ const MapLayer: React.FC = () => {
                             const currentZoom = map.getZoom();
                             if (currentZoom !== undefined && currentZoom !== zoom) {
                                 setZoom(currentZoom);
+                                markUserInteraction();
                             }
                         }
                     }}
@@ -683,6 +699,7 @@ const MapLayer: React.FC = () => {
                     }}
                     onDragStart={() => {
                         setIsPanning(true);
+                        markUserInteraction();
                     }}
                     onDragEnd={() => setIsPanning(false)}
                     options={{
@@ -881,6 +898,43 @@ const MapLayer: React.FC = () => {
                         }}
                     />
                 </GoogleMap>
+
+                {/* Overview / Recenter buttons — Bolt/Uber style navigation controls */}
+                {orderState === 'IN_TRANSIT' && !isMapSelecting && (
+                    <div className="absolute right-4 top-24 z-10 flex flex-col gap-2">
+                        {cameraMode !== 'overview' && (pickupCoords || dropoffCoords) && (
+                            <button
+                                onClick={() => {
+                                    const points: any[] = [];
+                                    if (driverCoords) points.push(driverCoords);
+                                    if (pickupCoords) points.push(pickupCoords);
+                                    if (waypointCoords) waypointCoords.forEach((wp: any) => { if (wp) points.push(wp); });
+                                    if (dropoffCoords) points.push(dropoffCoords);
+                                    if (points.length > 0) fitBounds(points);
+                                    setCameraMode('overview');
+                                }}
+                                className="w-12 h-12 bg-white rounded-2xl shadow-2xl flex items-center justify-center text-gray-700 hover:bg-gray-50 active:scale-95 transition-all border border-gray-100"
+                                title="Show full route"
+                            >
+                                <Navigation className="w-5 h-5" />
+                            </button>
+                        )}
+                        {cameraMode !== 'follow' && (
+                            <button
+                                onClick={() => {
+                                    setCameraMode('follow');
+                                    markUserInteraction();
+                                    // Reset interaction timestamp so follow resumes immediately
+                                    setTimeout(() => markUserInteraction(), 0);
+                                }}
+                                className="w-12 h-12 bg-brand-600 rounded-2xl shadow-2xl flex items-center justify-center text-white hover:bg-brand-700 active:scale-95 transition-all border border-brand-500"
+                                title="Recenter on driver"
+                            >
+                                <MapPin className="w-5 h-5" />
+                            </button>
+                        )}
+                    </div>
+                )}
 
                 {isMapSelecting && (
                     <>

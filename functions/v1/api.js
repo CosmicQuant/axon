@@ -11,7 +11,34 @@ const express = require("express");
 // Initialize Express App
 const app = express();
 app.use(cors);
-app.use(express.json());
+app.use(express.json({ limit: '100kb' })); // Prevent large payload DoS
+
+// ── Rate limiting (in-memory, per API key) ──────────────────────
+// Tracks request timestamps per key. Sliding window: max 100 req/min.
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT_MAX = 100;
+const rateLimitMap = new Map();
+
+const rateLimit = (req, res, next) => {
+    const token = req.headers.authorization?.split('Bearer ')[1] || 'unknown';
+    const now = Date.now();
+    const timestamps = rateLimitMap.get(token) || [];
+    // Prune entries outside the window
+    const recent = timestamps.filter(t => now - t < RATE_LIMIT_WINDOW_MS);
+    if (recent.length >= RATE_LIMIT_MAX) {
+        return res.status(429).json({
+            error: {
+                code: 'rate_limit_exceeded',
+                message: `Too many requests. Limit: ${RATE_LIMIT_MAX} per minute.`
+            }
+        });
+    }
+    recent.push(now);
+    rateLimitMap.get(token) ? rateLimitMap.set(token, recent) : rateLimitMap.set(token, recent);
+    next();
+};
+
+app.use(rateLimit);
 
 // --- 1. MIDDLEWARE: AUTHENTICATION ---
 // Validates the Bearer Token (sk_live_... or sk_test_...)
@@ -37,11 +64,6 @@ const authenticate = async (req, res, next) => {
             .get();
 
         if (snapshot.empty) {
-            // MOCK FALLBACK FOR DEMO if DB is empty (Remove in Prod)
-            if (token.startsWith('sk_live_DEMO') || token.startsWith('sk_test_DEMO')) {
-                req.business = { id: 'mock_biz_123', mode: token.includes('live') ? 'LIVE' : 'TEST', name: 'Demo Corp' };
-                return next();
-            }
             throw new Error('Invalid Key');
         }
 

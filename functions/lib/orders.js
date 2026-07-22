@@ -4,8 +4,12 @@ const admin = require('./admin');
 const { sendPushNotification, getNotificationTitle, getNotificationBody } = require('./notifications');
 
 // ── SERVER-SIDE DELIVERY VERIFICATION ───────────────────────────
-// Verifies the 4-digit passcode server-side so the driver never has
-// access to the code in the order document.
+// Verifies the passcode server-side so the driver never has access to
+// the code in the order document. Includes brute-force protection:
+// per-order attempt counter with lockout after 5 wrong attempts.
+const MAX_VERIFY_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 10 * 60 * 1000; // 10 minutes
+
 const verifyDeliveryCodeHandler = async (data, context) => {
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'You must be signed in to verify a delivery.');
@@ -55,7 +59,59 @@ const verifyDeliveryCodeHandler = async (data, context) => {
 
     const isValid = String(code) === String(targetCode);
 
-    return { valid: isValid };
+    // ── Brute-force protection (atomic via transaction) ──
+    // Reads + writes the attempt counter in a single transaction to prevent
+    // concurrent requests from bypassing the lockout. Resets count when
+    // lockout expires so the driver can retry after the cooldown.
+    const attemptsRef = orderRef.collection('private').doc('attempts');
+    let attemptsRemaining = MAX_VERIFY_ATTEMPTS;
+
+    await admin.firestore().runTransaction(async (transaction) => {
+        const attemptsDoc = await transaction.get(attemptsRef);
+        const attemptsData = attemptsDoc.exists ? attemptsDoc.data() : null;
+        let count = attemptsData ? (attemptsData.count || 0) : 0;
+        const lockedUntil = attemptsData ? attemptsData.lockedUntil : null;
+
+        // If locked and lockout hasn't expired, reject
+        if (lockedUntil && Date.now() < lockedUntil) {
+            const remainingMin = Math.ceil((lockedUntil - Date.now()) / 60000);
+            throw new functions.https.HttpsError(
+                'resource-exhausted',
+                `Too many incorrect attempts. Try again in ${remainingMin} minute(s).`
+            );
+        }
+
+        // If lockout has expired, reset the counter
+        if (lockedUntil && Date.now() >= lockedUntil) {
+            count = 0;
+        }
+
+        if (isValid) {
+            // Valid code — clear attempts
+            if (attemptsDoc.exists) {
+                transaction.delete(attemptsRef);
+            }
+            attemptsRemaining = MAX_VERIFY_ATTEMPTS;
+        } else {
+            // Invalid code — increment counter atomically
+            const newCount = count + 1;
+            const willLock = newCount >= MAX_VERIFY_ATTEMPTS;
+            transaction.set(attemptsRef, {
+                count: newCount,
+                lockedUntil: willLock ? Date.now() + LOCKOUT_DURATION_MS : null,
+                updatedAt: new Date().toISOString()
+            });
+            attemptsRemaining = MAX_VERIFY_ATTEMPTS - newCount;
+            if (willLock) {
+                throw new functions.https.HttpsError(
+                    'resource-exhausted',
+                    'Too many incorrect attempts. Verification locked for 10 minutes.'
+                );
+            }
+        }
+    });
+
+    return { valid: isValid, attemptsRemaining };
 };
 
 // ── SERVER-SIDE ORDER STATUS TRANSITION ─────────────────────────
@@ -120,6 +176,21 @@ const updateOrderStatusHandler = async (data, context) => {
             }
 
             transaction.update(orderRef, updates);
+
+            // ── Server-side metrics aggregation ──
+            // When an order is delivered, increment counters on the driver doc
+            // so getDriverMetrics can read a single doc instead of scanning all orders.
+            if (newStatus === 'delivered' && orderData.driver && orderData.driver.id) {
+                const driverRef = admin.firestore().doc(`drivers/${orderData.driver.id}`);
+                const increment = admin.firestore.FieldValue.increment;
+                const driverUpdates = {
+                    deliveredCount: increment(1),
+                    totalEarnings: increment(orderData.driverRate || 0),
+                    totalDistanceMeters: increment(orderData.distance || 0),
+                    updatedAt: new Date().toISOString()
+                };
+                transaction.set(driverRef, driverUpdates, { merge: true });
+            }
         });
 
         // Send push notification for status changes

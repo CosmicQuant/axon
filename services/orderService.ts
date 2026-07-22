@@ -9,12 +9,14 @@ import {
   updateDoc,
   orderBy,
   limit,
+  startAfter,
   runTransaction,
   increment
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { DeliveryOrder, DriverMetrics, Driver, PricingDetails, Review } from '../types';
 import { VehicleType, ServiceType } from '../types';
+import { generateSecureCode } from '../utils/crypto';
 
 const ORDERS_COLLECTION = 'orders';
 
@@ -23,12 +25,22 @@ export const orderService = {
   /**
    * Fetch all orders belonging to a specific user.
    */
-  getUserOrders: async (userId: string): Promise<DeliveryOrder[]> => {
+  getUserOrders: async (userId: string, limitCount: number = 500, startAfterId?: string): Promise<DeliveryOrder[]> => {
     try {
-      const q = query(
+      let q = query(
         collection(db, ORDERS_COLLECTION),
-        where('userId', '==', userId)
+        where('userId', '==', userId),
+        orderBy('date', 'desc'),
+        limit(limitCount)
       );
+
+      // Cursor-based pagination: if a startAfterId is provided, start after that doc
+      if (startAfterId) {
+        const cursorDoc = await getDoc(doc(db, ORDERS_COLLECTION, startAfterId));
+        if (cursorDoc.exists()) {
+          q = query(q, startAfter(cursorDoc));
+        }
+      }
 
       const querySnapshot = await getDocs(q);
       const orders = querySnapshot.docs.map(doc => {
@@ -105,6 +117,101 @@ export const orderService = {
    */
   getDriverMetrics: async (driverId: string): Promise<DriverMetrics> => {
     try {
+      // ── Fast path: read aggregated counters from the driver doc ──
+      // The updateOrderStatus CF increments these atomically on delivery.
+      // Falls back to the slow scan path only for legacy drivers without counters.
+      const driverDoc = await getDoc(doc(db, 'drivers', driverId));
+      const dData = driverDoc.exists() ? driverDoc.data() : null;
+      if (dData) {
+        const hasCounters = dData.deliveredCount !== undefined && dData.totalEarnings !== undefined;
+
+        if (hasCounters) {
+          // Compute time-based earnings from a recent orders scan (last 50 only)
+          const recentQ = query(
+            collection(db, ORDERS_COLLECTION),
+            where('driver.id', '==', driverId),
+            where('status', '==', 'delivered'),
+            limit(50)
+          );
+          const recentSnap = await getDocs(recentQ);
+          const recentOrders = recentSnap.docs.map(doc => ({ ...doc.data() as any, id: doc.id } as DeliveryOrder));
+          const deliveredOrders = recentOrders.sort((a, b) =>
+            new Date(b.deliveredAt || b.date).getTime() - new Date(a.deliveredAt || a.date).getTime()
+          );
+
+          const now = new Date();
+          const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+          const currentDay = now.getDay();
+          const diff = now.getDate() - currentDay + (currentDay === 0 ? -6 : 1);
+          const weekStart = new Date(now.setDate(diff));
+          weekStart.setHours(0, 0, 0, 0);
+          const weekStartStr = weekStart.toISOString();
+          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+          const calculatePayout = (o: DeliveryOrder) => {
+            const rate = o.driverRate || (o.price ? Math.floor(Number(o.price) * 0.8) : 0);
+            return isNaN(rate) ? 0 : rate;
+          };
+
+          const earningsToday = deliveredOrders
+            .filter(o => (o.deliveredAt || o.date) >= todayStart)
+            .reduce((sum, o) => sum + calculatePayout(o), 0);
+          const earningsWeek = deliveredOrders
+            .filter(o => (o.deliveredAt || o.date) >= weekStartStr)
+            .reduce((sum, o) => sum + calculatePayout(o), 0);
+          const earningsMonth = deliveredOrders
+            .filter(o => (o.deliveredAt || o.date) >= monthStart)
+            .reduce((sum, o) => sum + calculatePayout(o), 0);
+
+          const totalDistanceKm = Math.round(((dData.totalDistanceMeters || 0) / 1000) * 10) / 10;
+          const hoursOnline = Math.round((dData.totalOnlineMinutes || 0) / 60 * 10) / 10;
+
+          const ratings = deliveredOrders
+            .filter(o => o.reviewForDriver)
+            .map(o => o.reviewForDriver!.rating);
+          const avgRating = ratings.length > 0
+            ? ratings.reduce((a, b) => a + b, 0) / ratings.length
+            : 5.0;
+
+          const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+          const weeklyData = [1, 2, 3, 4, 5, 6, 0].map(dayIdx => {
+            const dayName = days[dayIdx];
+            const dayOrders = deliveredOrders.filter(o => {
+              const d = new Date(o.deliveredAt || o.date);
+              return d >= weekStart && d.getDay() === dayIdx;
+            });
+            const dayEarnings = dayOrders.reduce((sum, o) => sum + calculatePayout(o), 0);
+            return { day: dayName, value: dayEarnings, trips: dayOrders.length, amount: `KES ${dayEarnings.toLocaleString()}` };
+          });
+
+          const recentReviews = deliveredOrders
+            .filter(o => o.reviewForDriver)
+            .slice(0, 5)
+            .map(o => ({
+              id: o.id, rating: o.reviewForDriver!.rating, comment: o.reviewForDriver!.comment,
+              date: o.reviewForDriver!.date, customerName: o.sender.name
+            }));
+
+          return {
+            earnings: { today: earningsToday, week: earningsWeek, month: earningsMonth, balance: dData.totalEarnings || 0 },
+            performance: {
+              tripsCompleted: dData.deliveredCount || 0,
+              acceptanceRate: 100,
+              rating: Math.round(avgRating * 10) / 10,
+              hoursOnline,
+              totalDistanceKm
+            },
+            recentReviews,
+            weeklyChart: weeklyData,
+            recentTransactions: deliveredOrders.slice(0, 10).map(o => ({
+              id: o.id, amount: calculatePayout(o),
+              date: new Date(o.deliveredAt || o.date).toLocaleDateString(), type: 'trip'
+            }))
+          };
+        }
+      }
+
+      // ── Slow path: scan all orders (legacy drivers without counters) ──
       const q = query(
         collection(db, ORDERS_COLLECTION),
         where('driver.id', '==', driverId)
@@ -174,15 +281,10 @@ export const orderService = {
       });
 
       // Fetch Driver Document to get hours online (if tracked there)
+      // Reuse the driver doc already fetched at the top of this function
       let hoursOnline = 0;
-      try {
-        const driverDoc = await getDoc(doc(db, 'drivers', driverId));
-        if (driverDoc.exists()) {
-          const driverData = driverDoc.data();
-          hoursOnline = Math.round((driverData.totalOnlineMinutes || 0) / 60 * 10) / 10;
-        }
-      } catch (e) {
-        console.error("Error fetching driver doc for metrics:", e);
+      if (dData) {
+        hoursOnline = Math.round((dData.totalOnlineMinutes || 0) / 60 * 10) / 10;
       }
 
       const ratings = deliveredOrders
@@ -310,12 +412,12 @@ export const orderService = {
    */
   createOrder: async (order: Omit<DeliveryOrder, 'id'>): Promise<DeliveryOrder> => {
     try {
-      const orderCode = (order as any).verificationCode || Math.floor(1000 + Math.random() * 9000).toString();
+      const orderCode = (order as any).verificationCode || generateSecureCode(6);
 
       // Extract per-stop codes into the private doc; strip them from the public order doc
       const stopCodes: Record<string, string> = {};
       const sanitizedStops = (order.stops || []).map((stop: any) => {
-        const code = stop.verificationCode || Math.floor(1000 + Math.random() * 9000).toString();
+        const code = stop.verificationCode || generateSecureCode(6);
         stopCodes[stop.id] = code;
         const { verificationCode, ...rest } = stop;
         return rest;

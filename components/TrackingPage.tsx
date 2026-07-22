@@ -27,6 +27,7 @@ const TrackingPageContent: React.FC = () => {
     const [retryId, setRetryId] = React.useState('');
     const [orderCodes, setOrderCodes] = React.useState<{ orderCode?: string; stopCodes?: Record<string, string> }>({});
     const lastRouteUpdate = React.useRef<number>(0);
+    const lastSyncedOrderId = React.useRef<string>(''); // gate setMapCenter to first-load-per-order
     const updateStatusMutation = useUpdateOrderStatus();
     const updateOrderMutation = useUpdateOrder();
 
@@ -77,8 +78,10 @@ const TrackingPageContent: React.FC = () => {
 
                 if (p) {
                     setPickupCoords(p);
-                    // Set initial center to pickup if not already set
-                    setMapCenter(p.lat, p.lng);
+                    // Only center on pickup once per order (not on every order update)
+                    if (lastSyncedOrderId.current !== order.id) {
+                        setMapCenter(p.lat, p.lng);
+                    }
                 }
                 if (d) setDropoffCoords(d);
 
@@ -171,11 +174,13 @@ const TrackingPageContent: React.FC = () => {
                 }
             } catch (error) {
                 console.error("Error syncing map in TrackingPage:", error);
+            } finally {
+                lastSyncedOrderId.current = order.id;
             }
         };
 
         syncMap();
-    }, [order, isLoaded, setPickupCoords, setDropoffCoords, setDriverCoords, setDriverBearing, setRoutePolyline, fitBounds]);
+    }, [order, isLoaded, setPickupCoords, setDropoffCoords, setDriverCoords, setDriverBearing, setRoutePolyline, fitBounds, setMapCenter, setWaypointCoords, setDriverVehicleType, setDriverLabel, setOrderState]);
 
     React.useEffect(() => {
         if (!orderId) {
@@ -393,7 +398,9 @@ const TrackingPageContent: React.FC = () => {
 
 const TrackingPage: React.FC = () => {
     return (
-        <TrackingPageContent />
+        <MapProvider>
+            <TrackingPageContent />
+        </MapProvider>
     );
 };
 

@@ -10,6 +10,8 @@ const { submitReviewHandler } = require('./lib/reviews');
 const { raiseDisputeHandler } = require('./lib/disputes');
 const { registerFcmTokenHandler } = require('./lib/tokens');
 const { expirePendingOrdersHandler } = require('./lib/scheduled');
+const { analyzeDeliveryRequestHandler, parseNaturalLanguageOrderHandler, chatWithAssistantHandler } = require('./lib/gemini');
+const { deleteAccountHandler } = require('./lib/account');
 
 // ── Pricing ─────────────────────────────────────────────────────
 exports.calculateQuote = functions.https.onCall(calculateQuoteHandler);
@@ -33,3 +35,11 @@ exports.registerFcmToken = functions.https.onCall(registerFcmTokenHandler);
 
 // ── Scheduled jobs ──────────────────────────────────────────────
 exports.expirePendingOrders = functions.pubsub.schedule('every 1 minutes').onRun(expirePendingOrdersHandler);
+
+// ── Gemini AI (server-side key, never exposed to client) ────────
+exports.analyzeDeliveryRequest = functions.https.onCall(analyzeDeliveryRequestHandler);
+exports.parseNaturalLanguageOrder = functions.https.onCall(parseNaturalLanguageOrderHandler);
+exports.chatWithAssistant = functions.https.onCall(chatWithAssistantHandler);
+
+// ── Account management ──────────────────────────────────────────
+exports.deleteAccount = functions.https.onCall(deleteAccountHandler);

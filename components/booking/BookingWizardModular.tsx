@@ -12,6 +12,8 @@ import { Step2What } from './steps/Step2What';
 import { Step3How } from './steps/Step3How';
 import { Step4Who } from './steps/Step4Who';
 import { Step5Payment } from './steps/Step5Payment';
+import { useAuth } from '../../context/AuthContext';
+import { generateSecureCode } from '../../utils/crypto';
 
 const slideVariants = {
     enter: (direction: number) => ({ x: direction > 0 ? '30%' : '-30%', opacity: 0 }),
@@ -31,6 +33,7 @@ interface BookingWizardProps {
 
 const WizardContent: React.FC<BookingWizardProps> = ({ prefillData, onOrderComplete, onCollapseChange, startAtDashboard }) => {
     const { data, updateData, step, direction, nextStep } = useBooking();
+    const { user } = useAuth();
     const { pickupCoords, dropoffCoords, waypointCoords, routePolyline, setRoutePolyline, setIsMapSelecting, setActiveInput, setPickupCoords, setWaypointCoords, setDropoffCoords, userLocation, requestUserLocation, ensureFreshLocation, isMapSelecting, activeInput, mapCenter, setMapCenter, fitBounds, setBottomSheetHeight, setOrderState } = useMapState();
 
     // Guard: skip mapCenter watcher until initial location is settled
@@ -300,7 +303,7 @@ const WizardContent: React.FC<BookingWizardProps> = ({ prefillData, onOrderCompl
             intermediateCoords = intermediateCoords.slice(0, -1);
         }
 
-        const generateCode = () => Math.floor(1000 + Math.random() * 9000).toString();
+        const generateCode = () => generateSecureCode(6);
         const dropoffCode = generateCode();
 
         // Upload item image to Storage if present (instead of base64 in Firestore)
@@ -342,7 +345,7 @@ const WizardContent: React.FC<BookingWizardProps> = ({ prefillData, onOrderCompl
             status: 'pending',
             estimatedDuration: '45 mins',
             date: new Date().toISOString(),
-            sender: { name: 'Customer', phone: '' },
+            sender: { name: user?.name || user?.email || 'Customer', phone: user?.phone || '' },
             recipient: { name: data.receiverName || 'Receiver', phone: data.receiverPhone || '', id: data.receiverId || '' },
             paymentMethod: data.paymentMethod || 'MPESA',
             verificationCode: dropoffCode,

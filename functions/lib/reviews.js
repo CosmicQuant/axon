@@ -74,20 +74,26 @@ const submitReviewHandler = async (data, context) => {
             updates.status = 'reviewed';
         }
 
+        // ALL READS MUST COME BEFORE ANY WRITES in Firestore transactions.
+        // Pre-fetch driver doc (if we'll need it) before the order write below.
+        let driverRef = null;
+        let driverData = null;
+        if (isCustomer && orderData.driver && orderData.driver.id) {
+            driverRef = admin.firestore().doc(`drivers/${orderData.driver.id}`);
+            const driverDoc = await transaction.get(driverRef);
+            driverData = driverDoc.exists ? driverDoc.data() : null;
+        }
+
+        // Now perform all writes.
         transaction.update(orderRef, updates);
 
         // Update driver's average rating atomically (same transaction)
-        if (isCustomer && orderData.driver && orderData.driver.id) {
-            const driverRef = admin.firestore().doc(`drivers/${orderData.driver.id}`);
-            const driverDoc = await transaction.get(driverRef);
-            if (driverDoc.exists) {
-                const driverData = driverDoc.data();
-                const currentRating = driverData.rating || 0;
-                const currentTrips = driverData.totalTrips || 0;
-                const newTrips = currentTrips + 1;
-                const newRating = ((currentRating * currentTrips) + numericRating) / newTrips;
-                transaction.update(driverRef, { rating: Math.round(newRating * 10) / 10, totalTrips: newTrips });
-            }
+        if (driverRef && driverData) {
+            const currentRating = driverData.rating || 0;
+            const currentTrips = driverData.totalTrips || 0;
+            const newTrips = currentTrips + 1;
+            const newRating = ((currentRating * currentTrips) + numericRating) / newTrips;
+            transaction.update(driverRef, { rating: Math.round(newRating * 10) / 10, totalTrips: newTrips });
         }
     });
 

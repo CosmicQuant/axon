@@ -2,9 +2,10 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import type { User } from '../types';
 import { VehicleType } from '../types';
 import { authService } from '../services/authService';
-import { auth, db } from '../firebase';
+import { auth, db, functions } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { pushNotificationService } from '../services/pushNotificationService';
 
 interface ProfileDetails {
@@ -193,7 +194,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return;
     setIsLoading(true);
     try {
-      await authService.deleteAccount(user.id);
+      // Call server-side cascade CF (deletes Auth, Firestore, Storage, anonymizes orders)
+      const call = httpsCallable(functions, 'deleteAccount');
+      await call({});
       setUser(null);
     } catch (error) {
       console.error("AuthContext: Delete Account Error", error);

@@ -9,6 +9,7 @@ import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 
 export type MapOrderState = 'IDLE' | 'DRAFTING' | 'MATCHING' | 'IN_TRANSIT' | 'COMPLETED';
+export type CameraMode = 'idle' | 'follow' | 'overview' | 'arriving';
 
 interface Coordinates {
     lat: number;
@@ -98,6 +99,15 @@ interface MapContextType {
     // Commands
     fitBounds: (markers: Coordinates[]) => void;
 
+    // Camera mode state machine (Uber/Bolt pattern)
+    cameraMode: CameraMode;
+    setCameraMode: (mode: CameraMode) => void;
+
+    // User interaction tracking — when the user manually pans/zooms,
+    // follow mode pauses for 8 seconds. Maps to a timestamp.
+    userInteractedAt: number;
+    markUserInteraction: () => void;
+
     // Internal state for triggering map actions
     boundsToFit: Coordinates[] | null;
     resetBoundsTrigger: () => void;
@@ -140,6 +150,8 @@ export const MapProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     const [orderState, setOrderState] = useState<MapOrderState>('IDLE');
+    const [cameraMode, setCameraMode] = useState<CameraMode>('idle');
+    const [userInteractedAt, setUserInteractedAt] = useState<number>(0);
     const [pickupCoords, setPickupCoordsInternal] = useState<Coordinates | null>(null);
     const [dropoffCoords, setDropoffCoordsInternal] = useState<Coordinates | null>(null);
     const [waypointCoords, setWaypointCoords] = useState<Coordinates[]>([]);
@@ -363,6 +375,10 @@ export const MapProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setBoundsToFit(null);
     }, []);
 
+    const markUserInteraction = useCallback(() => {
+        setUserInteractedAt(Date.now());
+    }, []);
+
     const requestUserLocation = useCallback(async (): Promise<Coordinates | null> => {
         try {
             const coords = await mapService.getCurrentLocation();
@@ -518,6 +534,10 @@ export const MapProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             fitBounds,
             boundsToFit,
             resetBoundsTrigger,
+            cameraMode,
+            setCameraMode,
+            userInteractedAt,
+            markUserInteraction,
             userLocation,
             locationAccuracy,
             requestUserLocation,

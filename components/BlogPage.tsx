@@ -2,6 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, User, ArrowRight, Rss, ArrowLeft, Share2, Facebook, Instagram, MessageCircle } from 'lucide-react';
 import { useChat } from '../context/ChatContext';
 
+// Lightweight HTML sanitizer for blog content (defense-in-depth even though
+// content is statically authored; prevents accidental script injection if
+// content is ever sourced externally in the future).
+const sanitizeHtml = (html: string): string => {
+    return html
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+        .replace(/\son\w+\s*=\s*"[^"]*"/gi, '')
+        .replace(/\son\w+\s*=\s*'[^']*'/gi, '')
+        .replace(/javascript:/gi, '');
+};
+
 const BLOG_POSTS = [
     {
         id: 1,
@@ -143,7 +154,7 @@ const BlogPage: React.FC = () => {
                     <div className="grid grid-cols-1 lg:grid-cols-[1fr_200px] gap-16">
                         <div className="prose prose-invert prose-slate prose-lg max-w-none">
                             <div className="text-slate-400 font-medium text-lg leading-relaxed mb-12"
-                                dangerouslySetInnerHTML={{ __html: selectedPost.content.replace(/text-slate-900/g, 'text-white').replace(/text-slate-600/g, 'text-slate-400') }} />
+                                dangerouslySetInnerHTML={{ __html: sanitizeHtml(selectedPost.content.replace(/text-slate-900/g, 'text-white').replace(/text-slate-600/g, 'text-slate-400')) }} />
 
                             <div className="mt-16 pt-16 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-8">
                                 <div>
