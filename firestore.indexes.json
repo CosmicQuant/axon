@@ -47,12 +47,12 @@
             "queryScope": "COLLECTION",
             "fields": [
                 {
-                    "fieldPath": "userId",
+                    "fieldPath": "driver.id",
                     "order": "ASCENDING"
                 },
                 {
-                    "fieldPath": "date",
-                    "order": "DESCENDING"
+                    "fieldPath": "status",
+                    "order": "ASCENDING"
                 }
             ]
         },
@@ -61,11 +61,15 @@
             "queryScope": "COLLECTION",
             "fields": [
                 {
-                    "fieldPath": "userId",
+                    "fieldPath": "driver.id",
                     "order": "ASCENDING"
                 },
                 {
-                    "fieldPath": "date",
+                    "fieldPath": "status",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "deliveredAt",
                     "order": "DESCENDING"
                 }
             ]

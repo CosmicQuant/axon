@@ -90,8 +90,10 @@ export const orderService = {
   },
 
   /**
-   * Fetch active jobs for a specific driver.
-   */
+    * Fetch all jobs for a specific driver (active + completed).
+    * The "active" filter is now the responsibility of the caller — don't
+    * silently drop delivered/reviewed orders here; the history tabs need them.
+    */
   getDriverJobs: async (driverId: string): Promise<DeliveryOrder[]> => {
     try {
       const q = query(
@@ -102,10 +104,9 @@ export const orderService = {
       const querySnapshot = await getDocs(q);
       const allJobs = querySnapshot.docs.map(doc => ({ ...doc.data() as any, id: doc.id } as DeliveryOrder));
 
-      allJobs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-      // Filter out delivered jobs to show only active ones
-      return allJobs.filter(job => job.status !== 'delivered');
+      return allJobs.sort((a, b) =>
+        new Date(b.deliveredAt || b.date).getTime() - new Date(a.deliveredAt || a.date).getTime()
+      );
     } catch (error) {
       console.error("Error fetching driver jobs:", error);
       throw error;
@@ -117,36 +118,52 @@ export const orderService = {
    */
   getDriverMetrics: async (driverId: string): Promise<DriverMetrics> => {
     try {
-      // ── Fast path: read aggregated counters from the driver doc ──
-      // The updateOrderStatus CF increments these atomically on delivery.
-      // Falls back to the slow scan path only for legacy drivers without counters.
-      const driverDoc = await getDoc(doc(db, 'drivers', driverId));
-      const dData = driverDoc.exists() ? driverDoc.data() : null;
-      if (dData) {
-        const hasCounters = dData.deliveredCount !== undefined && dData.totalEarnings !== undefined;
+        // ── Fast path: read aggregated counters from the driver doc ──
+        // The updateOrderStatus CF increments these atomically on delivery.
+        // Falls back to the slow scan path only for legacy drivers without counters.
+        const driverDoc = await getDoc(doc(db, 'drivers', driverId));
+        const dData = driverDoc.exists() ? driverDoc.data() : null;
+        if (dData) {
+          const hasCounters = dData.deliveredCount !== undefined && dData.totalEarnings !== undefined;
 
-        if (hasCounters) {
-          // Compute time-based earnings from a recent orders scan (last 50 only)
-          const recentQ = query(
-            collection(db, ORDERS_COLLECTION),
-            where('driver.id', '==', driverId),
-            where('status', '==', 'delivered'),
-            limit(50)
-          );
-          const recentSnap = await getDocs(recentQ);
-          const recentOrders = recentSnap.docs.map(doc => ({ ...doc.data() as any, id: doc.id } as DeliveryOrder));
-          const deliveredOrders = recentOrders.sort((a, b) =>
-            new Date(b.deliveredAt || b.date).getTime() - new Date(a.deliveredAt || a.date).getTime()
-          );
+          if (hasCounters) {
+            // Compute time-based earnings from a recent orders scan (last 50 only)
+            // The 'in' filter with orderBy requires a composite index in production,
+            // so we wrap the query and fall back to a simpler query on index error.
+            const recentQ = query(
+              collection(db, ORDERS_COLLECTION),
+              where('driver.id', '==', driverId),
+              where('status', 'in', ['delivered', 'reviewed']),
+              orderBy('deliveredAt', 'desc'),
+              limit(50)
+            );
+            let recentSnap;
+            try {
+              recentSnap = await getDocs(recentQ);
+            } catch (idxErr: any) {
+              // Composite index not available — fall back without orderBy
+              if (import.meta.env.DEV) console.warn('[getDriverMetrics] index fallback:', idxErr?.message);
+              recentSnap = await getDocs(query(
+                collection(db, ORDERS_COLLECTION),
+                where('driver.id', '==', driverId),
+                where('status', 'in', ['delivered', 'reviewed']),
+                limit(50)
+              ));
+            }
+            const recentOrders = recentSnap.docs.map(doc => ({ ...doc.data() as any, id: doc.id } as DeliveryOrder));
+            const deliveredOrders = recentOrders.sort((a, b) =>
+              new Date(b.deliveredAt || b.date).getTime() - new Date(a.deliveredAt || a.date).getTime()
+            );
 
-          const now = new Date();
-          const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-          const currentDay = now.getDay();
-          const diff = now.getDate() - currentDay + (currentDay === 0 ? -6 : 1);
-          const weekStart = new Date(now.setDate(diff));
-          weekStart.setHours(0, 0, 0, 0);
-          const weekStartStr = weekStart.toISOString();
-          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+            // Use a fresh Date — do NOT mutate via setDate() (review finding: date mutation).
+            const now = new Date();
+            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+            const currentDay = now.getDay();
+            const diff = now.getDate() - currentDay + (currentDay === 0 ? -6 : 1);
+            const weekStart = new Date(now.getFullYear(), now.getMonth(), diff);
+            weekStart.setHours(0, 0, 0, 0);
+            const weekStartStr = weekStart.toISOString();
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
           const calculatePayout = (o: DeliveryOrder) => {
             const rate = o.driverRate || (o.price ? Math.floor(Number(o.price) * 0.8) : 0);
@@ -166,12 +183,20 @@ export const orderService = {
           const totalDistanceKm = Math.round(((dData.totalDistanceMeters || 0) / 1000) * 10) / 10;
           const hoursOnline = Math.round((dData.totalOnlineMinutes || 0) / 60 * 10) / 10;
 
-          const ratings = deliveredOrders
+          // Rating: the authoritative source is the driver doc, kept in sync by
+          // submitReview CF. Recent orders only contain the last 50, so deriving
+          // avg from them is unreliable. Prefer the aggregated doc value.
+          const driverAvgRating = typeof dData.rating === 'number' && dData.rating > 0
+            ? dData.rating
+            : null;
+          const fastPathRatings = deliveredOrders
             .filter(o => o.reviewForDriver)
             .map(o => o.reviewForDriver!.rating);
-          const avgRating = ratings.length > 0
-            ? ratings.reduce((a, b) => a + b, 0) / ratings.length
-            : 5.0;
+          const avgRating = driverAvgRating !== null
+            ? driverAvgRating
+            : fastPathRatings.length > 0
+              ? fastPathRatings.reduce((a, b) => a + b, 0) / fastPathRatings.length
+              : 5.0;
 
           const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
           const weeklyData = [1, 2, 3, 4, 5, 6, 0].map(dayIdx => {
@@ -197,7 +222,7 @@ export const orderService = {
             performance: {
               tripsCompleted: dData.deliveredCount || 0,
               acceptanceRate: 100,
-              rating: Math.round(avgRating * 10) / 10,
+          rating: Math.round(slowAvgRating * 10) / 10,
               hoursOnline,
               totalDistanceKm
             },
@@ -212,6 +237,8 @@ export const orderService = {
       }
 
       // ── Slow path: scan all orders (legacy drivers without counters) ──
+      // Note: legacy orders may not have deliveredAt, so we skip orderBy
+      // and sort in memory to avoid composite-index requirements.
       const q = query(
         collection(db, ORDERS_COLLECTION),
         where('driver.id', '==', driverId)
@@ -220,9 +247,10 @@ export const orderService = {
       const querySnapshot = await getDocs(q);
       const orders = querySnapshot.docs.map(doc => ({ ...doc.data() as any, id: doc.id } as DeliveryOrder));
 
-      const deliveredOrders = orders.filter(o => o.status === 'delivered')
+      const deliveredOrders = orders.filter(o => ['delivered', 'reviewed'].includes(o.status))
         .sort((a, b) => new Date(b.deliveredAt || b.date).getTime() - new Date(a.deliveredAt || a.date).getTime());
 
+      // Use a fresh Date — do NOT mutate via setDate() (review finding: date mutation).
       const now = new Date();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
 
@@ -235,11 +263,11 @@ export const orderService = {
         .filter(o => (o.deliveredAt || o.date) >= todayStart)
         .reduce((sum, o) => sum + calculatePayout(o), 0);
 
-      // This Week (Since Monday)
+      // This Week (Since Monday) — fresh Date, no mutation
       const now_week = new Date();
       const currentDay = now_week.getDay();
       const diff = now_week.getDate() - currentDay + (currentDay === 0 ? -6 : 1);
-      const weekStart = new Date(now_week.setDate(diff));
+      const weekStart = new Date(now_week.getFullYear(), now_week.getMonth(), diff);
       weekStart.setHours(0, 0, 0, 0);
       const weekStartStr = weekStart.toISOString();
 
@@ -290,9 +318,12 @@ export const orderService = {
       const ratings = deliveredOrders
         .filter(o => o.reviewForDriver)
         .map(o => o.reviewForDriver!.rating);
-      const avgRating = ratings.length > 0
-        ? ratings.reduce((a, b) => a + b, 0) / ratings.length
-        : 5.0;
+      // Slow path: also prefer authoritative driver doc rating if present.
+      const slowAvgRating = (typeof dData?.rating === 'number' && dData.rating > 0)
+        ? dData.rating
+        : ratings.length > 0
+          ? ratings.reduce((a, b) => a + b, 0) / ratings.length
+          : 5.0;
 
       const recentReviews = deliveredOrders
         .filter(o => o.reviewForDriver)
@@ -352,10 +383,10 @@ export const orderService = {
       const querySnapshot = await getDocs(q);
       const orders = querySnapshot.docs.map(doc => ({ ...doc.data() as any, id: doc.id } as DeliveryOrder));
 
-      const deliveredCount = orders.filter(o => o.status === 'delivered').length;
-      const activeCount = orders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled').length;
+      const deliveredCount = orders.filter(o => ['delivered', 'reviewed'].includes(o.status)).length;
+      const activeCount = orders.filter(o => !['delivered', 'reviewed', 'cancelled', 'expired'].includes(o.status)).length;
       const totalSpend = orders
-        .filter(o => o.status === 'delivered')
+        .filter(o => ['delivered', 'reviewed'].includes(o.status))
         .reduce((sum, o) => sum + (o.price || 0), 0);
 
       const successRate = orders.length > 0 ? (deliveredCount / orders.length) * 100 : 0;

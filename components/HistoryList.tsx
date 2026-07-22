@@ -45,7 +45,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ onTrackOrder, onReorder }) =>
     if (!orders || isLoading || reviewingOrder) return;
 
     const unreviewedDelivered = orders.find(
-      (o) => o.status === 'delivered' && !o.reviewForDriver && !promptedOrderIds.has(o.id)
+      (o) => ['delivered', 'reviewed'].includes(o.status) && !o.reviewForDriver && !promptedOrderIds.has(o.id)
     );
 
     if (unreviewedDelivered) {
@@ -63,8 +63,8 @@ const HistoryList: React.FC<HistoryListProps> = ({ onTrackOrder, onReorder }) =>
     );
   }
 
-  const ongoingOrders = orders?.filter(o => ['pending', 'driver_assigned', 'in_transit'].includes(o.status)) || [];
-  const deliveredOrders = orders?.filter(o => ['delivered', 'cancelled'].includes(o.status)) || [];
+  const ongoingOrders = orders?.filter(o => ['pending', 'driver_assigned', 'arriving_pickup', 'in_transit'].includes(o.status)) || [];
+  const deliveredOrders = orders?.filter(o => ['delivered', 'reviewed', 'cancelled'].includes(o.status)) || [];
 
   const displayOrders = activeTab === 'ongoing' ? ongoingOrders : deliveredOrders;
 
@@ -174,7 +174,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ onTrackOrder, onReorder }) =>
         <div className="space-y-4">
           {displayOrders.map((order) => {
             const Icon = getVehicleIcon(order.vehicle);
-            const isOngoing = ['pending', 'driver_assigned', 'in_transit'].includes(order.status);
+            const isOngoing = ['pending', 'driver_assigned', 'arriving_pickup', 'in_transit'].includes(order.status);
 
             // Status-based styling
             const getStatusStyles = () => {

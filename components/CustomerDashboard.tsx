@@ -48,9 +48,9 @@ const CustomerDashboard: React.FC = () => {
 
     const stats = useMemo(() => {
         if (!orders) return { active: 0, delivered: 0, totalSpent: 0 };
-        const active = orders.filter(o => ['pending', 'driver_assigned', 'in_transit'].includes(o.status)).length;
-        const delivered = orders.filter(o => o.status === 'delivered').length;
-        const totalSpent = orders.reduce((sum, o) => sum + (o.price || 0), 0);
+        const active = orders.filter(o => ['pending', 'driver_assigned', 'arriving_pickup', 'in_transit'].includes(o.status)).length;
+        const delivered = orders.filter(o => ['delivered', 'reviewed'].includes(o.status)).length;
+        const totalSpent = orders.filter(o => ['delivered', 'reviewed'].includes(o.status)).reduce((sum, o) => sum + (o.price || 0), 0);
         return { active, delivered, totalSpent };
     }, [orders]);
 
@@ -61,7 +61,7 @@ const CustomerDashboard: React.FC = () => {
 
     const lastDelivered = useMemo(() => {
         if (!orders) return null;
-        return orders.filter(o => o.status === 'delivered').sort((a, b) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime())[0] || null;
+        return orders.filter(o => ['delivered', 'reviewed'].includes(o.status)).sort((a, b) => new Date(b.deliveredAt || b.createdAt || b.date).getTime() - new Date(a.deliveredAt || a.createdAt || a.date).getTime())[0] || null;
     }, [orders]);
 
     const getGreeting = () => {

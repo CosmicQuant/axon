@@ -250,7 +250,8 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
    const customerTags = ["Polite", "Quick Handover", "Accurate Location", "Easy to Reach", "Respectful"];
 
    // Derived State
-   const activeJob = myJobs.find(j => j.status !== 'delivered');
+   // Active job = any job not yet in a terminal state (delivered/reviewed/cancelled/expired)
+   const activeJob = myJobs.find(j => !['delivered', 'reviewed', 'cancelled', 'expired'].includes(j.status));
    const hasActiveJob = !!activeJob;
 
    // Multi-stop Logic: Create a unified sequential list of all stops
@@ -588,19 +589,20 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
           setLoading(false);
        });
 
-       // 2. Listen for My Active Jobs (driver.id == user.id, status not delivered/cancelled)
-       const qJobs = query(collection(db, 'orders'),
-          where('driver.id', '==', user.id),
-          where('status', 'in', ['driver_assigned', 'arriving_pickup', 'in_transit'])
-       );
-       const unsubJobs = onSnapshot(qJobs, async (snapshot) => {
-          const jobs = snapshot.docs.map(doc => ({ ...doc.data() as any, id: doc.id } as DeliveryOrder));
-          const uniqueJobs = jobs.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
-          setMyJobs(uniqueJobs.sort((a, b) => {
-             const dateA = a.date ? new Date(a.date).getTime() : 0;
-             const dateB = b.date ? new Date(b.date).getTime() : 0;
-             return dateB - dateA;
-          }));
+        // 2. Listen for My Jobs (active + delivered + reviewed, all-in-one)
+        // Sorting/splitting active vs completed is handled in render.
+        const qJobs = query(collection(db, 'orders'),
+           where('driver.id', '==', user.id),
+           where('status', 'in', ['driver_assigned', 'arriving_pickup', 'in_transit', 'delivered', 'reviewed'])
+        );
+        const unsubJobs = onSnapshot(qJobs, async (snapshot) => {
+           const jobs = snapshot.docs.map(doc => ({ ...doc.data() as any, id: doc.id } as DeliveryOrder));
+           const uniqueJobs = jobs.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+           setMyJobs(uniqueJobs.sort((a, b) => {
+              const tA = new Date(a.deliveredAt || a.updatedAt || a.date).getTime();
+              const tB = new Date(b.deliveredAt || b.updatedAt || b.date).getTime();
+              return tB - tA;
+           }));
 
           // Refresh metrics when active jobs change
           const m = await orderService.getDriverMetrics(user.id);
