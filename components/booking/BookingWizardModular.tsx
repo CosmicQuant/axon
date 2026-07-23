@@ -342,6 +342,11 @@ const WizardContent: React.FC<BookingWizardProps> = ({ prefillData, onOrderCompl
             },
             price: finalPrice,
             driverRate: data.driverRate || Math.max(100, Math.round(finalPrice * 0.8)),
+            // Distance in meters — used by updateOrderStatus CF to increment
+            // the driver's totalDistanceMeters on delivery. Source: quote distanceKm.
+            distance: Math.round((data.distanceKm || 0) * 1000),
+            distanceKm: Number((data.distanceKm || 0).toFixed(1)),
+            durationMinutes: data.etaTime ? undefined : Math.round((data.distanceKm || 0) / 35 * 60),
             status: 'pending',
             estimatedDuration: '45 mins',
             date: new Date().toISOString(),

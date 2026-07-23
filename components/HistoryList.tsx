@@ -172,10 +172,12 @@ const HistoryList: React.FC<HistoryListProps> = ({ onTrackOrder, onReorder }) =>
             const Icon = getVehicleIcon(order.vehicle);
             const isOngoing = ['pending', 'driver_assigned', 'arriving_pickup', 'in_transit'].includes(order.status);
 
-            // Status-based styling
+            // Status-based styling — 'reviewed' inherits the 'delivered' look
+            const isTerminalDelivered = ['delivered', 'reviewed'].includes(order.status);
             const getStatusStyles = () => {
               switch (order.status) {
                 case 'delivered':
+                case 'reviewed':
                   return 'bg-emerald-50 border-emerald-200 hover:border-emerald-300';
                 case 'cancelled':
                   return 'bg-red-50 border-red-200 hover:border-red-300';
@@ -282,19 +284,23 @@ const HistoryList: React.FC<HistoryListProps> = ({ onTrackOrder, onReorder }) =>
                     </div>
 
                     <div className="flex flex-col items-end w-full md:w-auto">
-                      <span className={`inline-flex items-center px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest mb-3 shadow-sm ${order.status === 'delivered' ? 'bg-emerald-500 text-white border border-emerald-400' :
+                      <span className={`inline-flex items-center px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest mb-3 shadow-sm ${isTerminalDelivered ? 'bg-emerald-500 text-white border border-emerald-400' :
                         order.status === 'cancelled' ? 'bg-red-500 text-white border border-red-400' :
                           order.status === 'in_transit' ? 'bg-brand-600 text-white border border-brand-500' :
                             order.status === 'driver_assigned' ? 'bg-blue-600 text-white border border-blue-500' :
-                              order.status === 'pending' ? 'bg-amber-500 text-white border border-amber-400' :
-                                'bg-gray-500 text-white border border-gray-400'
+                              order.status === 'arriving_pickup' ? 'bg-brand-500 text-white border border-brand-400' :
+                                order.status === 'pending' ? 'bg-amber-500 text-white border border-amber-400' :
+                                  order.status === 'expired' ? 'bg-gray-400 text-white border border-gray-500' :
+                                    'bg-gray-500 text-white border border-gray-400'
                         }`}>
-                        {order.status === 'delivered' ? <CheckCircle className="w-3 h-3 mr-1.5 shrink-0" /> :
+                        {isTerminalDelivered ? <CheckCircle className="w-3 h-3 mr-1.5 shrink-0" /> :
                           order.status === 'cancelled' ? <XCircle className="w-3 h-3 mr-1.5 shrink-0" /> :
                             order.status === 'in_transit' ? <Navigation className="w-3 h-3 mr-1.5 shrink-0" /> :
                               order.status === 'driver_assigned' ? <User className="w-3 h-3 mr-1.5 shrink-0" /> :
-                                <Clock className="w-3 h-3 mr-1.5 shrink-0" />}
-                        <span className="truncate max-w-[10ch] min-[320px]:max-w-[12ch] sm:max-w-none text-[9px] sm:text-[10px]">{order.status.replace('_', ' ')}</span>
+                                order.status === 'arriving_pickup' ? <Navigation className="w-3 h-3 mr-1.5 shrink-0" /> :
+                                  order.status === 'expired' ? <XCircle className="w-3 h-3 mr-1.5 shrink-0" /> :
+                                    <Clock className="w-3 h-3 mr-1.5 shrink-0" />}
+                        <span className="truncate max-w-[10ch] min-[320px]:max-w-[12ch] sm:max-w-none text-[9px] sm:text-[10px]">{isTerminalDelivered ? 'Delivered' : order.status === 'arriving_pickup' ? 'Arriving' : order.status.replace('_', ' ')}</span>
                       </span>
 
                       {isOngoing && (
@@ -410,7 +416,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ onTrackOrder, onReorder }) =>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
-                      {order.status === 'delivered' && (
+                      {isTerminalDelivered && (
                         <>
                           <button
                             onClick={() => setViewingReceipt(order)}
@@ -427,7 +433,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ onTrackOrder, onReorder }) =>
                         </>
                       )}
 
-                      {order.status === 'delivered' && (
+                      {isTerminalDelivered && (
                         (user.role === 'driver' && !order.reviewForCustomer) ||
                         (user.role !== 'driver' && !order.reviewForDriver)
                       ) && (

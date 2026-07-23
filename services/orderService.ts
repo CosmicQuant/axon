@@ -209,6 +209,12 @@ export const orderService = {
             return { day: dayName, value: dayEarnings, trips: dayOrders.length, amount: `KES ${dayEarnings.toLocaleString()}` };
           });
 
+          // Today's distance from delivered orders today (recent-50 subset)
+          const todayDistanceMeters = deliveredOrders
+            .filter(o => (o.deliveredAt || o.date) >= todayStart)
+            .reduce((sum, o) => sum + (o.distance || 0), 0);
+          const todayDistanceKm = Math.round((todayDistanceMeters / 1000) * 10) / 10;
+
           const recentReviews = deliveredOrders
             .filter(o => o.reviewForDriver)
             .slice(0, 5)
@@ -219,12 +225,13 @@ export const orderService = {
 
           return {
             earnings: { today: earningsToday, week: earningsWeek, month: earningsMonth, balance: dData.totalEarnings || 0 },
-            performance: {
+performance: {
               tripsCompleted: dData.deliveredCount || 0,
               acceptanceRate: 100,
           rating: Math.round(avgRating * 10) / 10,
               hoursOnline,
-              totalDistanceKm
+              totalDistanceKm,
+              todayDistanceKm
             },
             recentReviews,
             weeklyChart: weeklyData,
@@ -284,6 +291,12 @@ export const orderService = {
 
       const totalDistanceMeters = deliveredOrders.reduce((sum, o) => sum + (o.distance || 0), 0);
       const totalDistanceKm = Math.round((totalDistanceMeters / 1000) * 10) / 10;
+
+      // Today's distance from delivered orders today (slow-path full scan)
+      const todayDistanceMeters = deliveredOrders
+        .filter(o => (o.deliveredAt || o.date) >= todayStart)
+        .reduce((sum, o) => sum + (o.distance || 0), 0);
+      const todayDistanceKm = Math.round((todayDistanceMeters / 1000) * 10) / 10;
 
       // Calculate total earnings (using stored driverRate with fallback)
       const totalEarnings = deliveredOrders.reduce((sum, o) => sum + calculatePayout(o), 0);
@@ -348,7 +361,8 @@ export const orderService = {
           acceptanceRate: 100, // Placeholder
           rating: Math.round(slowAvgRating * 10) / 10,
           hoursOnline: hoursOnline,
-          totalDistanceKm: totalDistanceKm
+          totalDistanceKm: totalDistanceKm,
+          todayDistanceKm: todayDistanceKm
         },
         recentReviews,
         weeklyChart: weeklyData,
@@ -363,7 +377,7 @@ export const orderService = {
       console.error("Error fetching driver metrics:", error);
       return {
         earnings: { today: 0, week: 0, month: 0, balance: 0 },
-        performance: { tripsCompleted: 0, acceptanceRate: 0, rating: 0, hoursOnline: 0, totalDistanceKm: 0 },
+        performance: { tripsCompleted: 0, acceptanceRate: 0, rating: 0, hoursOnline: 0, totalDistanceKm: 0, todayDistanceKm: 0 },
         weeklyChart: [],
         recentTransactions: []
       };

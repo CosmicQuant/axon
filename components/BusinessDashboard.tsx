@@ -972,7 +972,7 @@ const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user, onNewReques
     };
 
     return (
-        <div className="h-screen h-[100dvh] bg-gray-50 flex flex-col lg:flex-row relative pb-[env(safe-area-inset-bottom)] overflow-hidden">
+        <div className="h-screen h-[100dvh] bg-gray-50 flex flex-col lg:flex-row relative pb-[max(env(safe-area-inset-bottom),8px)] overflow-hidden">
             {/* ... (Previous components: Toast, Dialog, Header, Sidebar) ... */}
             {/* Toast Notification */}
             {notification && (

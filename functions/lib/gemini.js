@@ -76,8 +76,11 @@ const analyzeDeliveryRequestHandler = async (data, context) => {
             }
         });
 
-        const text = response.text;
-        if (!text) return null;
+        const text = (typeof response.text === 'function') ? response.text() : response.text;
+        if (!text) {
+            console.error('Gemini Analysis: empty response');
+            return null;
+        }
 
         return JSON.parse(text);
     } catch (error) {
@@ -114,7 +117,8 @@ const parseNaturalLanguageOrderHandler = async (data, context) => {
             }
         });
 
-        return JSON.parse(response.text || '{}');
+        const respText = (typeof response.text === 'function') ? response.text() : response.text;
+        return JSON.parse(respText || '{}');
     } catch (error) {
         console.error('Gemini Parse Error:', error);
         return {};
@@ -133,24 +137,46 @@ const chatWithAssistantHandler = async (data, context) => {
     }
 
     try {
+        // Gemini requires history roles to alternate user/model, and the
+        // first message in history should be 'user'. If the client sends a
+        // history that starts with 'model' (its welcome message), strip it
+        // and re-prepend it as part of the system instruction instead.
+        let cleanHistory = (history || []).filter(m => m && m.role && m.parts && m.parts.length);
+        // Drop any leading 'model' entries (welcome messages) so the first
+        // history item is a 'user' turn, as Gemini expects.
+        while (cleanHistory.length && cleanHistory[0].role === 'model') {
+            cleanHistory = cleanHistory.slice(1);
+        }
+
         const chat = ai.chats.create({
             model: GEMINI_MODEL,
-            history: history || [],
+            history: cleanHistory,
             config: {
                 systemInstruction: `You are 'Kifaru', a helpful, witty Kenyan logistics assistant for the app Axon.
-                
-                ${buildPricingRules()}
-                
-                Tone: Use local Kenyan slang occasionally (like 'Sawa', 'Haina shida', 'Niko rada') but remain professional.
-                Role: Help users decide how to ship items, check if items are legal to ship, and give general distance estimates between Kenyan towns.`
+
+${buildPricingRules()}
+
+Tone: Use local Kenyan slang occasionally (like 'Sawa', 'Haina shida', 'Niko rada') but remain professional.
+Role: Help users decide how to ship items, check if items are legal to ship, and give general distance estimates between Kenyan towns.`,
+                // Avoid empty-response / safety 204-path returns.
+                temperature: 0.7,
+                maxOutputTokens: 1024,
             }
         });
 
         const result = await chat.sendMessage({ message });
-        return { text: result.text };
+        // SDK 1.x: result.text is a getter returning the text string.
+        const text = (typeof result.text === 'function') ? result.text() : result.text;
+        if (!text) {
+            console.error('Gemini Chat: empty response', JSON.stringify(result));
+            return { text: "I'm not sure how to respond to that. Could you rephrase?" };
+        }
+        return { text };
     } catch (error) {
         console.error('Gemini Chat Error:', error);
-        return { text: "Sorry, I had trouble connecting to the network." };
+        // Surface the actual error message so it's debuggable in the client
+        const msg = error?.message || String(error);
+        return { text: `Kifaru hit a snag: ${msg}. Please try again.` };
     }
 };
 

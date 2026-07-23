@@ -220,7 +220,9 @@ export const mapService = {
         try {
             // First check if native
             if (Capacitor.isNativePlatform()) {
-                // Request permissions first on native
+                // ── Seamless Android permission + location-accuracy flow ──
+                // Step 1: Check permission state. Only request if not granted
+                // (avoids stacking permission dialogs if permission was already given).
                 const perm = await Geolocation.checkPermissions();
                 if (perm.location !== 'granted') {
                     const req = await Geolocation.requestPermissions({ permissions: ['location'] });
@@ -229,45 +231,49 @@ export const mapService = {
                     }
                 }
 
+                // Step 2: On Android, ask the OS to turn on high-accuracy location
+                // if the user has GPS off. This triggers the native "For a better
+                // experience, turn on device location" prompt that toggles GPS on.
                 if (Capacitor.getPlatform() === 'android') {
-                    try {
-                        await new Promise<void>((resolve, reject) => {
-                            const cordova = (window as any).cordova;
-                            if (cordova && cordova.plugins && cordova.plugins.locationAccuracy) {
-                                // Always attempt to request high accuracy — this triggers the
-                                // native "For a better experience, turn on Location Accuracy" dialog
-                                // that the user sees in the screenshot. canRequest() is unreliable
-                                // when location services are completely off, so we try regardless.
-                                cordova.plugins.locationAccuracy.request(
-                                    cordova.plugins.locationAccuracy.REQUEST_PRIORITY_HIGH_ACCURACY,
-                                    () => resolve(),
-                                    (error: any) => {
-                                        // Error code 4 = user rejected the dialog, still try GPS
-                                        console.warn("locationAccuracy.request error:", error);
-                                        resolve(); // Don't reject — let getCurrentPosition try
-                                    }
-                                );
-                            } else {
-                                resolve();
-                            }
-                        });
-                    } catch (accuracyError) {
-                        console.warn("Failed to request high accuracy location:", accuracyError);
-                        // Do not throw here, let Geolocation.getCurrentPosition try anyway
-                    }
+                    await new Promise<void>((resolve) => {
+                        const cordova = (window as any).cordova;
+                        const plugin = cordova?.plugins?.locationAccuracy;
+                        if (plugin && typeof plugin.request === 'function') {
+                            plugin.request(
+                                plugin.REQUEST_PRIORITY_HIGH_ACCURACY,
+                                () => resolve(), // dialog accepted OR already on
+                                (error: any) => {
+                                    // code 4 = user declined dialog; 0 = already on; other = plugin issue
+                                    console.warn("locationAccuracy.request error:", error);
+                                    resolve(); // don't block â€” getCurrentPosition retries below
+                                }
+                            );
+                        } else {
+                            resolve(); // plugin unavailable â€” fall through to direct getCurrentPosition
+                        }
+                    });
                 }
 
-                // Use Capacitor Geolocation
-                // enableHighAccuracy: true is KEY for the "Turn on precise location" prompt
-                const position = await Geolocation.getCurrentPosition({
+                // Step 3: Acquire position. enableHighAccuracy forces Android to
+                // prompt "Improve location accuracy" if still off. Timeout split:
+                // first attempt 10s (user turns on GPS), retry with 15s if timed out.
+                const acquire = (timeoutMs: number) => Geolocation.getCurrentPosition({
                     enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 3000 // Don't use very old cached positions
+                    timeout: timeoutMs,
+                    maximumAge: 3000
                 });
-                return {
-                    lat: position.coords.latitude,
-                    lng: position.coords.longitude
-                };
+
+                let position;
+                try {
+                    position = await acquire(10000);
+                } catch (posErr: any) {
+                    if (posErr?.code === 3) { // POSITION_UNAVAILABLE / timeout â€” user may still be enabling GPS
+                        position = await acquire(15000);
+                    } else {
+                        throw posErr;
+                    }
+                }
+                return { lat: position.coords.latitude, lng: position.coords.longitude };
             } else {
                 // Web: Check permission state first
                 let permState: PermissionState | null = null;

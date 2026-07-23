@@ -102,7 +102,8 @@ export const DUMMY_DRIVER_METRICS: DriverMetrics = {
     acceptanceRate: 94,
     rating: 4.8,
     hoursOnline: 6.5,
-    totalDistanceKm: 1240
+    totalDistanceKm: 1240,
+    todayDistanceKm: 48.2
   },
   weeklyChart: [
     { day: 'Mon', value: 45, amount: 'KES 4.5k' },

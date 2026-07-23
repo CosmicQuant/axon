@@ -335,6 +335,7 @@ export interface DriverMetrics {
     rating: number;
     hoursOnline: number;
     totalDistanceKm: number;
+    todayDistanceKm: number;
   };
   weeklyChart: { day: string; value: number; amount: string }[];
   recentTransactions: { id: string; amount: number; date: string; type: 'trip' | 'tip' | 'bonus' }[];

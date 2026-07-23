@@ -146,12 +146,13 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
        setTimeout(() => setCopiedId(null), 2000);
     };
 
-   // Set Vehicle Type
+   // Set Vehicle Type — must fire even on first render so the correct
+   // vehicle SVG shows immediately. Falls back to a sensible default until
+   // the driver doc merges in `vehicleType`.
    useEffect(() => {
-      if (user.vehicleType) {
-         setDriverVehicleType(user.vehicleType);
-      }
-   }, [user.vehicleType, setDriverVehicleType]);
+      const vt = user.vehicleType || (user.role === 'driver' ? 'Boda Boda' : undefined);
+      if (vt) setDriverVehicleType(vt);
+   }, [user.vehicleType, user.role, setDriverVehicleType]);
 
    // Data State
    const [availableOrders, setAvailableOrders] = useState<DeliveryOrder[]>([]);
@@ -1289,7 +1290,7 @@ if (p && d) {
                         />
                         <StatCard
                            title="Distance (Today)"
-                           value={`${(metrics.performance.totalDistanceKm || 0).toFixed(1)} km`}
+                           value={`${(metrics.performance.todayDistanceKm || 0).toFixed(1)} km`}
                            icon={Navigation}
                            color="bg-purple-50 text-purple-600"
                            trend="Target: 50km"
@@ -2166,7 +2167,7 @@ if (p && d) {
 
             {/* Active Job Overlay (Map View) */}
             {currentView === 'JOBS' && (
-               <div ref={bottomSheetRef} className="absolute inset-x-0 bottom-0 z-10 pointer-events-none pb-[env(safe-area-inset-bottom)] md:pb-6">
+               <div ref={bottomSheetRef} className="absolute inset-x-0 bottom-0 z-10 pointer-events-none pb-[max(env(safe-area-inset-bottom),8px)] md:pb-6">
                   {hasActiveJob ? (
                       <div className={`w-full md:absolute md:left-auto md:right-8 md:w-96 bg-white/95 backdrop-blur-xl rounded-t-[2.5rem] md:rounded-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] md:shadow-2xl border-t md:border border-gray-200 transition-all duration-300 pointer-events-auto ${Capacitor.isNativePlatform() ? 'md:mb-0 md:bottom-28' : 'md:mb-0 md:bottom-8'} ${isDrawerCollapsed ? 'p-4' : 'p-6 pt-4'}`}>
                         {/* Mobile Drag Handle */}
@@ -2572,7 +2573,7 @@ const DriverDashboard: React.FC<DriverDashboardProps> = (props) => {
 
    return (
       <MapProvider>
-      <div className="relative min-h-screen bg-gray-50 pb-[env(safe-area-inset-bottom)]">
+      <div className="relative min-h-screen bg-gray-50 pb-[max(env(safe-area-inset-bottom),8px)]">
          <DriverDashboardContent {...props} onViewChange={navigateToView} currentView={currentView} />
 
          {/* Driver Bottom Navigation - Native Apps Only */}
