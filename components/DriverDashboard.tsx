@@ -603,20 +603,50 @@ if (p && d) {
        return orderVehicle === driverVehicleId;
     };
 
-    // Filtered Orders Logic (memoized + null-safe)
-    const filteredOrders = useMemo(() => availableOrders.filter(order => {
-       // Guard against malformed orders that would crash the filter
-       if (!order.pickup || !order.dropoff || !order.items?.itemDesc) return false;
-
-       const matchesSearch =
-          order.pickup.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          order.dropoff.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          order.items.itemDesc.toLowerCase().includes(searchQuery.toLowerCase());
-
-       const isPending = order.status === 'pending';
-
-       return matchesSearch && vehicleMatches(order) && isPending;
-    }), [availableOrders, searchQuery, vehicleMatches]);
+    // Filtered Orders Logic (memoized + null-safe) + proximity sort.
+    // Drivers see orders within a 50km radius of their current location
+    // (Uber/Bolt pattern). Orders beyond 50km are filtered out to keep the
+    // marketplace relevant. If driver location is unknown, distance sort is
+    // skipped (orders still shown by recency).
+    const ACCEPT_RADIUS_KM = 50;
+    const filteredOrders = useMemo(() => {
+       if (!driverCoords) {
+          // No GPS yet ÃÂ¢ show all by recency (existing behavior)
+          return availableOrders.filter(order => {
+             if (!order.pickup || !order.dropoff || !order.items?.itemDesc) return false;
+             const matchesSearch =
+                order.pickup.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                order.dropoff.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                order.items.itemDesc.toLowerCase().includes(searchQuery.toLowerCase());
+             return matchesSearch && vehicleMatches(order) && order.status === 'pending';
+          });
+       }
+       const withDistance = availableOrders
+          .filter(order => {
+             if (!order.pickup || !order.dropoff || !order.items?.itemDesc) return false;
+             if (order.status !== 'pending') return false;
+             const matchesSearch =
+                order.pickup.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                order.dropoff.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                order.items.itemDesc.toLowerCase().includes(searchQuery.toLowerCase());
+             if (!matchesSearch || !vehicleMatches(order)) return false;
+             // Radius filter: distance from driver to order pickup
+             if (order.pickupCoords?.lat && order.pickupCoords?.lng) {
+                const d = mapService.calculateDistance(driverCoords, order.pickupCoords);
+                return d <= ACCEPT_RADIUS_KM;
+             }
+             return true; // No coords ÃÂ¢ keep (avoid hiding legacy orders)
+          })
+          .map(order => ({
+             order,
+             distance: (order.pickupCoords?.lat && order.pickupCoords?.lng && driverCoords)
+                ? mapService.calculateDistance(driverCoords, order.pickupCoords)
+                : Infinity
+          }))
+          .sort((a, b) => a.distance - b.distance)
+          .map(x => x.order);
+       return withDistance;
+    }, [availableOrders, searchQuery, vehicleMatches, driverCoords]);
 
    // Helper for Icons
    const getVehicleIcon = (type: string) => {

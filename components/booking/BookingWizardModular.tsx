@@ -331,7 +331,7 @@ const WizardContent: React.FC<BookingWizardProps> = ({ prefillData, onOrderCompl
             pickupCoords: pickupCoords || { lat: 0, lng: 0 },
             dropoffCoords: finalDropoffCoords || { lat: 0, lng: 0 },
             pickupTime: data.isScheduled ? data.pickupTime : 'ASAP',
-            vehicle: data.vehicle,
+            vehicle: data.vehicle || activeVehicle?.id || 'boda',
             items: {
                 itemDesc: `${data.category} - ${data.subCategory}`,
                 category: data.category as any,

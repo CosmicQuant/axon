@@ -5,8 +5,13 @@ const { sendPushNotification } = require('./notifications');
 // ── EXPIRE PENDING ORDERS (scheduled cron) ──────────────────────
 // Runs every minute; flips pending orders past their expiresAt to 'expired'
 // and notifies the customer. Paginated to handle large backlogs.
+//
+// IMPORTANT: `expiresAt` is stored as an ISO STRING (not a Firestore Timestamp)
+// by the booking wizard. Comparing a Timestamp against a string with `<` returns
+// no results (Firestore requires matching types). So we use ISO strings here.
+// We also backfill/migrate any value that was stored as a Timestamp.
 const expirePendingOrdersHandler = async (event) => {
-    const now = admin.firestore.Timestamp.now();
+    const nowIso = new Date().toISOString();
     let totalExpired = 0;
 
     // Paginate: process up to 400 per batch, loop until no more expired orders
@@ -14,7 +19,7 @@ const expirePendingOrdersHandler = async (event) => {
         const snapshot = await admin.firestore()
             .collection('orders')
             .where('status', '==', 'pending')
-            .where('expiresAt', '<', now)
+            .where('expiresAt', '<', nowIso)
             .limit(400)
             .get();
 
@@ -24,12 +29,25 @@ const expirePendingOrdersHandler = async (event) => {
         const expiredUserIds = [];
 
         snapshot.forEach(doc => {
-            batch.update(doc.ref, {
-                status: 'expired',
-                updatedAt: new Date().toISOString(),
-            });
-            const userId = doc.data().userId;
-            if (userId) expiredUserIds.push(userId);
+            const data = doc.data();
+            // Defensive: normalize expiresAt to an ISO string if it was somehow
+            // stored as a Firestore Timestamp on legacy orders (helps future
+            // queries that compare against ISO strings).
+            const exp = data.expiresAt;
+            if (exp && typeof exp.toISOString === 'function') {
+                // It's a Firestore Timestamp Ã¢ convert & persist the migration
+                batch.update(doc.ref, {
+                    status: 'expired',
+                    expiresAt: exp.toDate().toISOString(),
+                    updatedAt: nowIso,
+                });
+            } else {
+                batch.update(doc.ref, {
+                    status: 'expired',
+                    updatedAt: nowIso,
+                });
+            }
+            if (data.userId) expiredUserIds.push(data.userId);
         });
 
         await batch.commit();

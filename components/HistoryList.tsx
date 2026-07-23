@@ -64,7 +64,9 @@ const HistoryList: React.FC<HistoryListProps> = ({ onTrackOrder, onReorder }) =>
   }
 
   const ongoingOrders = orders?.filter(o => ['pending', 'driver_assigned', 'arriving_pickup', 'in_transit'].includes(o.status)) || [];
-  const deliveredOrders = orders?.filter(o => ['delivered', 'reviewed', 'cancelled'].includes(o.status)) || [];
+  // Terminal orders shown in the "Delivered" tab: delivered, reviewed (post-review),
+    // cancelled, and expired (no driver accepted within the time window).
+    const deliveredOrders = orders?.filter(o => ['delivered', 'reviewed', 'cancelled', 'expired'].includes(o.status)) || [];
 
   const displayOrders = activeTab === 'ongoing' ? ongoingOrders : deliveredOrders;
 
