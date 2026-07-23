@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GoogleMap, MarkerF, Polyline, InfoWindow, OverlayView } from '@react-google-maps/api';
 import { useMapState } from '@/context/MapContext';
 import { APP_CONFIG } from '@/config';
-import { Truck, Navigation, MapPin, GripVertical, X } from 'lucide-react';
+import { Truck, Navigation, MapPin, GripVertical, X, Compass, Flag, ArrowUp, ArrowUpRight, ArrowRight, ArrowDownRight, ArrowDown, ArrowLeft, ArrowUpLeft, CornerUpLeft, CornerUpRight, Merge, Navigation2 } from 'lucide-react';
 
 /* ── Bird's-eye (top-down) vehicle SVGs ─────────────────────
    All paths face NORTH (12 o'clock) at 0°. The parent div rotates by GPS bearing.
@@ -139,6 +139,34 @@ const getBirdEyeSvg = (type: string): React.FC<{ size: number; accent: string }>
     return BirdEyeTruck;
 };
 
+// Phase 3: Maneuver icon for the navigation banner
+const ManeuverIcon = ({ maneuver }: { maneuver: string }) => {
+    const iconMap: Record<string, React.FC<any>> = {
+        'turn-left': ArrowUpLeft,
+        'turn-right': ArrowUpRight,
+        'slight-left': ArrowUpLeft,
+        'slight-right': ArrowUpRight,
+        'sharp-left': CornerUpLeft,
+        'sharp-right': CornerUpRight,
+        'uturn-left': CornerUpLeft,
+        'uturn-right': CornerUpRight,
+        'straight': ArrowUp,
+        'keep-left': ArrowUpLeft,
+        'keep-right': ArrowUpRight,
+        'merge-left': Merge,
+        'merge-right': Merge,
+        'merge': Merge,
+        'fork-left': ArrowUpLeft,
+        'fork-right': ArrowUpRight,
+        'ramp-left': ArrowUpLeft,
+        'ramp-right': ArrowUpRight,
+        'roundabout-left': ArrowUpLeft,
+        'roundabout-right': ArrowUpRight,
+    };
+    const IconComp = iconMap[maneuver] || ArrowUp;
+    return <IconComp className="w-6 h-6" strokeWidth={2.5} />;
+};
+
 const VehicleIcon = ({ type, bearing = 0, color = "blue", isDriver = false }: { type: string, bearing?: number, color?: string, isDriver?: boolean }) => {
     const size = isDriver ? 44 : 28;
     const accent = getVehicleAccent(type, isDriver);
@@ -200,6 +228,17 @@ const computePadding = (bottomSheetHeight: number) => {
     return isDesktop
         ? { top: 50, bottom: 50, left: 40, right: 440 }
         : { top: 50, bottom: sheetPad, left: 48, right: 48 };
+};
+
+// Haversine distance in km (Phase 4 — auto-arriving mode trigger)
+const haversine = (a: { lat: number; lng: number }, b: { lat: number; lng: number }): number => {
+    const R = 6371;
+    const dLat = (b.lat - a.lat) * Math.PI / 180;
+    const dLng = (b.lng - a.lng) * Math.PI / 180;
+    const sinLat = Math.sin(dLat / 2);
+    const sinLng = Math.sin(dLng / 2);
+    const h = sinLat * sinLat + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * sinLng * sinLng;
+    return 2 * R * Math.asin(Math.sqrt(h));
 };
 
 // Helper to decode Google's encoded polyline
@@ -268,6 +307,11 @@ const MapLayer: React.FC = () => {
         bottomSheetHeight,
         cameraMode,
         setCameraMode,
+        headingUp,
+        setHeadingUp,
+        nextManeuver,
+        driverAccuracy,
+        setDriverAccuracy,
         userInteractedAt,
         markUserInteraction,
         clearUserInteraction
@@ -283,6 +327,9 @@ const MapLayer: React.FC = () => {
     const [mapVisible, setMapVisible] = useState(false);
     const cameraTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
     const lastBoundsRef = useRef('');
+    const interpolatedDriverCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
+    const interpolationFrameRef = useRef<number | null>(null);
+    const overviewAutoReturnRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastSheetHeightRef = useRef(0);
     const sheetRefitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const prevDriverCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
@@ -555,6 +602,9 @@ const MapLayer: React.FC = () => {
         // Auto-set camera mode based on order state transitions
         if (orderState === 'IN_TRANSIT' && prevOrderStateRef.current !== 'IN_TRANSIT') {
             setCameraMode('follow');
+        } else if (orderState === 'DRIVER_IDLE' && prevOrderStateRef.current !== 'DRIVER_IDLE') {
+            // Driver is online but waiting for jobs — follow their GPS at zoom 16
+            setCameraMode('follow');
         } else if (orderState === 'IDLE' || orderState === 'DRAFTING') {
             setCameraMode('idle');
         }
@@ -562,15 +612,17 @@ const MapLayer: React.FC = () => {
     }, [map, orderState, userLocation, flyTo, setCameraMode]);
 
     // ── Effect: Follow driver at navigation-level zoom ─────────────
-    // State-machine driven: only follows when cameraMode is 'follow' or 'arriving'.
+    // State-machine driven: follows when cameraMode is 'follow' or 'arriving'.
+    // Also follows the driver during DRIVER_IDLE (waiting for jobs).
     // Pauses for 8s after user interaction (pan/zoom), like Bolt/Uber.
     const USER_INTERACTION_PAUSE_MS = 8000;
+    const OVERVIEW_AUTO_RETURN_MS = 10000;
     useEffect(() => {
         if (!map || !driverCoords) {
             prevDriverCoordsRef.current = driverCoords;
             return;
         }
-        // Only follow when actively tracking
+        // Only follow when actively tracking or driver idle
         if (orderState === 'IDLE' || orderState === 'DRAFTING') {
             prevDriverCoordsRef.current = driverCoords;
             return;
@@ -597,16 +649,65 @@ const MapLayer: React.FC = () => {
         // Skip if another animation is mid-flight from a fitBounds call
         if (isMapAnimatingRef.current) return;
 
+        // ── Phase 4: Auto-switch to 'arriving' mode when within 200m of next destination ──
+        // Determine the next destination based on order state
+        if (orderState === 'IN_TRANSIT' && cameraMode === 'follow') {
+            let nextDest: { lat: number; lng: number } | null = null;
+            if (dropoffCoords) nextDest = dropoffCoords;
+            if (waypointCoords && waypointCoords.length > 0) nextDest = waypointCoords[waypointCoords.length - 1];
+            if (pickupCoords && !dropoffCoords && !waypointCoords?.length) nextDest = pickupCoords;
+
+            if (nextDest) {
+                const distToDest = haversine(driverCoords, nextDest);
+                if (distToDest <= 0.2) { // 200m
+                    setCameraMode('arriving');
+                }
+            }
+        }
+
         const padding = computePadding(bottomSheetHeight);
         // Offset center upward so driver is visible above the bottom sheet
         const padded = computeBoundsTarget([driverCoords], padding);
         const target = padded ? padded.target : driverCoords;
 
         // Use a tighter zoom for 'arriving' mode (closer to destination)
-        const zoom = cameraMode === 'arriving' ? CAMERA.DRIVER_FOLLOW_ZOOM + 1 : CAMERA.DRIVER_FOLLOW_ZOOM;
+        const zoom = cameraMode === 'arriving' ? CAMERA.DRIVER_FOLLOW_ZOOM + 2 : CAMERA.DRIVER_FOLLOW_ZOOM;
 
         flyTo(target, zoom, CAMERA.DRIVER_FOLLOW_MS, easeInOutCubic);
-    }, [map, driverCoords, orderState, cameraMode, userInteractedAt, flyTo, computeBoundsTarget, bottomSheetHeight]);
+
+        // ── Phase 3: Heading-up rotation ──
+        // When headingUp is on (driver navigation), rotate the map so the
+        // direction of travel is "up". Google Map v2 requires setHeading + tilt
+        // for the immersive 3D view.
+        if (headingUp && driverBearing !== undefined && driverBearing > 0) {
+            try {
+                (map as any).moveCamera({ heading: driverBearing, tilt: 45 });
+            } catch {
+                // heading/tilt only supported with vector maps (mapId set)
+            }
+        }
+    }, [map, driverCoords, orderState, cameraMode, userInteractedAt, flyTo, computeBoundsTarget, bottomSheetHeight, headingUp, driverBearing, pickupCoords, dropoffCoords, waypointCoords, setCameraMode]);
+
+    // ── Effect: Phase 4 — Auto-return from overview to follow after 10s ──
+    useEffect(() => {
+        if (cameraMode === 'overview') {
+            overviewAutoReturnRef.current = setTimeout(() => {
+                setCameraMode('follow');
+                clearUserInteraction();
+            }, OVERVIEW_AUTO_RETURN_MS);
+        }
+        return () => {
+            if (overviewAutoReturnRef.current) clearTimeout(overviewAutoReturnRef.current);
+        };
+    }, [cameraMode, setCameraMode, clearUserInteraction]);
+
+    // ── Effect: Phase 3 — Reset heading/tilt when headingUp turns off ──
+    useEffect(() => {
+        if (!map) return;
+        if (!headingUp) {
+            try { (map as any).moveCamera({ heading: 0, tilt: 0 }); } catch { /* vector maps only */ }
+        }
+    }, [map, headingUp]);
 
     // ── Effect: Re-fit route when bottom sheet resizes ──────────────
     useEffect(() => {
@@ -753,6 +854,7 @@ const MapLayer: React.FC = () => {
 
                     {dropoffCoords && (!isMapSelecting || activeInput !== 'dropoff') && (
                         <>
+                            {/* Phase 5: Destination flag marker (Uber/Bolt style) */}
                             <OverlayView
                                 position={dropoffCoords}
                                 mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
@@ -765,9 +867,14 @@ const MapLayer: React.FC = () => {
                                             setMapCenter(dropoffCoords.lat, dropoffCoords.lng);
                                         }
                                     }}
-                                    className="w-6 h-6 bg-red-500 rounded-full border-4 border-white shadow-xl -translate-x-1/2 -translate-y-1/2 cursor-pointer hover:scale-110 transition-transform flex items-center justify-center"
+                                    className="relative -translate-x-1/2 -translate-y-full cursor-pointer hover:scale-110 transition-transform"
                                 >
-                                    <div className="w-1.5 h-1.5 bg-white rounded-full" />
+                                    <div className="flex flex-col items-center">
+                                        <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center shadow-2xl border-2 border-white">
+                                            <Flag className="w-4 h-4 text-white" />
+                                        </div>
+                                        <div className="w-1 h-8 bg-red-600 shadow-sm -mt-0.5 rounded-full"></div>
+                                    </div>
                                 </div>
                             </OverlayView>
                             <OverlayView
@@ -828,6 +935,21 @@ const MapLayer: React.FC = () => {
 
                     {driverCoords && (
                         <>
+                            {/* Phase 5: GPS accuracy circle (translucent blue, like Google Maps) */}
+                            {driverAccuracy > 25 && (
+                                <OverlayView
+                                    position={driverCoords}
+                                    mapPaneName={OverlayView.OVERLAY_LAYER}
+                                >
+                                    <div
+                                        className="rounded-full bg-blue-400/15 border border-blue-400/30 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                                        style={{
+                                            width: `${Math.min(driverAccuracy * 2, 300)}px`,
+                                            height: `${Math.min(driverAccuracy * 2, 300)}px`,
+                                        }}
+                                    />
+                                </OverlayView>
+                            )}
                             <OverlayView
                                 position={driverCoords}
                                 mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
@@ -900,10 +1022,39 @@ const MapLayer: React.FC = () => {
                     />
                 </GoogleMap>
 
-                {/* Overview / Recenter buttons — Bolt/Uber style navigation controls */}
-                {orderState === 'IN_TRANSIT' && !isMapSelecting && (
+                {/* ── Phase 3: Navigation banner (next maneuver) — Uber/Bolt style ── */}
+                {orderState === 'IN_TRANSIT' && nextManeuver && !isMapSelecting && (
+                    <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+                        <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-100 px-4 py-3 flex items-center gap-3 min-w-[220px] animate-in slide-in-from-top-4 duration-300">
+                            <div className="w-11 h-11 rounded-xl bg-brand-600 flex items-center justify-center text-white flex-shrink-0 shadow-lg">
+                                <ManeuverIcon maneuver={nextManeuver.maneuver} />
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                                <span className="text-lg font-black text-gray-900 leading-none">
+                                    {nextManeuver.distanceMeters >= 1000
+                                        ? `${(nextManeuver.distanceMeters / 1000).toFixed(1)} km`
+                                        : `${Math.round(nextManeuver.distanceMeters)} m`}
+                                </span>
+                                <span className="text-[11px] font-bold text-gray-500 truncate">{nextManeuver.streetName || nextManeuver.instructions || 'Continue'}</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Overview / Recenter / Compass buttons — Bolt/Uber style navigation controls */}
+                {(orderState === 'IN_TRANSIT' || orderState === 'DRIVER_IDLE') && !isMapSelecting && (
                     <div className="absolute right-4 top-24 z-10 flex flex-col gap-2">
-                        {cameraMode !== 'overview' && (pickupCoords || dropoffCoords) && (
+                        {/* Phase 3: Compass button — toggles heading-up vs north-up */}
+                        {orderState === 'IN_TRANSIT' && (
+                            <button
+                                onClick={() => setHeadingUp(!headingUp)}
+                                className={`w-12 h-12 rounded-2xl shadow-2xl flex items-center justify-center transition-all active:scale-95 border ${headingUp ? 'bg-brand-600 text-white border-brand-500' : 'bg-white text-gray-700 border-gray-100 hover:bg-gray-50'}`}
+                                title={headingUp ? 'Switch to North-up' : 'Switch to heading-up navigation'}
+                            >
+                                <Compass className={`w-5 h-5 ${headingUp ? 'animate-pulse' : ''}`} style={headingUp ? { transform: `rotate(${driverBearing}deg)` } : undefined} />
+                            </button>
+                        )}
+                        {orderState === 'IN_TRANSIT' && cameraMode !== 'overview' && (pickupCoords || dropoffCoords) && (
                             <button
                                 onClick={() => {
                                     const points: any[] = [];

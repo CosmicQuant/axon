@@ -8,8 +8,16 @@ import { db } from '@/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 
-export type MapOrderState = 'IDLE' | 'DRAFTING' | 'MATCHING' | 'IN_TRANSIT' | 'COMPLETED';
+export type MapOrderState = 'IDLE' | 'DRAFTING' | 'MATCHING' | 'DRIVER_IDLE' | 'IN_TRANSIT' | 'COMPLETED';
 export type CameraMode = 'idle' | 'follow' | 'overview' | 'arriving';
+
+// Next maneuver for the navigation banner (Phase 3)
+export interface NextManeuver {
+    maneuver: string;        // 'turn-left', 'turn-right', 'straight', 'uturn-left', 'roundabout-left', etc.
+    distanceMeters: number;  // distance to the maneuver point
+    instructions: string;    // human-readable instruction e.g. "Turn left onto Moi Avenue"
+    streetName?: string;     // extracted street name
+}
 
 interface Coordinates {
     lat: number;
@@ -103,6 +111,20 @@ interface MapContextType {
     cameraMode: CameraMode;
     setCameraMode: (mode: CameraMode) => void;
 
+    // Heading-up navigation (Phase 3): when true, the map rotates with the
+    // driver's bearing so the direction of travel is always "up" (like Uber/Bolt).
+    // Customers never use this — only drivers in 'follow' mode.
+    headingUp: boolean;
+    setHeadingUp: (up: boolean) => void;
+
+    // Next maneuver for the navigation banner (Phase 3)
+    nextManeuver: NextManeuver | null;
+    setNextManeuver: (maneuver: NextManeuver | null) => void;
+
+    // GPS accuracy in meters (Phase 5 — accuracy circle around driver marker)
+    driverAccuracy: number;
+    setDriverAccuracy: (accuracy: number) => void;
+
     // User interaction tracking — when the user manually pans/zooms,
     // follow mode pauses for 8 seconds. Maps to a timestamp.
     userInteractedAt: number;
@@ -152,6 +174,9 @@ export const MapProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const [orderState, setOrderState] = useState<MapOrderState>('IDLE');
     const [cameraMode, setCameraMode] = useState<CameraMode>('idle');
+    const [headingUp, setHeadingUp] = useState<boolean>(false);
+    const [nextManeuver, setNextManeuver] = useState<NextManeuver | null>(null);
+    const [driverAccuracy, setDriverAccuracy] = useState<number>(0);
     const [userInteractedAt, setUserInteractedAt] = useState<number>(0);
     const [pickupCoords, setPickupCoordsInternal] = useState<Coordinates | null>(null);
     const [dropoffCoords, setDropoffCoordsInternal] = useState<Coordinates | null>(null);
@@ -167,8 +192,8 @@ export const MapProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     useEffect(() => {
         if (!isLoaded) return;
 
-        // Only show nearby vehicles when idle, drafting, or matching
-        if (orderState !== 'IDLE' && orderState !== 'DRAFTING' && orderState !== 'MATCHING') {
+        // Show nearby vehicles when idle, drafting, matching, OR driver-idle
+        if (!['IDLE', 'DRAFTING', 'MATCHING', 'DRIVER_IDLE'].includes(orderState)) {
             setNearbyVehicles([]);
             return;
         }
@@ -541,6 +566,12 @@ export const MapProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             resetBoundsTrigger,
             cameraMode,
             setCameraMode,
+            headingUp,
+            setHeadingUp,
+            nextManeuver,
+            setNextManeuver,
+            driverAccuracy,
+            setDriverAccuracy,
             userInteractedAt,
             markUserInteraction,
             clearUserInteraction,

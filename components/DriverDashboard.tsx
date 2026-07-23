@@ -7,7 +7,7 @@ import { orderApi } from '../services/orderApi';
 import { mapService } from '../services/mapService';
 import { storageService } from '../services/storageService';
 import { MapProvider, useMapState } from '@/context/MapContext';
-import { collection, query, where, onSnapshot, limit } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, limit, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { usePrompt } from '../context/PromptContext';
@@ -112,7 +112,7 @@ interface DashboardContentProps extends DriverDashboardProps {
 const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHome, onViewChange, currentView: propCurrentView }) => {
    const { logout, updateUser, deleteAccount } = useAuth();
    const { showAlert, showConfirm } = usePrompt();
-   const { isLoaded, setPickupCoords, setDropoffCoords, setWaypointCoords, setOrderState, fitBounds, setDriverCoords, setDriverBearing, setDriverVehicleType, setRoutePolyline, requestUserLocation, driverCoords, setBottomSheetHeight } = useMapState();
+   const { isLoaded, setPickupCoords, setDropoffCoords, setWaypointCoords, setOrderState, fitBounds, setDriverCoords, setDriverBearing, setDriverVehicleType, setRoutePolyline, setNextManeuver, setDriverAccuracy, requestUserLocation, driverCoords, setBottomSheetHeight, setCameraMode, setHeadingUp } = useMapState();
 
    const [internalView, setInternalView] = useState<DashboardView>('JOBS');
 
@@ -328,71 +328,140 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                 return { pickup: p, dropoff: d };
              });
 
-             if (p && d) {
-                setPickupCoords(p);
-                setDropoffCoords(d);
+if (p && d) {
+                 setPickupCoords(p);
+                 setDropoffCoords(d);
 
-                // Set Waypoints for multi-stop visualization
-                if (activeJob.stops && activeJob.stops.length > 0) {
-                   const wpCoords = activeJob.stops
-                      .filter(s => s.type === 'waypoint')
-                      .map(s => ({ lat: s.lat, lng: s.lng }));
-                   setWaypointCoords(wpCoords);
-                } else {
-                   setWaypointCoords([]);
-                }
+                 // Set Waypoints for multi-stop visualization
+                 if (activeJob.stops && activeJob.stops.length > 0) {
+                    const wpCoords = activeJob.stops
+                       .filter(s => s.type === 'waypoint')
+                       .map(s => ({ lat: s.lat, lng: s.lng }));
+                    setWaypointCoords(wpCoords);
+                 } else {
+                    setWaypointCoords([]);
+                 }
 
-                setOrderState('IN_TRANSIT');
+                 setOrderState('IN_TRANSIT');
+                 setCameraMode('follow');
+                 setHeadingUp(true);
 
-                // Determine navigation target based on multi-stop logic
-                const userLoc = await requestUserLocation();
-                const remainingStops = allStops.filter(s => s.status !== 'completed');
+                 // Determine navigation target based on multi-stop logic
+                 const userLoc = await requestUserLocation();
+                 const remainingStops = allStops.filter(s => s.status !== 'completed');
 
-                if (remainingStops.length > 0) {
-                   const startPoint = userLoc || p;
-                   const endPoint = remainingStops[remainingStops.length - 1].coords;
-                   const waypoints = remainingStops.slice(0, -1).map(s => s.coords);
+                 if (remainingStops.length > 0) {
+                    const startPoint = userLoc || driverCoords || p;
+                    const endPoint = remainingStops[remainingStops.length - 1].coords;
+                    const waypoints = remainingStops.slice(0, -1).map(s => s.coords);
 
-                   if (startPoint && endPoint) {
-                      const allPoints = [startPoint, p, d, ...allStops.map(s => s.coords!)].filter(pt => !!pt);
-                      fitBounds(allPoints);
-                      const route = await mapService.getRoute(startPoint, endPoint, waypoints, activeJob.vehicle);
-                      if (route) {
-                         setRoutePolyline(route.geometry);
-                         setRouteDuration(route.nextLegDuration);
-                         setRouteDistance(Math.round(((route.nextLegDistance || 0) / 1000) * 10) / 10);
-                         setTotalRouteDuration(route.duration);
-                         setTotalRouteDistance(Math.round((route.distance / 1000) * 10) / 10);
-                      }
-                   }
-                } else {
-                   fitBounds([p, d]);
-                   const route = await mapService.getRoute(p, d, [], activeJob.vehicle);
-                   if (route) {
-                      setRoutePolyline(route.geometry);
-                      setRouteDuration(route.duration);
-                      setRouteDistance(Math.round((route.distance / 1000) * 10) / 10);
-                      setTotalRouteDuration(route.duration);
-                      setTotalRouteDistance(Math.round((route.distance / 1000) * 10) / 10);
-                   }
-                }
-             }
-          } else if (!activeJob) {
-             setPickupCoords(null);
-             setDropoffCoords(null);
-             setWaypointCoords([]);
-             setRoutePolyline(null);
-             setOrderState('IDLE');
-             setRouteDuration(null);
-             setRouteDistance(null);
-             setTotalRouteDuration(null);
-             setTotalRouteDistance(null);
-          }
+                    if (startPoint && endPoint) {
+                       // ── Staged camera: fit only driver→next destination (not the full route) ──
+                       fitBounds([startPoint, endPoint]);
+                       const route = await mapService.getRoute(startPoint, endPoint, waypoints, activeJob.vehicle);
+                       if (route) {
+                          setRoutePolyline(route.geometry);
+                          setRouteDuration(route.nextLegDuration);
+                          setRouteDistance(Math.round(((route.nextLegDistance || 0) / 1000) * 10) / 10);
+                          setTotalRouteDuration(route.duration);
+                          setTotalRouteDistance(Math.round((route.distance / 1000) * 10) / 10);
+                          if (route.nextManeuver) setNextManeuver(route.nextManeuver);
+                       }
+                    }
+                 } else {
+                    fitBounds([p, d]);
+                    const route = await mapService.getRoute(p, d, [], activeJob.vehicle);
+                    if (route) {
+                       setRoutePolyline(route.geometry);
+                       setRouteDuration(route.duration);
+                       setRouteDistance(Math.round((route.distance / 1000) * 10) / 10);
+                       setTotalRouteDuration(route.duration);
+                       setTotalRouteDistance(Math.round((route.distance / 1000) * 10) / 10);
+                       if (route.nextManeuver) setNextManeuver(route.nextManeuver);
+                    }
+                 }
+              }
+} else if (!activeJob) {
+              setPickupCoords(null);
+              setDropoffCoords(null);
+              setWaypointCoords([]);
+              setRoutePolyline(null);
+              setNextManeuver(null);
+              setOrderState('DRIVER_IDLE');
+              setCameraMode('follow');
+              setHeadingUp(false);
+              setRouteDuration(null);
+              setRouteDistance(null);
+              setTotalRouteDuration(null);
+              setTotalRouteDistance(null);
+           }
        };
        syncMap();
        // Removed currentView and allStops from deps to prevent re-fetching on view switches
        // and geocode loops. Route refresh is handled by the tracking effect.
     }, [activeJob?.id, activeJob?.pickup, activeJob?.dropoff, nextStop?.id, isLoaded, setPickupCoords, setDropoffCoords, setWaypointCoords, setOrderState, fitBounds, setRoutePolyline, requestUserLocation]);
+
+    // ── Always-on GPS tracking for the driver's own vehicle marker ──
+    // Runs whenever the driver is on the JOBS view (active job or not).
+    // This ensures the driver's vehicle marker is ALWAYS visible at their
+    // current location on the map (Uber/Bolt pattern), and writes the
+    // driver's location to their driver doc so customers can see them nearby.
+    useEffect(() => {
+       if (!isOnline || !user?.id || currentView !== 'JOBS' || !isLoaded) {
+          return;
+       }
+
+       const IDLE_WRITE_INTERVAL = 30000; // Write driver location every 30s when idle (vs 5s when active)
+       let lastIdleWrite = 0;
+
+       const watchId = navigator.geolocation.watchPosition(
+          async (position) => {
+             const { latitude: lat, longitude: lng, heading, accuracy } = position.coords;
+
+             // Reject highly inaccurate fixes
+             if (accuracy && accuracy > 80) return;
+
+             const currentCoords = { lat, lng };
+
+             // Deadband: skip if hasn't moved >10m from last valid position
+             if (lastValidCoordsRef.current) {
+                const dist = mapService.calculateDistance(lastValidCoordsRef.current, currentCoords);
+                if (dist < 0.01) return;
+             }
+             lastValidCoordsRef.current = currentCoords;
+
+             // Always update MapContext so the vehicle marker shows
+             setDriverCoords(currentCoords);
+             setDriverAccuracy(accuracy || 0);
+             if (heading) setDriverBearing(heading);
+
+             // When idle (no active job), write driver location to Firestore
+             // at a throttled interval so customers' "nearby vehicles" updates.
+             if (!hasActiveJob) {
+                const now = Date.now();
+                if (now - lastIdleWrite > IDLE_WRITE_INTERVAL) {
+                   lastIdleWrite = now;
+                   try {
+                      await updateDoc(doc(db, 'drivers', user.id), {
+                         location: { lat, lng },
+                         bearing: heading || 0,
+                         lastLocationUpdate: new Date().toISOString()
+                      });
+                   } catch (e) {
+                      // Non-fatal — location update is best-effort
+                   }
+                }
+             }
+          },
+          (error) => {
+             if (import.meta.env.DEV) console.warn('Driver idle GPS error:', error);
+          },
+          { enableHighAccuracy: true, timeout: 20000, maximumAge: 5000 }
+       );
+
+       return () => navigator.geolocation.clearWatch(watchId);
+    }, [isOnline, user?.id, currentView, isLoaded, hasActiveJob, setDriverCoords, setDriverBearing, setDriverAccuracy]);
+
 
     // Real-time Driver Tracking — runs whenever there's an active job, regardless of view
     useEffect(() => {
@@ -481,6 +550,7 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
                               setRouteDistance(remDist ?? null);
                               setTotalRouteDuration(totalDur ?? null);
                               setTotalRouteDistance(totalDist ?? null);
+                              if (route.nextManeuver) setNextManeuver(route.nextManeuver);
                            }
                         }
                       }

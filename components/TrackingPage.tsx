@@ -28,6 +28,7 @@ const TrackingPageContent: React.FC = () => {
     const [orderCodes, setOrderCodes] = React.useState<{ orderCode?: string; stopCodes?: Record<string, string> }>({});
     const lastRouteUpdate = React.useRef<number>(0);
     const lastSyncedOrderId = React.useRef<string>(''); // gate setMapCenter to first-load-per-order
+    const lastFitBoundsStatus = React.useRef<string>(''); // gate fitBounds to status transitions only
     const updateStatusMutation = useUpdateOrderStatus();
     const updateOrderMutation = useUpdateOrder();
 
@@ -156,14 +157,18 @@ const TrackingPageContent: React.FC = () => {
                         setDriverBearing(order.driverLocation.bearing);
                     }
 
-                    // Fit bounds to include driver and their current destination
-                    if (order.status === 'driver_assigned' && p) {
+                    // Fit bounds to include driver and their current destination —
+                    // BUT only on status transitions, not every Firestore snapshot.
+                    // Repeated fitBounds on every location update fights the follow-mode camera.
+                    const statusChanged = lastFitBoundsStatus.current !== order.status;
+                    if (order.status === 'driver_assigned' && p && statusChanged) {
                         fitBounds([driverPos, p]);
-                    } else if (order.status === 'in_transit' && d) {
+                    } else if (order.status === 'in_transit' && d && statusChanged) {
                         fitBounds([driverPos, d]);
                     }
-                } else if (p && d) {
-                    // No driver yet, show full route bounds including waypoints
+                    lastFitBoundsStatus.current = order.status;
+                } else if (p && d && lastFitBoundsStatus.current !== 'no-driver') {
+                    // No driver yet — show full route bounds INCLUDING waypoints (once)
                     const allPoints: Array<{ lat: number; lng: number }> = [p, d];
                     order.stops?.forEach(s => {
                         if (s.type !== 'dropoff' && s.lat && s.lng) {
@@ -171,6 +176,7 @@ const TrackingPageContent: React.FC = () => {
                         }
                     });
                     fitBounds(allPoints);
+                    lastFitBoundsStatus.current = 'no-driver';
                 }
             } catch (error) {
                 console.error("Error syncing map in TrackingPage:", error);

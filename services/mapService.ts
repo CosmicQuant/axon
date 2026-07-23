@@ -422,8 +422,8 @@ export const mapService = {
             };
 
             const fieldMask = isOptimizing
-                ? 'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.legs,routes.optimizedIntermediateWaypointIndex'
-                : 'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.legs';
+                ? 'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.legs,routes.legs.steps,routes.optimizedIntermediateWaypointIndex'
+                : 'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.legs,routes.legs.steps';
 
             const response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
                 method: 'POST',
@@ -476,12 +476,73 @@ export const mapService = {
                     console.log("[Diagnostic: mapService] V2 Optimization Index Found:", route.optimizedIntermediateWaypointIndex);
                 }
 
+                // ── Extract next maneuver + street name from the first leg's steps ──
+// The Routes API v2 returns legs[].steps[].navigationInstruction.maneuver
+// (e.g. 'TURN_LEFT', 'STRAIGHT') + legs[].steps[].distanceMeters +
+// legs[].steps[].instructions (e.g. "Turn left onto Moi Avenue").
+                let nextManeuver: any = null;
+                let steps: any[] = [];
+                if (route.legs && route.legs[0] && route.legs[0].steps) {
+                    steps = route.legs[0].steps.map((s: any) => ({
+                        maneuver: s.navigationInstruction?.maneuver || 'STRAIGHT',
+                        distanceMeters: s.distanceMeters || 0,
+                        instructions: s.instructions || s.navigationInstruction?.instructions || '',
+                        startLocation: s.startLocation?.latLng,
+                        endLocation: s.endLocation?.latLng,
+                        polyline: s.polyline?.encodedPolyline,
+                        speedReadingIntervals: s.speedReadingIntervals || [],
+                    }));
+
+                    const firstStep = steps[0];
+                    if (firstStep) {
+                        // Decode the maneuver value to a banner-friendly format
+                        const rawManeuver = firstStep.maneuver || 'STRAIGHT';
+                        const maneuverMapRo: Record<string, string> = {
+                            'TURN_SLIGHT_LEFT': 'slight-left',
+                            'TURN_SHARP_LEFT': 'sharp-left',
+                            'UTURN_LEFT': 'uturn-left',
+                            'TURN_LEFT': 'turn-left',
+                            'TURN_SLIGHT_RIGHT': 'slight-right',
+                            'TURN_SHARP_RIGHT': 'sharp-right',
+                            'UTURN_RIGHT': 'uturn-right',
+                            'TURN_RIGHT': 'turn-right',
+                            'STRAIGHT': 'straight',
+                            'RUNDABOUT_LEFT': 'roundabout-left',
+                            'RUNDABOUT_RIGHT': 'roundabout-right',
+                            'FORK_LEFT': 'fork-left',
+                            'FORK_RIGHT': 'fork-right',
+                            'MERGE_LEFT': 'merge-left',
+                            'MERGE_RIGHT': 'merge-right',
+                            'MERGE_UNSPECIFIED': 'merge',
+                            'ON_RAMP_LEFT': 'ramp-left',
+                            'ON_RAMP_RIGHT': 'ramp-right',
+                            'OFF_RAMP_LEFT': 'ramp-left',
+                            'OFF_RAMP_RIGHT': 'ramp-right',
+                            'KEEP_LEFT': 'keep-left',
+                            'KEEP_RIGHT': 'keep-right',
+                        };
+                        const parsedManeuver = maneuverMapRo[rawManeuver] || 'straight';
+                        let streetName = firstStep.instructions || '';
+                        const m = streetName.match(/onto (.+?)(?:\.|$)/i);
+                        if (m) streetName = m[1].trim();
+
+                        nextManeuver = {
+                            maneuver: parsedManeuver,
+                            distanceMeters: firstStep.distanceMeters || 0,
+                            instructions: firstStep.instructions || '',
+                            streetName: streetName || undefined,
+                        };
+                    }
+                }
+
                 return {
                     geometry,
                     distance: totalDistance,
                     duration: duration,
                     nextLegDistance,
                     nextLegDuration,
+                    nextManeuver,
+                    steps,
                     waypoint_order: route.optimizedIntermediateWaypointIndex || waypoints.map((_, i) => i)
                 };
             }
