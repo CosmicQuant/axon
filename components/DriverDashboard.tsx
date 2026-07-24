@@ -2197,9 +2197,9 @@ if (p && d) {
 
             {/* Active Job Overlay (Map View) */}
             {currentView === 'JOBS' && (
-               <div ref={bottomSheetRef} className="absolute inset-x-0 bottom-0 z-10 pointer-events-none pb-[max(env(safe-area-inset-bottom),8px)] md:pb-6">
+               <div ref={bottomSheetRef} className="absolute inset-x-0 bottom-0 z-10 pointer-events-none">
                   {hasActiveJob ? (
-                      <div className={`w-full md:absolute md:left-auto md:right-8 md:w-96 bg-white/95 backdrop-blur-xl rounded-t-[2.5rem] md:rounded-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] md:shadow-2xl border-t md:border border-gray-200 transition-all duration-300 pointer-events-auto ${Capacitor.isNativePlatform() ? 'md:mb-0 md:bottom-28' : 'md:mb-0 md:bottom-8'} ${isDrawerCollapsed ? 'p-4' : 'p-6 pt-4'}`}>
+                      <div className={`w-full md:absolute md:left-auto md:right-8 md:w-96 bg-white/95 backdrop-blur-xl rounded-t-[2.5rem] md:rounded-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] md:shadow-2xl border-t md:border border-gray-200 transition-all duration-300 pointer-events-auto pb-[env(safe-area-inset-bottom)] ${Capacitor.isNativePlatform() ? 'md:mb-0 md:bottom-28' : 'md:mb-0 md:bottom-8'} ${isDrawerCollapsed ? 'p-4' : 'p-6 pt-4'}`}>
                         {/* Mobile Drag Handle */}
                         <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-4 md:hidden" />
 
@@ -2394,7 +2394,7 @@ if (p && d) {
                         )}
                      </div>
                   ) : (
-                      <div className={`w-full md:absolute md:left-auto md:right-8 md:w-96 bg-white/95 backdrop-blur-xl rounded-t-[2.5rem] md:rounded-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] md:shadow-2xl border-t md:border border-gray-200 transition-all duration-300 pointer-events-auto ${Capacitor.isNativePlatform() ? 'md:mb-0 md:bottom-28' : 'md:mb-0 md:bottom-8'} p-6`}>
+                      <div className={`w-full md:absolute md:left-auto md:right-8 md:w-96 bg-white/95 backdrop-blur-xl rounded-t-[2.5rem] md:rounded-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] md:shadow-2xl border-t md:border border-gray-200 transition-all duration-300 pointer-events-auto pb-[env(safe-area-inset-bottom)] ${Capacitor.isNativePlatform() ? 'md:mb-0 md:bottom-28' : 'md:mb-0 md:bottom-8'} p-6`}>
                         <div className="flex flex-col items-center justify-center text-center">
                            <div className="w-16 h-16 bg-brand-50 rounded-full flex items-center justify-center mb-3">
                               <div className="w-12 h-12 bg-brand-100 rounded-full flex items-center justify-center animate-ping absolute" />
@@ -2603,7 +2603,7 @@ const DriverDashboard: React.FC<DriverDashboardProps> = (props) => {
 
    return (
       <MapProvider>
-      <div className="relative min-h-screen bg-gray-50 pb-[max(env(safe-area-inset-bottom),8px)]">
+      <div className="relative min-h-screen bg-gray-50">
          <DriverDashboardContent {...props} onViewChange={navigateToView} currentView={currentView} />
 
          {/* Driver Bottom Navigation - Native Apps Only */}

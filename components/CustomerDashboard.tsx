@@ -353,7 +353,7 @@ const CustomerDashboard: React.FC = () => {
     );
 
     return (
-        <div className="min-h-screen flex relative bg-slate-50 font-sans pb-[max(env(safe-area-inset-bottom),8px)]">
+        <div className="min-h-screen flex relative bg-slate-50 font-sans">
             {/* SIDEBAR (Desktop) - Always interactive */}
             <aside className={`fixed inset-y-0 left-0 bg-white border-r border-gray-100 w-64 z-50 transform transition-transform duration-300 lg:translate-x-0 pointer-events-auto ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                 <div className="h-full flex flex-col">
