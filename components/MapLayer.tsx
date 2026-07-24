@@ -5,113 +5,134 @@ import { useMapState } from '@/context/MapContext';
 import { APP_CONFIG } from '@/config';
 import { Truck, Navigation, MapPin, GripVertical, X, Compass, Flag, ArrowUp, ArrowUpRight, ArrowRight, ArrowDownRight, ArrowDown, ArrowLeft, ArrowUpLeft, CornerUpLeft, CornerUpRight, Merge, Navigation2 } from 'lucide-react';
 
-/* ── Bird's-eye (top-down) vehicle SVGs ─────────────────────
-   All paths face NORTH (12 o'clock) at 0°. The parent div rotates by GPS bearing.
-   viewBox is 48x48 for all. */
+/* ── Bird's-eye (top-down) vehicle SVGs — Uber/Bolt style ─────
+   All face NORTH at 0°. Parent div rotates by GPS bearing.
+   viewBox 48x48. Each has: tapered nose (front), dark windshield,
+   colored body, dark wheels, and a white contrast ring for map legibility. */
 
 const BirdEyeMotorcycle = ({ size, accent }: { size: number; accent: string }) => (
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        {/* body */}
-        <rect x="20" y="10" width="8" height="28" rx="4" fill={accent} />
-        {/* seat */}
-        <rect x="19" y="22" width="10" height="8" rx="3" fill={accent} opacity="0.7" />
+        <circle cx="24" cy="24" r="22" fill="white" opacity="0.9" />
         {/* front wheel */}
-        <ellipse cx="24" cy="9" rx="4" ry="3" fill="#1e293b" />
-        {/* rear wheel */}
-        <ellipse cx="24" cy="39" rx="4" ry="3" fill="#1e293b" />
+        <ellipse cx="24" cy="7" rx="4.5" ry="4" fill="#111827" />
         {/* handlebars */}
-        <rect x="14" y="11" width="20" height="2.5" rx="1.25" fill="#334155" />
+        <rect x="13" y="10" width="22" height="3" rx="1.5" fill="#111827" />
+        {/* nose/fairing taper */}
+        <path d="M20 12 L28 12 L30 18 L24 22 L18 18 Z" fill={accent} />
+        {/* tank/seat body */}
+        <path d="M18 22 L30 22 L29 32 L19 32 Z" fill={accent} />
+        <rect x="19" y="26" width="10" height="9" rx="3" fill={accent} opacity="0.85" />
+        {/* rear wheel */}
+        <ellipse cx="24" cy="41" rx="4.5" ry="4" fill="#111827" />
     </svg>
 );
 
 const BirdEyeTuktuk = ({ size, accent }: { size: number; accent: string }) => (
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        {/* body */}
-        <rect x="14" y="12" width="20" height="26" rx="5" fill={accent} />
-        {/* cabin roof */}
-        <rect x="16" y="14" width="16" height="14" rx="3" fill="white" opacity="0.35" />
-        {/* front wheel */}
-        <ellipse cx="24" cy="10" rx="3" ry="2.5" fill="#1e293b" />
-        {/* rear left */}
-        <ellipse cx="16" cy="38" rx="3" ry="2.5" fill="#1e293b" />
-        {/* rear right */}
-        <ellipse cx="32" cy="38" rx="3" ry="2.5" fill="#1e293b" />
+        <circle cx="24" cy="24" r="22" fill="white" opacity="0.9" />
+        {/* single front wheel */}
+        <ellipse cx="24" cy="9" rx="3.5" ry="3" fill="#111827" />
+        {/* tapered nose */}
+        <path d="M17 11 L31 11 L34 16 L14 16 Z" fill={accent} />
+        {/* windshield */}
+        <path d="M15 16 L33 16 L34 21 L14 21 Z" fill="#111827" opacity="0.55" />
+        {/* rounded cabin body */}
+        <rect x="13" y="21" width="22" height="16" rx="6" fill={accent} />
+        {/* side windows */}
+        <rect x="16" y="24" width="6" height="7" rx="2" fill="#111827" opacity="0.3" />
+        <rect x="26" y="24" width="6" height="7" rx="2" fill="#111827" opacity="0.3" />
+        {/* two rear wheels */}
+        <ellipse cx="15" cy="40" rx="3.5" ry="3" fill="#111827" />
+        <ellipse cx="33" cy="40" rx="3.5" ry="3" fill="#111827" />
     </svg>
 );
 
 const BirdEyeCar = ({ size, accent }: { size: number; accent: string }) => (
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        {/* body shell */}
-        <rect x="12" y="6" width="24" height="36" rx="7" fill={accent} />
+        <circle cx="24" cy="24" r="22" fill="white" opacity="0.9" />
+        {/* nose taper */}
+        <path d="M16 6 L32 6 L35 11 L13 11 Z" fill={accent} />
+        {/* hood to windshield */}
+        <rect x="12" y="11" width="24" height="26" rx="8" fill={accent} />
         {/* windshield */}
-        <rect x="15" y="10" width="18" height="8" rx="3" fill="#0f172a" opacity="0.45" />
+        <path d="M14 13 L34 13 L36 19 L12 19 Z" fill="#111827" opacity="0.5" />
+        {/* side windows */}
+        <rect x="14" y="21" width="20" height="7" rx="3" fill="#111827" opacity="0.28" />
         {/* rear window */}
-        <rect x="15" y="32" width="18" height="6" rx="2.5" fill="#0f172a" opacity="0.3" />
-        {/* front-left wheel */}
-        <rect x="9" y="11" width="4" height="7" rx="2" fill="#1e293b" />
-        {/* front-right wheel */}
-        <rect x="35" y="11" width="4" height="7" rx="2" fill="#1e293b" />
-        {/* rear-left wheel */}
-        <rect x="9" y="31" width="4" height="7" rx="2" fill="#1e293b" />
-        {/* rear-right wheel */}
-        <rect x="35" y="31" width="4" height="7" rx="2" fill="#1e293b" />
+        <path d="M14 31 L34 31 L33 36 L15 36 Z" fill="#111827" opacity="0.4" />
+        {/* 4 wheels */}
+        <rect x="7" y="13" width="5" height="8" rx="2.5" fill="#111827" />
+        <rect x="36" y="13" width="5" height="8" rx="2.5" fill="#111827" />
+        <rect x="7" y="30" width="5" height="8" rx="2.5" fill="#111827" />
+        <rect x="36" y="30" width="5" height="8" rx="2.5" fill="#111827" />
     </svg>
 );
 
 const BirdEyeVan = ({ size, accent }: { size: number; accent: string }) => (
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        {/* body */}
-        <rect x="11" y="4" width="26" height="40" rx="6" fill={accent} />
+        <circle cx="24" cy="24" r="22" fill="white" opacity="0.9" />
+        {/* nose */}
+        <path d="M16 4 L32 4 L35 10 L13 10 Z" fill={accent} />
+        {/* boxy van body */}
+        <rect x="11" y="10" width="26" height="30" rx="6" fill={accent} />
         {/* windshield */}
-        <rect x="14" y="7" width="20" height="8" rx="3" fill="#0f172a" opacity="0.4" />
-        {/* cargo area lines */}
-        <rect x="14" y="20" width="20" height="1" fill="white" opacity="0.2" />
-        <rect x="14" y="28" width="20" height="1" fill="white" opacity="0.2" />
-        {/* wheels */}
-        <rect x="8" y="10" width="4" height="7" rx="2" fill="#1e293b" />
-        <rect x="36" y="10" width="4" height="7" rx="2" fill="#1e293b" />
-        <rect x="8" y="33" width="4" height="7" rx="2" fill="#1e293b" />
-        <rect x="36" y="33" width="4" height="7" rx="2" fill="#1e293b" />
+        <path d="M13 12 L35 12 L36 18 L12 18 Z" fill="#111827" opacity="0.5" />
+        {/* cargo panel seams */}
+        <rect x="13" y="22" width="22" height="1.5" rx="0.75" fill="#ffffff" opacity="0.25" />
+        <rect x="13" y="30" width="22" height="1.5" rx="0.75" fill="#ffffff" opacity="0.25" />
+        {/* 4 wheels */}
+        <rect x="7" y="13" width="5" height="8" rx="2.5" fill="#111827" />
+        <rect x="36" y="13" width="5" height="8" rx="2.5" fill="#111827" />
+        <rect x="7" y="31" width="5" height="8" rx="2.5" fill="#111827" />
+        <rect x="36" y="31" width="5" height="8" rx="2.5" fill="#111827" />
     </svg>
 );
 
 const BirdEyePickup = ({ size, accent }: { size: number; accent: string }) => (
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="24" cy="24" r="22" fill="white" opacity="0.9" />
+        {/* nose */}
+        <path d="M16 3 L32 3 L35 9 L13 9 Z" fill={accent} />
         {/* cab */}
-        <rect x="12" y="4" width="24" height="18" rx="6" fill={accent} />
+        <rect x="12" y="9" width="24" height="15" rx="6" fill={accent} />
         {/* windshield */}
-        <rect x="15" y="7" width="18" height="7" rx="2.5" fill="#0f172a" opacity="0.4" />
-        {/* bed */}
-        <rect x="13" y="22" width="22" height="20" rx="3" fill={accent} opacity="0.75" />
+        <path d="M14 11 L34 11 L35 17 L13 17 Z" fill="#111827" opacity="0.5" />
+        {/* open cargo bed (darker, recessed) */}
+        <rect x="13" y="25" width="22" height="15" rx="3" fill={accent} opacity="0.6" />
+        <rect x="15" y="27" width="18" height="11" rx="2" fill="#111827" opacity="0.25" />
         {/* bed rails */}
-        <rect x="13" y="22" width="1.5" height="20" rx="0.75" fill="#0f172a" opacity="0.2" />
-        <rect x="33.5" y="22" width="1.5" height="20" rx="0.75" fill="#0f172a" opacity="0.2" />
-        {/* wheels */}
-        <rect x="9" y="9" width="4" height="7" rx="2" fill="#1e293b" />
-        <rect x="35" y="9" width="4" height="7" rx="2" fill="#1e293b" />
-        <rect x="9" y="33" width="4" height="7" rx="2" fill="#1e293b" />
-        <rect x="35" y="33" width="4" height="7" rx="2" fill="#1e293b" />
+        <rect x="13" y="25" width="1.5" height="15" fill="#111827" opacity="0.3" />
+        <rect x="33.5" y="25" width="1.5" height="15" fill="#111827" opacity="0.3" />
+        {/* 4 wheels */}
+        <rect x="7" y="11" width="5" height="8" rx="2.5" fill="#111827" />
+        <rect x="36" y="11" width="5" height="8" rx="2.5" fill="#111827" />
+        <rect x="7" y="30" width="5" height="8" rx="2.5" fill="#111827" />
+        <rect x="36" y="30" width="5" height="8" rx="2.5" fill="#111827" />
     </svg>
 );
 
 const BirdEyeTruck = ({ size, accent }: { size: number; accent: string }) => (
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="24" cy="24" r="22" fill="white" opacity="0.9" />
+        {/* cab nose */}
+        <path d="M16 2 L32 2 L35 8 L13 8 Z" fill={accent} />
         {/* cab */}
-        <rect x="13" y="2" width="22" height="14" rx="5" fill={accent} />
+        <rect x="13" y="8" width="22" height="10" rx="4" fill={accent} />
         {/* windshield */}
-        <rect x="16" y="4" width="16" height="6" rx="2" fill="#0f172a" opacity="0.4" />
-        {/* cargo box */}
-        <rect x="11" y="17" width="26" height="27" rx="3" fill={accent} opacity="0.8" />
-        {/* cargo top highlight */}
-        <rect x="13" y="19" width="22" height="2" rx="1" fill="white" opacity="0.15" />
-        {/* wheels */}
-        <rect x="8" y="7" width="5" height="7" rx="2.5" fill="#1e293b" />
-        <rect x="35" y="7" width="5" height="7" rx="2.5" fill="#1e293b" />
-        <rect x="8" y="34" width="5" height="7" rx="2.5" fill="#1e293b" />
-        <rect x="35" y="34" width="5" height="7" rx="2.5" fill="#1e293b" />
-        {/* dual rear axle indicator */}
-        <rect x="8" y="30" width="5" height="4" rx="2" fill="#1e293b" opacity="0.5" />
-        <rect x="35" y="30" width="5" height="4" rx="2" fill="#1e293b" opacity="0.5" />
+        <path d="M15 9 L33 9 L34 14 L14 14 Z" fill="#111827" opacity="0.5" />
+        {/* cargo box (long) */}
+        <rect x="11" y="19" width="26" height="24" rx="3" fill={accent} opacity="0.85" />
+        {/* cargo seams */}
+        <rect x="13" y="25" width="22" height="1.5" rx="0.75" fill="#ffffff" opacity="0.2" />
+        <rect x="13" y="32" width="22" height="1.5" rx="0.75" fill="#ffffff" opacity="0.2" />
+        {/* front wheels */}
+        <rect x="7" y="9" width="5" height="7" rx="2.5" fill="#111827" />
+        <rect x="36" y="9" width="5" height="7" rx="2.5" fill="#111827" />
+        {/* dual rear axle */}
+        <rect x="7" y="28" width="5" height="6" rx="2.5" fill="#111827" />
+        <rect x="36" y="28" width="5" height="6" rx="2.5" fill="#111827" />
+        <rect x="7" y="36" width="5" height="6" rx="2.5" fill="#111827" />
+        <rect x="36" y="36" width="5" height="6" rx="2.5" fill="#111827" />
     </svg>
 );
 

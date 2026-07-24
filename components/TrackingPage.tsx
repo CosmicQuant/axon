@@ -145,9 +145,9 @@ const TrackingPageContent: React.FC = () => {
                         if (route) setRoutePolyline(route.geometry);
                     }
 
-                if (order.vehicle) {
-                    setDriverVehicleType(order.vehicle);
-                }
+                // Default to 'boda' when the order vehicle is unset (legacy orders
+                // with empty vehicle field) so the map never shows the Truck fallback.
+                setDriverVehicleType(order.vehicle || 'boda');
 
                 // Update Driver Location
                 if (order.driverLocation) {
