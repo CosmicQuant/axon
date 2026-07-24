@@ -11,19 +11,51 @@ const { sendPushNotification } = require('./notifications');
 // no results (Firestore requires matching types). So we use ISO strings here.
 // We also backfill/migrate any value that was stored as a Timestamp.
 const expirePendingOrdersHandler = async (event) => {
-    const nowIso = new Date().toISOString();
+    const nowMs = Date.now();
     let totalExpired = 0;
+
+    // Two-phase approach for resilience:
+    // 1. Try the indexed query (status == 'pending' AND expiresAt < now). This
+    //    requires the composite index (status, expiresAt). Fast for large collections.
+    // 2. If the index is unavailable (FAILED_PRECONDITION), fall back to querying
+    //    all pending orders (uses the single-field status index) and filter
+    //    expiresAt in memory. Slower but always works.
+    const fetchExpired = async () => {
+        try {
+            return await admin.firestore()
+                .collection('orders')
+                .where('status', '==', 'pending')
+                .where('expiresAt', '<', new Date().toISOString())
+                .limit(400)
+                .get();
+        } catch (err) {
+            if (err?.code === 9 && /index/i.test(err.message || '')) {
+                // Index building — fall back to in-memory filter
+                console.warn('expirePendingOrders: index unavailable, using fallback scan');
+                const snap = await admin.firestore()
+                    .collection('orders')
+                    .where('status', '==', 'pending')
+                    .limit(400)
+                    .get();
+                // Filter in memory: expiresAt can be ISO string OR Firestore Timestamp
+                const filtered = snap.docs.filter(d => {
+                    const exp = d.data().expiresAt;
+                    if (!exp) return false;
+                    const expMs = typeof exp.toMillis === 'function'
+                        ? exp.toMillis()
+                        : new Date(exp).getTime();
+                    return expMs < nowMs;
+                });
+                return { empty: filtered.length === 0, docs: filtered, size: filtered.length };
+            }
+            throw err;
+        }
+    };
 
     // Paginate: process up to 400 per batch, loop until no more expired orders
     while (true) {
-        const snapshot = await admin.firestore()
-            .collection('orders')
-            .where('status', '==', 'pending')
-            .where('expiresAt', '<', nowIso)
-            .limit(400)
-            .get();
-
-        if (snapshot.empty) break;
+        const snapshot = await fetchExpired();
+        if (!snapshot.docs || snapshot.docs.length === 0) break;
 
         const batch = admin.firestore().batch();
         const expiredUserIds = [];
