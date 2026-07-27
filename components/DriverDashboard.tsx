@@ -1435,7 +1435,7 @@ if (p && d) {
                         ) : (
                            myJobs.map((job) => {
                               const Icon = getVehicleIcon(job.vehicle);
-                              const isCompleted = job.status === 'delivered';
+                              const isCompleted = ['delivered', 'reviewed'].includes(job.status);
                               return (
                                  <div key={job.id} className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm hover:border-brand-200 transition-all group">
                                     <div className="flex flex-col md:flex-row justify-between gap-6">

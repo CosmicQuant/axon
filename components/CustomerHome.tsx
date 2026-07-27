@@ -339,63 +339,45 @@ const CustomerHome: React.FC = () => {
                     {/* ── RIGHT: Vehicle stacks ── */}
                     <div className="flex-1 flex flex-col gap-2">
 
-                        {/* 2×2 heavy truck grid with colored cells */}
+                        {/* 2×2 heavy truck grid — 3D icons, layered depth */}
                         <div className="grid grid-cols-2 gap-1.5">
-                            <button onClick={() => handleQuickAction({ vehicle: 'Lorry 10T' })} className="relative overflow-hidden bg-gradient-to-br from-slate-700 to-slate-800 rounded-xl p-2.5 text-left shadow-md hover:shadow-lg transition-all active:scale-[0.96]">
-                                <Truck className="w-5 h-5 text-slate-300 mb-1.5" />
-                                <p className="text-white font-bold text-[11px] leading-tight">Lorry 10T</p>
-                                <p className="text-slate-400 text-[9px] font-semibold">10,000 kg</p>
-                            </button>
-                            <button onClick={() => handleQuickAction({ vehicle: 'Container' })} className="relative overflow-hidden bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl p-2.5 text-left shadow-md hover:shadow-lg transition-all active:scale-[0.96]">
-                                <Container className="w-5 h-5 text-blue-200 mb-1.5" />
-                                <p className="text-white font-bold text-[11px] leading-tight">Container</p>
-                                <p className="text-blue-300 text-[9px] font-semibold">20ft &amp; 40ft</p>
-                            </button>
-                            <button onClick={() => handleQuickAction({ vehicle: 'Tipper' })} className="relative overflow-hidden bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl p-2.5 text-left shadow-md hover:shadow-lg transition-all active:scale-[0.96]">
-                                <Forklift className="w-5 h-5 text-amber-100 mb-1.5" />
-                                <p className="text-white font-bold text-[11px] leading-tight">Tipper</p>
-                                <p className="text-amber-200 text-[9px] font-semibold">Sand, ballast</p>
-                            </button>
-                            <button onClick={() => handleQuickAction({ vehicle: 'Tanker' })} className="relative overflow-hidden bg-gradient-to-br from-rose-600 to-red-700 rounded-xl p-2.5 text-left shadow-md hover:shadow-lg transition-all active:scale-[0.96]">
-                                <Fuel className="w-5 h-5 text-rose-200 mb-1.5" />
-                                <p className="text-white font-bold text-[11px] leading-tight">Tanker</p>
-                                <p className="text-rose-200 text-[9px] font-semibold">LPG &amp; Petroleum</p>
-                            </button>
+                            {[
+                                { v: 'Lorry 10T', img: '/icons3d/articulated_lorry.png', sub: '10,000 kg', from: 'from-slate-700', to: 'to-slate-900', txt: 'text-slate-200' },
+                                { v: 'Container', img: '/icons3d/container_truck.svg', sub: '20ft & 40ft', from: 'from-blue-600', to: 'to-indigo-800', txt: 'text-blue-200' },
+                                { v: 'Tipper', img: '/icons3d/tipper_truck.svg', sub: 'Sand, ballast', from: 'from-amber-500', to: 'to-orange-700', txt: 'text-amber-200' },
+                                { v: 'Tanker', img: '/icons3d/tanker_truck.svg', sub: 'LPG & Petroleum', from: 'from-rose-600', to: 'to-red-800', txt: 'text-rose-200' },
+                            ].map(t => (
+                                <button key={t.v} onClick={() => handleQuickAction({ vehicle: t.v })} className={`group relative overflow-hidden bg-gradient-to-br ${t.from} ${t.to} rounded-2xl p-2.5 text-left shadow-lg ring-1 ring-white/10 hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200`}>
+                                    <img src={t.img} alt={t.v} className="w-10 h-10 object-contain mb-1 drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)] group-hover:scale-110 group-hover:-rotate-2 transition-transform duration-300" />
+                                    <p className="text-white font-black text-[11px] leading-tight tracking-tight">{t.v}</p>
+                                    <p className={`${t.txt} text-[9px] font-semibold`}>{t.sub}</p>
+                                </button>
+                            ))}
                         </div>
 
-                        {/* 4-column mid-tier vehicles */}
+                        {/* 4-column mid-tier vehicles — glass cards + 3D icons */}
                         <div className="grid grid-cols-4 gap-1.5">
-                            <button onClick={() => handleQuickAction({ vehicle: 'Pickup Truck' })} className="bg-gradient-to-b from-teal-50 to-teal-100 border border-teal-200 rounded-xl p-2 text-center shadow-sm hover:shadow-md transition-all active:scale-[0.96]">
-                                <CarTaxiFront className="w-4 h-4 text-teal-600 mx-auto mb-0.5" />
-                                <p className="text-teal-800 font-bold text-[9px]">Pickup</p>
-                            </button>
-                            <button onClick={() => handleQuickAction({ vehicle: 'Probox' })} className="bg-gradient-to-b from-violet-50 to-violet-100 border border-violet-200 rounded-xl p-2 text-center shadow-sm hover:shadow-md transition-all active:scale-[0.96]">
-                                <Car className="w-4 h-4 text-violet-600 mx-auto mb-0.5" />
-                                <p className="text-violet-800 font-bold text-[9px]">Probox</p>
-                            </button>
-                            <button onClick={() => handleQuickAction({ vehicle: 'Cargo Van' })} className="bg-gradient-to-b from-sky-50 to-sky-100 border border-sky-200 rounded-xl p-2 text-center shadow-sm hover:shadow-md transition-all active:scale-[0.96]">
-                                <CarFront className="w-4 h-4 text-sky-600 mx-auto mb-0.5" />
-                                <p className="text-sky-800 font-bold text-[9px]">Van</p>
-                            </button>
-                            <button onClick={() => handleQuickAction({ vehicle: 'Tuk-Tuk' })} className="bg-gradient-to-b from-orange-50 to-orange-100 border border-orange-200 rounded-xl p-2 text-center shadow-sm hover:shadow-md transition-all active:scale-[0.96]">
-                                <svg className="w-4 h-4 text-orange-600 mx-auto mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M8 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" /><path d="M18 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" />
-                                    <path d="M10 16H5V6h9l3 5h2a1 1 0 0 1 1 1v4h-2" /><path d="M14 16h-4" /><path d="M14 11V6" /><path d="M5 11h9" />
-                                </svg>
-                                <p className="text-orange-800 font-bold text-[9px]">Tuk-Tuk</p>
-                            </button>
+                            {[
+                                { v: 'Pickup Truck', label: 'Pickup', img: '/icons3d/pickup_truck.png', ring: 'ring-teal-200/70', bg: 'bg-teal-50/80' },
+                                { v: 'Probox', label: 'Probox', img: '/icons3d/automobile.png', ring: 'ring-violet-200/70', bg: 'bg-violet-50/80' },
+                                { v: 'Cargo Van', label: 'Van', img: '/icons3d/delivery_truck.png', ring: 'ring-sky-200/70', bg: 'bg-sky-50/80' },
+                                { v: 'Tuk-Tuk', label: 'Tuk-Tuk', img: '/icons3d/auto_rickshaw.png', ring: 'ring-orange-200/70', bg: 'bg-orange-50/80' },
+                            ].map(t => (
+                                <button key={t.v} onClick={() => handleQuickAction({ vehicle: t.v })} className={`group ${t.bg} backdrop-blur-sm rounded-2xl p-1.5 pt-2 text-center shadow-sm ring-1 ${t.ring} hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200`}>
+                                    <img src={t.img} alt={t.label} className="w-7 h-7 object-contain mx-auto mb-0.5 drop-shadow-sm group-hover:scale-110 transition-transform duration-300" />
+                                    <p className="text-gray-800 font-bold text-[9px] leading-tight">{t.label}</p>
+                                </button>
+                            ))}
                         </div>
 
-                        {/* Boda — colored compact strip */}
-                        <button onClick={() => handleQuickAction({ vehicle: 'Boda Boda' })} className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl px-2.5 py-2 shadow-md shadow-indigo-200 hover:shadow-lg transition-all text-left active:scale-[0.98]">
-                            <div className="w-7 h-7 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                                <Bike className="w-4 h-4 text-white" />
-                            </div>
+                        {/* Boda — wide strip with 3D motorcycle */}
+                        <button onClick={() => handleQuickAction({ vehicle: 'Boda Boda' })} className="group relative overflow-hidden flex items-center gap-2.5 bg-gradient-to-r from-indigo-600 to-purple-700 rounded-2xl px-3 py-2.5 shadow-lg shadow-indigo-300/40 ring-1 ring-white/10 hover:shadow-xl hover:shadow-indigo-400/50 transition-all text-left active:scale-[0.98]">
+                            <img src="/icons3d/motorcycle.png" alt="Boda" className="w-9 h-9 object-contain flex-shrink-0 drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)] group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300" />
                             <div className="flex-1 min-w-0">
-                                <p className="text-[11px] font-bold text-white">Boda Boda</p>
+                                <p className="text-[12px] font-black text-white tracking-tight">Boda Boda</p>
                                 <p className="text-[9px] text-indigo-200 font-medium">Small parcels · Motorbike</p>
                             </div>
-                            <ChevronRight className="w-3.5 h-3.5 text-white/50 flex-shrink-0" />
+                            <ChevronRight className="w-4 h-4 text-white/60 flex-shrink-0 group-hover:translate-x-1 transition-transform" />
                         </button>
                     </div>
                 </div>

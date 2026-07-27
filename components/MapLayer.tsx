@@ -679,12 +679,16 @@ const MapLayer: React.FC = () => {
         if (isMapAnimatingRef.current) return;
 
         // ── Phase 4: Auto-switch to 'arriving' mode when within 200m of next destination ──
-        // Determine the next destination based on order state
+        // Next destination depends on phase:
+        //   in_transit → dropoff (or last pending waypoint)
+        //   (driver_assigned/arriving_pickup handled by customer camera, not here)
         if (orderState === 'IN_TRANSIT' && cameraMode === 'follow') {
             let nextDest: { lat: number; lng: number } | null = null;
-            if (dropoffCoords) nextDest = dropoffCoords;
-            if (waypointCoords && waypointCoords.length > 0) nextDest = waypointCoords[waypointCoords.length - 1];
-            if (pickupCoords && !dropoffCoords && !waypointCoords?.length) nextDest = pickupCoords;
+            if (waypointCoords && waypointCoords.length > 0) {
+                nextDest = waypointCoords[waypointCoords.length - 1];
+            } else if (dropoffCoords) {
+                nextDest = dropoffCoords;
+            }
 
             if (nextDest) {
                 const distToDest = haversine(driverCoords, nextDest);
@@ -840,7 +844,10 @@ const MapLayer: React.FC = () => {
                         gestureHandling: 'greedy' // Enables one-finger panning on mobile
                     }}
                 >
-                    {userLocation && !pickupCoords && !isMapSelecting && (
+                    {/* Pickup placeholder only renders during booking flow (IDLE/DRAFTING/MATCHING).
+                        Not in DRIVER_IDLE or IN_TRANSIT where it would wrongly label
+                        the driver's own location as "Pickup". */}
+                    {userLocation && !pickupCoords && !isMapSelecting && ['IDLE', 'DRAFTING', 'MATCHING'].includes(orderState) && (
                         <React.Fragment key="pickup-user-loc">
                             <OverlayView position={userLocation} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                 <div className="w-6 h-6 bg-emerald-500 rounded-full border-4 border-white shadow-xl -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">

@@ -225,7 +225,13 @@ export const MapProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return () => unsubscribe();
     }, [isLoaded, orderState]);
 
-    // Auto-clear map data when state becomes IDLE to prevent stale routes
+    // Auto-clear map data when state becomes IDLE to prevent stale routes.
+    // NOTE: driverVehicleType is profile-bound (set from user.vehicleType in
+    // DriverDashboard) and must NOT be reset here Ã¢ resetting it to 'Truck'
+    // overrides the driver's actual vehicle (e.g. boda) and persists because
+    // the user.vehicleType effect only re-fires on auth changes, not on every
+    // orderState transition. That was the root cause of the driver map showing
+    // a truck despite huuduma's vehicleType = 'Boda Boda'.
     useEffect(() => {
         if (orderState === 'IDLE') {
             setPickupCoordsInternal(null);
@@ -235,7 +241,6 @@ export const MapProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setBoundsToFit(null);
             setDriverCoords(null);
             setDriverBearing(0);
-            setDriverVehicleType('Truck');
         }
     }, [orderState]);
 

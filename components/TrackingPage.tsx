@@ -95,8 +95,9 @@ const TrackingPageContent: React.FC = () => {
                 }
 
                 // Update Route for customer
-                if (order.routeGeometry && !order.driverLocation && !p) {
-                    // Reuse stored geometry only when we don't have live coords yet
+                if (order.routeGeometry && !order.driverLocation) {
+                    // No live driver location yet ÃÂ¢ restore the stored route geometry
+                    // (covers reload before driver is assigned or while idling).
                     setRoutePolyline(order.routeGeometry);
                 } else if (order.driverLocation) {
                         // Throttle driver-location-triggered route updates to every 15s
