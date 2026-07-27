@@ -10,6 +10,7 @@ const { submitReviewHandler } = require('./lib/reviews');
 const { raiseDisputeHandler } = require('./lib/disputes');
 const { registerFcmTokenHandler } = require('./lib/tokens');
 const { expirePendingOrdersHandler } = require('./lib/scheduled');
+const { notifyDriversOnNewOrderHandler } = require('./lib/dispatch');
 const { analyzeDeliveryRequestHandler, parseNaturalLanguageOrderHandler, chatWithAssistantHandler } = require('./lib/gemini');
 const { deleteAccountHandler } = require('./lib/account');
 
@@ -35,6 +36,9 @@ exports.registerFcmToken = functions.https.onCall(registerFcmTokenHandler);
 
 // ── Scheduled jobs ──────────────────────────────────────────────
 exports.expirePendingOrders = functions.pubsub.schedule('every 1 minutes').onRun(expirePendingOrdersHandler);
+
+// ── Dispatch: ping online drivers on every new pending order ────
+exports.notifyDriversOnNewOrder = functions.firestore.document('orders/{orderId}').onCreate(notifyDriversOnNewOrderHandler);
 
 // ── Gemini AI (server-side key, never exposed to client) ────────
 exports.analyzeDeliveryRequest = functions.https.onCall(analyzeDeliveryRequestHandler);

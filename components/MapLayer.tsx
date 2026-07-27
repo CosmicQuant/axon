@@ -12,18 +12,26 @@ import { Truck, Navigation, MapPin, GripVertical, X, Compass, Flag, ArrowUp, Arr
 
 const BirdEyeMotorcycle = ({ size, accent }: { size: number; accent: string }) => (
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="24" cy="24" r="22" fill="white" opacity="0.9" />
-        {/* front wheel */}
-        <ellipse cx="24" cy="7" rx="4.5" ry="4" fill="#111827" />
-        {/* handlebars */}
-        <rect x="13" y="10" width="22" height="3" rx="1.5" fill="#111827" />
-        {/* nose/fairing taper */}
-        <path d="M20 12 L28 12 L30 18 L24 22 L18 18 Z" fill={accent} />
-        {/* tank/seat body */}
-        <path d="M18 22 L30 22 L29 32 L19 32 Z" fill={accent} />
-        <rect x="19" y="26" width="10" height="9" rx="3" fill={accent} opacity="0.85" />
-        {/* rear wheel */}
-        <ellipse cx="24" cy="41" rx="4.5" ry="4" fill="#111827" />
+        {/* white contrast ring (map legibility) */}
+        <circle cx="24" cy="24" r="22" fill="white" opacity="0.92" />
+        {/* front wheel — bold, ringed */}
+        <circle cx="24" cy="8" r="5" fill="#111827" />
+        <circle cx="24" cy="8" r="2" fill="#6b7280" />
+        {/* handlebars — wide V reaching back */}
+        <path d="M14 12 L20 16 M34 12 L28 16" stroke="#111827" strokeWidth="2.2" strokeLinecap="round" fill="none" />
+        {/* fairing/nose — tapered pill front */}
+        <path d="M19 13 L29 13 L30.5 20 L24 23 L17.5 20 Z" fill={accent} />
+        {/* main body — rounded pill (tank + seat) */}
+        <rect x="18.5" y="20" width="11" height="13" rx="5.5" fill={accent} />
+        {/* rider head — distinct dark circle */}
+        <circle cx="24" cy="24" r="3.2" fill="#1f2937" />
+        {/* rider shoulders hint */}
+        <rect x="20" y="27" width="8" height="4" rx="2" fill="#1f2937" opacity="0.45" />
+        {/* seat rear lip */}
+        <rect x="20" y="31" width="8" height="2.5" rx="1.2" fill="#0f172a" opacity="0.25" />
+        {/* rear wheel — bold, ringed */}
+        <circle cx="24" cy="40" r="5" fill="#111827" />
+        <circle cx="24" cy="40" r="2" fill="#6b7280" />
     </svg>
 );
 
@@ -1062,19 +1070,27 @@ const MapLayer: React.FC = () => {
                     </div>
                 )}
 
-                {/* Overview / Recenter / Compass buttons — Bolt/Uber style navigation controls */}
+                {/* Overview / Recenter / Compass buttons — 3D Uber-style controls */}
                 {(orderState === 'IN_TRANSIT' || orderState === 'DRIVER_IDLE') && !isMapSelecting && (
-                    <div className="absolute right-4 top-24 z-10 flex flex-col gap-2">
-                        {/* Phase 3: Compass button — toggles heading-up vs north-up */}
+                    <div className="absolute right-4 top-24 z-10 flex flex-col gap-2.5">
+                        {/* Compass button — toggles heading-up vs north-up */}
                         {orderState === 'IN_TRANSIT' && (
                             <button
                                 onClick={() => setHeadingUp(!headingUp)}
-                                className={`w-12 h-12 rounded-2xl shadow-2xl flex items-center justify-center transition-all active:scale-95 border ${headingUp ? 'bg-brand-600 text-white border-brand-500' : 'bg-white text-gray-700 border-gray-100 hover:bg-gray-50'}`}
+                                className={`group relative w-13 h-13 rounded-2xl flex items-center justify-center transition-all active:scale-90 active:shadow-lg ${
+                                    headingUp
+                                        ? 'bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-[0_6px_16px_rgba(22,163,74,0.45),0_2px_4px_rgba(0,0,0,0.2)] ring-1 ring-brand-400/40'
+                                        : 'bg-gradient-to-br from-white to-gray-50 text-gray-700 shadow-[0_4px_12px_rgba(0,0,0,0.18),0_1px_2px_rgba(0,0,0,0.1)] ring-1 ring-gray-200/60 hover:from-gray-50 hover:to-gray-100'
+                                }`}
                                 title={headingUp ? 'Switch to North-up' : 'Switch to heading-up navigation'}
+                                style={{ width: '52px', height: '52px' }}
                             >
-                                <Compass className={`w-5 h-5 ${headingUp ? 'animate-pulse' : ''}`} style={headingUp ? { transform: `rotate(${driverBearing}deg)` } : undefined} />
+                                {/* top inner highlight for 3D depth */}
+                                <span className="absolute inset-x-3 top-1.5 h-2.5 rounded-full bg-white/30 pointer-events-none" />
+                                <Compass className={`relative w-6 h-6 drop-shadow-sm ${headingUp ? 'animate-pulse' : ''}`} style={headingUp ? { transform: `rotate(${driverBearing}deg)` } : undefined} strokeWidth={2.2} />
                             </button>
                         )}
+                        {/* Overview button — show full route */}
                         {orderState === 'IN_TRANSIT' && cameraMode !== 'overview' && (pickupCoords || dropoffCoords) && (
                             <button
                                 onClick={() => {
@@ -1086,22 +1102,27 @@ const MapLayer: React.FC = () => {
                                     if (points.length > 0) fitBounds(points);
                                     setCameraMode('overview');
                                 }}
-                                className="w-12 h-12 bg-white rounded-2xl shadow-2xl flex items-center justify-center text-gray-700 hover:bg-gray-50 active:scale-95 transition-all border border-gray-100"
+                                className="group relative w-13 h-13 rounded-2xl flex items-center justify-center text-gray-700 transition-all active:scale-90 active:shadow-lg bg-gradient-to-br from-white to-gray-50 shadow-[0_4px_12px_rgba(0,0,0,0.18),0_1px_2px_rgba(0,0,0,0.1)] ring-1 ring-gray-200/60 hover:from-gray-50 hover:to-gray-100"
                                 title="Show full route"
+                                style={{ width: '52px', height: '52px' }}
                             >
-                                <Navigation className="w-5 h-5" />
+                                <span className="absolute inset-x-3 top-1.5 h-2.5 rounded-full bg-white/30 pointer-events-none" />
+                                <Navigation className="relative w-6 h-6 drop-shadow-sm" strokeWidth={2.2} />
                             </button>
                         )}
+                        {/* Recenter button — lock on driver */}
                         {cameraMode !== 'follow' && (
                             <button
                                 onClick={() => {
                                     setCameraMode('follow');
                                     clearUserInteraction();
                                 }}
-                                className="w-12 h-12 bg-brand-600 rounded-2xl shadow-2xl flex items-center justify-center text-white hover:bg-brand-700 active:scale-95 transition-all border border-brand-500"
+                                className="group relative w-13 h-13 rounded-2xl flex items-center justify-center text-white transition-all active:scale-90 active:shadow-lg bg-gradient-to-br from-brand-500 to-brand-700 shadow-[0_6px_16px_rgba(22,163,74,0.45),0_2px_4px_rgba(0,0,0,0.2)] ring-1 ring-brand-400/40 hover:from-brand-600 hover:to-brand-800"
                                 title="Recenter on driver"
+                                style={{ width: '52px', height: '52px' }}
                             >
-                                <MapPin className="w-5 h-5" />
+                                <span className="absolute inset-x-3 top-1.5 h-2.5 rounded-full bg-white/30 pointer-events-none" />
+                                <MapPin className="relative w-6 h-6 drop-shadow-sm" strokeWidth={2.2} />
                             </button>
                         )}
                     </div>
