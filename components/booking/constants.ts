@@ -240,9 +240,18 @@ export const VEHICLES: VehicleCapability[] = [
             allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
             cargoHazardous: 'Class2', strictCargoFilter: true, allowConsolidated: false },
     },
-    // Fuel: petrol/diesel/kerosene, Class 3; payload 35-42kL within 50T 6-axle GVW.
+    // Fuel: petrol/diesel/kerosene, Class 3; capacity-graded tankers.
     {
-        id: 'fuel-tanker-3axle', label: 'Fuel Tanker 26T (3-Axle, Rigid)', img: '/icons3d/tanker_truck.svg',
+        id: 'fuel-tanker-2axle-10kl', label: 'Fuel Tanker 10,000L (2-Axle)', img: '/icons3d/tanker_truck.svg',
+        accentText: 'text-red-400', accentBg: 'bg-red-400', accentBgLight: 'bg-red-50',
+        pricePerKm: 180, tier: 'hazmat',
+        constraints: { maxDist: UNLIMITED, maxWeight: 10000, maxStops: 1, allowedCats: ['B'],
+            weightUnit: 'litres', allowFragile: false, allowReturn: true,
+            allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 2,
+            cargoHazardous: 'Class3', strictCargoFilter: true, allowConsolidated: false },
+    },
+    {
+        id: 'fuel-tanker-3axle-18kl', label: 'Fuel Tanker 18,000L (3-Axle)', img: '/icons3d/tanker_truck.svg',
         accentText: 'text-red-500', accentBg: 'bg-red-500', accentBgLight: 'bg-red-50',
         pricePerKm: 200, tier: 'hazmat',
         constraints: { maxDist: UNLIMITED, maxWeight: 18000, maxStops: 1, allowedCats: ['B'],
@@ -251,10 +260,19 @@ export const VEHICLES: VehicleCapability[] = [
             cargoHazardous: 'Class3', strictCargoFilter: true, allowConsolidated: false },
     },
     {
-        id: 'fuel-tanker-6axle', label: 'Fuel Tanker 50T (6-Axle, Semi)', img: '/icons3d/tanker_truck.svg',
+        id: 'fuel-tanker-4axle-20kl', label: 'Fuel Tanker 20,000L (4-Axle)', img: '/icons3d/tanker_truck.svg',
         accentText: 'text-red-600', accentBg: 'bg-red-600', accentBgLight: 'bg-red-50',
-        pricePerKm: 240, tier: 'hazmat',
-        constraints: { maxDist: UNLIMITED, maxWeight: 42000, maxStops: 1, allowedCats: ['B'],
+        pricePerKm: 220, tier: 'hazmat',
+        constraints: { maxDist: UNLIMITED, maxWeight: 20000, maxStops: 1, allowedCats: ['B'],
+            weightUnit: 'litres', allowFragile: false, allowReturn: true,
+            allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
+            cargoHazardous: 'Class3', strictCargoFilter: true, allowConsolidated: false },
+    },
+    {
+        id: 'fuel-tanker-6axle-30kl', label: 'Fuel Tanker 30,000L (6-Axle)', img: '/icons3d/tanker_truck.svg',
+        accentText: 'text-red-700', accentBg: 'bg-red-700', accentBgLight: 'bg-red-50',
+        pricePerKm: 260, tier: 'hazmat',
+        constraints: { maxDist: UNLIMITED, maxWeight: 30000, maxStops: 1, allowedCats: ['B'],
             weightUnit: 'litres', allowFragile: false, allowReturn: true,
             allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
             cargoHazardous: 'Class3', strictCargoFilter: true, allowConsolidated: false },
@@ -271,6 +289,6 @@ export const CARGO_VEHICLE_MAP: Record<string, string[]> = {
     'Hardware / Construction': ['pickup', 'canter', 'rigid-truck-2axle', 'rigid-truck-3axle', 'rigid-truck-4axle', 'semi-truck-4axle', 'semi-truck-5axle', 'semi-truck-6axle', 'semi-truck-7axle', 'tipper-2axle', 'tipper-3axle', 'tipper-4axle'],
     'Agricultural': ['canter', 'rigid-truck-2axle', 'rigid-truck-3axle', 'rigid-truck-4axle', 'semi-truck-4axle', 'semi-truck-5axle'],
     'LPG / Gas (Bulk)': ['lpg-tanker-6axle'],
-    'Petroleum / Oil': ['fuel-tanker-3axle', 'fuel-tanker-6axle'],
+    'Petroleum / Oil': ['fuel-tanker-2axle-10kl', 'fuel-tanker-3axle-18kl', 'fuel-tanker-4axle-20kl', 'fuel-tanker-6axle-30kl'],
     'Loose Aggregate': ['tipper-2axle', 'tipper-3axle', 'tipper-4axle'],
 };

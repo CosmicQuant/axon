@@ -4,8 +4,10 @@ import { VEHICLES, CARGO_VEHICLE_MAP, VehicleCapability, WeightUnit } from '../c
 // Old orders may carry simplified vehicle ids. Map them to the canonical
 // entry so historical data doesn't break the new capability model.
 const LEGACY_ALIASES: Record<string, string> = {
-    'tanker': 'fuel-tanker-6axle',          // legacy "tanker" → most common: fuel semi
-    'fuel-tanker': 'fuel-tanker-6axle',     // old pre-axle taxonomy
+    'tanker': 'fuel-tanker-6axle-30kl',          // legacy "tanker" → 30kL semi
+    'fuel-tanker': 'fuel-tanker-6axle-30kl',     // old pre-axle taxonomy
+    'fuel-tanker-3axle': 'fuel-tanker-3axle-18kl',
+    'fuel-tanker-6axle': 'fuel-tanker-6axle-30kl',
     'lpg-tanker': 'lpg-tanker-6axle',
     'lorry': 'rigid-truck-3axle',
     'lorry-5t': 'rigid-truck-3axle',

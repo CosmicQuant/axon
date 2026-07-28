@@ -36,14 +36,19 @@ const VEHICLE_CAPABILITIES = {
     'container-6axle':  { label: 'Container Truck 50T (6-Axle)', allowedCats: ['B'], maxWeightKg: 34000, maxDistKm: 9999, weightUnit: 'tonnes' },
     'container-7axle':  { label: 'Container Truck 56T (7-Axle)', allowedCats: ['B'], maxWeightKg: 34000, maxDistKm: 9999, weightUnit: 'tonnes' },
     'lpg-tanker-6axle': { label: 'LPG Tanker 50T (6-Axle)', allowedCats: ['B'],     maxWeightKg: 24000, maxDistKm: 9999, weightUnit: 'tonnes' },
-    'fuel-tanker-3axle':{ label: 'Fuel Tanker 26T (3-Axle, Rigid)', allowedCats: ['B'], maxWeightKg: 15120, maxDistKm: 9999, weightUnit: 'litres' }, // 18000L * 0.84
-    'fuel-tanker-6axle':{ label: 'Fuel Tanker 50T (6-Axle, Semi)', allowedCats: ['B'], maxWeightKg: 35280, maxDistKm: 9999, weightUnit: 'litres' }, // 42000L * 0.84
+    // Fuel tankers graded by tank capacity (litres).
+    'fuel-tanker-2axle-10kl': { label: 'Fuel Tanker 10,000L (2-Axle)', allowedCats: ['B'], maxWeightKg: 8400,  maxDistKm: 9999, weightUnit: 'litres' }, // 10000L * 0.84
+    'fuel-tanker-3axle-18kl': { label: 'Fuel Tanker 18,000L (3-Axle)', allowedCats: ['B'], maxWeightKg: 15120, maxDistKm: 9999, weightUnit: 'litres' }, // 18000L * 0.84
+    'fuel-tanker-4axle-20kl': { label: 'Fuel Tanker 20,000L (4-Axle)', allowedCats: ['B'], maxWeightKg: 16800, maxDistKm: 9999, weightUnit: 'litres' }, // 20000L * 0.84
+    'fuel-tanker-6axle-30kl': { label: 'Fuel Tanker 30,000L (6-Axle)', allowedCats: ['B'], maxWeightKg: 25200, maxDistKm: 9999, weightUnit: 'litres' }, // 30000L * 0.84
 };
 
 // Legacy id shim ÃÂ¢ keep historical orders working.
 const LEGACY_ALIASES = {
-    'tanker': 'fuel-tanker-6axle',
-    'fuel-tanker': 'fuel-tanker-6axle',
+    'tanker': 'fuel-tanker-6axle-30kl',
+    'fuel-tanker': 'fuel-tanker-6axle-30kl',
+    'fuel-tanker-3axle': 'fuel-tanker-3axle-18kl',
+    'fuel-tanker-6axle': 'fuel-tanker-6axle-30kl',
     'lpg-tanker': 'lpg-tanker-6axle',
     'lorry': 'rigid-truck-3axle',
     'lorry-5t': 'rigid-truck-3axle',

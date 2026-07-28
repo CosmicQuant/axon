@@ -54,6 +54,12 @@ const VEHICLE_RATES = {
 
     // ── Axle-based hazmat tankers (KeNHA GVW; strict cargo) ──
     'lpg-tanker-6axle':  { base: 10000, perKm: 240, perMin: 40, stopFee: 900, min: 10000 },  // 50T, ~22-25T LPG payload
+    // Fuel tankers graded by tank capacity (litres).
+    'fuel-tanker-2axle-10kl': { base: 6000, perKm: 180, perMin: 30, stopFee: 600, min: 6000 },  // 10,000L
+    'fuel-tanker-3axle-18kl': { base: 8000, perKm: 200, perMin: 35, stopFee: 700, min: 8000 },  // 18,000L
+    'fuel-tanker-4axle-20kl': { base: 9500, perKm: 220, perMin: 38, stopFee: 800, min: 9500 },  // 20,000L
+    'fuel-tanker-6axle-30kl': { base: 11000, perKm: 260, perMin: 45, stopFee: 1000, min: 11000 }, // 30,000L
+    // Legacy fuel tanker IDs (pre-capacity grading)
     'fuel-tanker-3axle': { base: 8000, perKm: 200, perMin: 35, stopFee: 700, min: 8000 },    // 26T rigid, ~16-18kL
     'fuel-tanker-6axle': { base: 12000, perKm: 270, perMin: 45, stopFee: 1000, min: 12000 }, // 50T semi, ~35-42kL
 
@@ -97,6 +103,12 @@ const VEHICLE_FUEL = {
     'container-40ft': { energy: 'diesel', lPerKm: 0.60, fuel: 'diesel' },
     'lpg-tanker':  { energy: 'diesel', lPerKm: 0.50, fuel: 'diesel' },
     'fuel-tanker': { energy: 'diesel', lPerKm: 0.55, fuel: 'diesel' },
+    'fuel-tanker-2axle-10kl': { energy: 'diesel', lPerKm: 0.35, fuel: 'diesel' },
+    'fuel-tanker-3axle-18kl': { energy: 'diesel', lPerKm: 0.45, fuel: 'diesel' },
+    'fuel-tanker-4axle-20kl': { energy: 'diesel', lPerKm: 0.50, fuel: 'diesel' },
+    'fuel-tanker-6axle-30kl': { energy: 'diesel', lPerKm: 0.60, fuel: 'diesel' },
+    'fuel-tanker-3axle': { energy: 'diesel', lPerKm: 0.45, fuel: 'diesel' },
+    'fuel-tanker-6axle': { energy: 'diesel', lPerKm: 0.60, fuel: 'diesel' },
     'standard':    { energy: 'electric', kwhPerKm: 0.04, lPerKm: 0.045, fuel: 'petrol' },
 };
 

@@ -345,7 +345,7 @@ const CustomerHome: React.FC = () => {
                                 { v: 'rigid-truck-3axle', label: 'Truck 26T', img: '/icons3d/articulated_lorry.png', sub: '3-axle rigid', from: 'from-slate-700', to: 'to-slate-900', txt: 'text-slate-200' },
                                 { v: 'container-5axle', label: 'Container', img: '/icons3d/container_truck.svg', sub: '20ft & 40ft', from: 'from-blue-600', to: 'to-indigo-800', txt: 'text-blue-200' },
                                 { v: 'tipper-3axle', label: 'Tipper', img: '/icons3d/tipper_truck.svg', sub: 'Sand, ballast', from: 'from-amber-500', to: 'to-orange-700', txt: 'text-amber-200' },
-                                { v: 'fuel-tanker-6axle', label: 'Fuel Tanker', img: '/icons3d/tanker_truck.svg', sub: 'Petrol & Diesel', from: 'from-rose-600', to: 'to-red-800', txt: 'text-rose-200' },
+                                { v: 'fuel-tanker-6axle-30kl', label: 'Fuel Tanker', img: '/icons3d/tanker_truck.svg', sub: 'Petrol & Diesel', from: 'from-rose-600', to: 'to-red-800', txt: 'text-rose-200' },
                             ].map(t => (
                                 <button key={t.v} onClick={() => handleQuickAction({ vehicle: t.v })} className={`group relative overflow-hidden bg-gradient-to-br ${t.from} ${t.to} rounded-2xl p-2.5 text-left shadow-lg ring-1 ring-white/10 hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200`}>
                                     <img src={t.img} alt={t.label} className="w-10 h-10 object-contain mb-1 drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)] group-hover:scale-110 group-hover:-rotate-2 transition-transform duration-300" />
