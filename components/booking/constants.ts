@@ -34,6 +34,10 @@ export interface VehicleCapability {
         // CARGO_VEHICLE_MAP entry explicitly lists this vehicle id. Also forces
         // the category to the vehicle's only allowed category (no default 'A').
         strictCargoFilter?: boolean;
+        // Consolidated (Standard shared-truck) allowed? Heavy/hazmat vehicles
+        // are dedicated → false. The Service-type toggle hides Standard when
+        // the chosen vehicle forbids consolidation.
+        allowConsolidated?: boolean; // default true if omitted
     };
 }
 
@@ -87,122 +91,173 @@ export const VEHICLES: VehicleCapability[] = [
             cargoHazardous: false },
     },
 
-    // ── Tier: heavy (lorries) ──────────────────────────────────
+    // ── Tier: heavy (rigid lorries — axle-based GVW per KeNHA / EAC Act) ──
+// GVW = truck + body + cargo. Naming follows axle count, which is the legal
+// enforcement standard at Kenyan weighbridges (not cargo type).
     {
-        id: 'canter', label: 'Canter 3T', img: '/icons3d/delivery_truck.png',
+        id: 'rigid-truck-2axle', label: 'Truck 18T (2-Axle)', img: '/icons3d/delivery_truck.png',
         accentText: 'text-teal-600', accentBg: 'bg-teal-600', accentBgLight: 'bg-teal-50',
         pricePerKm: 110, tier: 'medium',
-        constraints: { maxDist: UNLIMITED, maxWeight: 3000, maxStops: 5, allowedCats: ['B'],
-            weightUnit: 'kg', allowFragile: true, allowReturn: true,
+        constraints: { maxDist: UNLIMITED, maxWeight: 18, maxStops: 5, allowedCats: ['A', 'B'],
+            weightUnit: 'tonnes', allowFragile: true, allowReturn: true,
             allowAsap: true, allowScheduled: true, requiresHelpers: false, suggestedHelpers: 0,
             cargoHazardous: false },
     },
     {
-        id: 'lorry-5t', label: 'Lorry 5T', img: '/icons3d/articulated_lorry.png',
+        id: 'canter', label: 'Canter 3T', img: '/icons3d/delivery_truck.png',
+        accentText: 'text-teal-700', accentBg: 'bg-teal-700', accentBgLight: 'bg-teal-50',
+        pricePerKm: 110, tier: 'medium',
+        constraints: { maxDist: UNLIMITED, maxWeight: 3, maxStops: 5, allowedCats: ['B'],
+            weightUnit: 'tonnes', allowFragile: true, allowReturn: true,
+            allowAsap: true, allowScheduled: true, requiresHelpers: false, suggestedHelpers: 0,
+            cargoHazardous: false },
+    },
+    {
+        id: 'rigid-truck-3axle', label: 'Truck 26T (3-Axle)', img: '/icons3d/articulated_lorry.png',
         accentText: 'text-slate-600', accentBg: 'bg-slate-600', accentBgLight: 'bg-slate-50',
-        pricePerKm: 130, tier: 'heavy',
-        constraints: { maxDist: UNLIMITED, maxWeight: 5000, maxStops: 5, allowedCats: ['B'],
-            weightUnit: 'tonnes', allowFragile: true, allowReturn: true,
-            allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 2,
-            cargoHazardous: false },
-    },
-    {
-        id: 'lorry-7t', label: 'Lorry 7T', img: '/icons3d/articulated_lorry.png',
-        accentText: 'text-slate-700', accentBg: 'bg-slate-700', accentBgLight: 'bg-slate-50',
         pricePerKm: 150, tier: 'heavy',
-        constraints: { maxDist: UNLIMITED, maxWeight: 7000, maxStops: 5, allowedCats: ['B'],
+        constraints: { maxDist: UNLIMITED, maxWeight: 26, maxStops: 5, allowedCats: ['B'],
             weightUnit: 'tonnes', allowFragile: true, allowReturn: true,
             allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 2,
-            cargoHazardous: false },
+            cargoHazardous: false, allowConsolidated: false },
     },
     {
-        id: 'lorry-10t', label: 'Lorry 10T', img: '/icons3d/articulated_lorry.png',
-        accentText: 'text-slate-800', accentBg: 'bg-slate-800', accentBgLight: 'bg-slate-100',
+        id: 'rigid-truck-4axle', label: 'Truck 30T (4-Axle)', img: '/icons3d/articulated_lorry.png',
+        accentText: 'text-slate-700', accentBg: 'bg-slate-700', accentBgLight: 'bg-slate-50',
         pricePerKm: 170, tier: 'heavy',
-        constraints: { maxDist: UNLIMITED, maxWeight: 10000, maxStops: 5, allowedCats: ['B'],
+        constraints: { maxDist: UNLIMITED, maxWeight: 30, maxStops: 5, allowedCats: ['B'],
             weightUnit: 'tonnes', allowFragile: true, allowReturn: true,
-            allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
-            cargoHazardous: false },
+            allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 2,
+            cargoHazardous: false, allowConsolidated: false },
     },
     {
-        id: 'lorry-14t', label: 'Lorry 14T', img: '/icons3d/articulated_lorry.png',
-        accentText: 'text-slate-900', accentBg: 'bg-slate-900', accentBgLight: 'bg-slate-100',
-        pricePerKm: 200, tier: 'heavy',
-        constraints: { maxDist: UNLIMITED, maxWeight: 14000, maxStops: 5, allowedCats: ['B'],
+        id: 'semi-truck-4axle', label: 'Truck 38T (Semi 4-Axle)', img: '/icons3d/articulated_lorry.png',
+        accentText: 'text-slate-800', accentBg: 'bg-slate-800', accentBgLight: 'bg-slate-100',
+        pricePerKm: 190, tier: 'heavy',
+        constraints: { maxDist: UNLIMITED, maxWeight: 38, maxStops: 3, allowedCats: ['B'],
             weightUnit: 'tonnes', allowFragile: true, allowReturn: true,
             allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
-            cargoHazardous: false },
+            cargoHazardous: false, allowConsolidated: false },
+    },
+    {
+        id: 'semi-truck-5axle', label: 'Truck 44T (Semi 5-Axle)', img: '/icons3d/articulated_lorry.png',
+        accentText: 'text-slate-900', accentBg: 'bg-slate-900', accentBgLight: 'bg-slate-100',
+        pricePerKm: 220, tier: 'heavy',
+        constraints: { maxDist: UNLIMITED, maxWeight: 44, maxStops: 3, allowedCats: ['B'],
+            weightUnit: 'tonnes', allowFragile: true, allowReturn: true,
+            allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
+            cargoHazardous: false, allowConsolidated: false },
+    },
+    {
+        id: 'semi-truck-6axle', label: 'Truck 50T (Semi 6-Axle)', img: '/icons3d/articulated_lorry.png',
+        accentText: 'text-slate-950', accentBg: 'bg-slate-950', accentBgLight: 'bg-slate-100',
+        pricePerKm: 260, tier: 'heavy',
+        constraints: { maxDist: UNLIMITED, maxWeight: 50, maxStops: 3, allowedCats: ['B'],
+            weightUnit: 'tonnes', allowFragile: true, allowReturn: true,
+            allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
+            cargoHazardous: false, allowConsolidated: false },
+    },
+    {
+        id: 'semi-truck-7axle', label: 'Truck 56T (Max 7-Axle)', img: '/icons3d/articulated_lorry.png',
+        accentText: 'text-gray-900', accentBg: 'bg-gray-900', accentBgLight: 'bg-gray-100',
+        pricePerKm: 300, tier: 'heavy',
+        constraints: { maxDist: UNLIMITED, maxWeight: 56, maxStops: 3, allowedCats: ['B'],
+            weightUnit: 'tonnes', allowFragile: true, allowReturn: true,
+            allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
+            cargoHazardous: false, allowConsolidated: false },
     },
 
-    // ── Tier: heavy (tippers — loose aggregate, volume/coverage) ─
+    // ── Tier: heavy (tippers — rigid dump trucks by axle, strict cargo) ─
+    // Tippers carry only loose aggregate (sand, ballast, hardcore). The KeNHA
+    // axle limits apply, but the cargo type is locked via strictCargoFilter.
     {
-        id: 'tipper-7t', label: 'Tipper 7T', img: '/icons3d/tipper_truck.svg',
+        id: 'tipper-2axle', label: 'Tipper 18T (2-Axle)', img: '/icons3d/tipper_truck.svg',
         accentText: 'text-amber-600', accentBg: 'bg-amber-600', accentBgLight: 'bg-amber-50',
         pricePerKm: 140, tier: 'heavy',
-        constraints: { maxDist: UNLIMITED, maxWeight: 7000, maxStops: 1, allowedCats: ['B'],
+        constraints: { maxDist: UNLIMITED, maxWeight: 18, maxStops: 1, allowedCats: ['B'],
             weightUnit: 'tonnes', allowFragile: false, allowReturn: true,
             allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 2,
-            cargoHazardous: false, strictCargoFilter: true },
+            cargoHazardous: false, strictCargoFilter: true, allowConsolidated: false },
     },
     {
-        id: 'tipper-14t', label: 'Tipper 14T', img: '/icons3d/tipper_truck.svg',
+        id: 'tipper-3axle', label: 'Tipper 26T (3-Axle)', img: '/icons3d/tipper_truck.svg',
         accentText: 'text-amber-700', accentBg: 'bg-amber-700', accentBgLight: 'bg-amber-50',
-        pricePerKm: 180, tier: 'heavy',
-        constraints: { maxDist: UNLIMITED, maxWeight: 14000, maxStops: 1, allowedCats: ['B'],
+        pricePerKm: 170, tier: 'heavy',
+        constraints: { maxDist: UNLIMITED, maxWeight: 26, maxStops: 1, allowedCats: ['B'],
             weightUnit: 'tonnes', allowFragile: false, allowReturn: true,
             allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
-            cargoHazardous: false, strictCargoFilter: true },
+            cargoHazardous: false, strictCargoFilter: true, allowConsolidated: false },
     },
     {
-        id: 'tipper-25t', label: 'Tipper 25T', img: '/icons3d/tipper_truck.svg',
+        id: 'tipper-4axle', label: 'Tipper 30T (4-Axle)', img: '/icons3d/tipper_truck.svg',
         accentText: 'text-amber-800', accentBg: 'bg-amber-800', accentBgLight: 'bg-amber-100',
-        pricePerKm: 220, tier: 'heavy',
-        constraints: { maxDist: UNLIMITED, maxWeight: 25000, maxStops: 1, allowedCats: ['B'],
-            weightUnit: 'tonnes', allowFragile: false, allowReturn: true,
-            allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
-            cargoHazardous: false, strictCargoFilter: true },
-    },
-
-    // ── Tier: heavy (containers) ───────────────────────────────
-    {
-        id: 'container-20ft', label: '20ft Container', img: '/icons3d/container_truck.svg',
-        accentText: 'text-purple-600', accentBg: 'bg-purple-600', accentBgLight: 'bg-purple-50',
         pricePerKm: 200, tier: 'heavy',
-        constraints: { maxDist: UNLIMITED, maxWeight: 18000, maxStops: 3, allowedCats: ['B'],
-            weightUnit: 'tonnes', allowFragile: true, allowReturn: true,
-            allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
-            cargoHazardous: false },
-    },
-    {
-        id: 'container-40ft', label: '40ft Container', img: '/icons3d/container_truck.svg',
-        accentText: 'text-purple-700', accentBg: 'bg-purple-700', accentBgLight: 'bg-purple-50',
-        pricePerKm: 280, tier: 'heavy',
-        constraints: { maxDist: UNLIMITED, maxWeight: 28000, maxStops: 3, allowedCats: ['B'],
-            weightUnit: 'tonnes', allowFragile: true, allowReturn: true,
-            allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
-            cargoHazardous: false },
-    },
-
-    // ── Tier: hazmat (tankers) ─────────────────────────────────
-    // LPG: petroleum gas (pressurized) — Class 2 dangerous goods, kg/tonnes
-    {
-        id: 'lpg-tanker', label: 'LPG Tanker', img: '/icons3d/tanker_truck.svg',
-        accentText: 'text-sky-600', accentBg: 'bg-sky-600', accentBgLight: 'bg-sky-50',
-        pricePerKm: 250, tier: 'hazmat',
-        constraints: { maxDist: UNLIMITED, maxWeight: 20000, maxStops: 1, allowedCats: ['B'],
+        constraints: { maxDist: UNLIMITED, maxWeight: 30, maxStops: 1, allowedCats: ['B'],
             weightUnit: 'tonnes', allowFragile: false, allowReturn: true,
             allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
-            cargoHazardous: 'Class2', strictCargoFilter: true },
+            cargoHazardous: false, strictCargoFilter: true, allowConsolidated: false },
     },
-    // Fuel: petrol/diesel/kerosene (vented) — Class 3 flammable, litres
+
+    // ── Tier: heavy (containers — semi-trailer configs, port-road limits) ─
+    // Container cargo + tare capped at 34T per maritime/Shippers Council rules;
+    // GVW follows the semi-trailer axle totals. Height <4.3m enforced by carrier.
     {
-        id: 'fuel-tanker', label: 'Fuel Tanker', img: '/icons3d/tanker_truck.svg',
+        id: 'container-5axle', label: 'Container Truck 44T (5-Axle)', img: '/icons3d/container_truck.svg',
+        accentText: 'text-purple-600', accentBg: 'bg-purple-600', accentBgLight: 'bg-purple-50',
+        pricePerKm: 230, tier: 'heavy',
+        constraints: { maxDist: UNLIMITED, maxWeight: 34, maxStops: 3, allowedCats: ['B'],
+            weightUnit: 'tonnes', allowFragile: true, allowReturn: true,
+            allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
+            cargoHazardous: false, allowConsolidated: false },
+    },
+    {
+        id: 'container-6axle', label: 'Container Truck 50T (6-Axle)', img: '/icons3d/container_truck.svg',
+        accentText: 'text-purple-700', accentBg: 'bg-purple-700', accentBgLight: 'bg-purple-50',
+        pricePerKm: 260, tier: 'heavy',
+        constraints: { maxDist: UNLIMITED, maxWeight: 34, maxStops: 3, allowedCats: ['B'],
+            weightUnit: 'tonnes', allowFragile: true, allowReturn: true,
+            allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
+            cargoHazardous: false, allowConsolidated: false },
+    },
+    {
+        id: 'container-7axle', label: 'Container Truck 56T (7-Axle)', img: '/icons3d/container_truck.svg',
+        accentText: 'text-purple-800', accentBg: 'bg-purple-800', accentBgLight: 'bg-purple-100',
+        pricePerKm: 290, tier: 'heavy',
+        constraints: { maxDist: UNLIMITED, maxWeight: 34, maxStops: 3, allowedCats: ['B'],
+            weightUnit: 'tonnes', allowFragile: true, allowReturn: true,
+            allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
+            cargoHazardous: false, allowConsolidated: false },
+    },
+
+    // ── Tier: hazmat (tankers — axle GVW + strict cargo) ────────
+    // LPG: pressurized gas, Class 2; payload ~22-25T within 50T 6-axle GVW.
+    {
+        id: 'lpg-tanker-6axle', label: 'LPG Tanker 50T (6-Axle)', img: '/icons3d/tanker_truck.svg',
+        accentText: 'text-sky-600', accentBg: 'bg-sky-600', accentBgLight: 'bg-sky-50',
+        pricePerKm: 260, tier: 'hazmat',
+        constraints: { maxDist: UNLIMITED, maxWeight: 24, maxStops: 1, allowedCats: ['B'],
+            weightUnit: 'tonnes', allowFragile: false, allowReturn: true,
+            allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
+            cargoHazardous: 'Class2', strictCargoFilter: true, allowConsolidated: false },
+    },
+    // Fuel: petrol/diesel/kerosene, Class 3; payload 35-42kL within 50T 6-axle GVW.
+    {
+        id: 'fuel-tanker-3axle', label: 'Fuel Tanker 26T (3-Axle, Rigid)', img: '/icons3d/tanker_truck.svg',
+        accentText: 'text-red-500', accentBg: 'bg-red-500', accentBgLight: 'bg-red-50',
+        pricePerKm: 200, tier: 'hazmat',
+        constraints: { maxDist: UNLIMITED, maxWeight: 18000, maxStops: 1, allowedCats: ['B'],
+            weightUnit: 'litres', allowFragile: false, allowReturn: true,
+            allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 2,
+            cargoHazardous: 'Class3', strictCargoFilter: true, allowConsolidated: false },
+    },
+    {
+        id: 'fuel-tanker-6axle', label: 'Fuel Tanker 50T (6-Axle, Semi)', img: '/icons3d/tanker_truck.svg',
         accentText: 'text-red-600', accentBg: 'bg-red-600', accentBgLight: 'bg-red-50',
-        pricePerKm: 300, tier: 'hazmat',
-        constraints: { maxDist: UNLIMITED, maxWeight: 30000, maxStops: 1, allowedCats: ['B'],
+        pricePerKm: 240, tier: 'hazmat',
+        constraints: { maxDist: UNLIMITED, maxWeight: 42000, maxStops: 1, allowedCats: ['B'],
             weightUnit: 'litres', allowFragile: false, allowReturn: true,
             allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
-            cargoHazardous: 'Class3', strictCargoFilter: true },
+            cargoHazardous: 'Class3', strictCargoFilter: true, allowConsolidated: false },
     },
 ];
 
@@ -210,12 +265,12 @@ export const VEHICLES: VehicleCapability[] = [
    Maps each subCategory to the vehicle IDs it can use.
    If a subCategory is NOT listed, all category-eligible vehicles are shown. */
 export const CARGO_VEHICLE_MAP: Record<string, string[]> = {
-    'Electronics': ['probox', 'van', 'pickup', 'canter', 'lorry-5t', 'lorry-7t', 'lorry-10t'],
-    'Large Appliances': ['van', 'pickup', 'canter', 'lorry-5t', 'lorry-7t', 'lorry-10t'],
-    'Furniture': ['van', 'pickup', 'canter', 'lorry-5t', 'lorry-7t', 'lorry-10t'],
-    'Hardware / Construction': ['pickup', 'canter', 'lorry-5t', 'lorry-7t', 'lorry-10t', 'lorry-14t', 'tipper-7t', 'tipper-14t', 'tipper-25t'],
-    'Agricultural': ['canter', 'lorry-5t', 'lorry-7t', 'lorry-10t', 'lorry-14t'],
-    'LPG / Gas (Bulk)': ['lpg-tanker'],
-    'Petroleum / Oil': ['fuel-tanker'],
-    'Loose Aggregate': ['tipper-7t', 'tipper-14t', 'tipper-25t'],
+    'Electronics': ['probox', 'van', 'pickup', 'canter', 'rigid-truck-2axle', 'rigid-truck-3axle', 'rigid-truck-4axle'],
+    'Large Appliances': ['van', 'pickup', 'canter', 'rigid-truck-2axle', 'rigid-truck-3axle', 'rigid-truck-4axle'],
+    'Furniture': ['van', 'pickup', 'canter', 'rigid-truck-2axle', 'rigid-truck-3axle', 'rigid-truck-4axle'],
+    'Hardware / Construction': ['pickup', 'canter', 'rigid-truck-2axle', 'rigid-truck-3axle', 'rigid-truck-4axle', 'semi-truck-4axle', 'semi-truck-5axle', 'semi-truck-6axle', 'semi-truck-7axle', 'tipper-2axle', 'tipper-3axle', 'tipper-4axle'],
+    'Agricultural': ['canter', 'rigid-truck-2axle', 'rigid-truck-3axle', 'rigid-truck-4axle', 'semi-truck-4axle', 'semi-truck-5axle'],
+    'LPG / Gas (Bulk)': ['lpg-tanker-6axle'],
+    'Petroleum / Oil': ['fuel-tanker-3axle', 'fuel-tanker-6axle'],
+    'Loose Aggregate': ['tipper-2axle', 'tipper-3axle', 'tipper-4axle'],
 };

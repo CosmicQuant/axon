@@ -14,24 +14,48 @@ const VEHICLE_RATES = {
     // Medium trucks
     'canter': { base: 2000, perKm: 95, perMin: 18, stopFee: 250, min: 2000 },
 
-    // Lorry tonnage variants
+// Lorry tonnage variants
     'lorry-5t': { base: 3000, perKm: 115, perMin: 20, stopFee: 350, min: 3000 },
     'lorry-7t': { base: 3500, perKm: 130, perMin: 22, stopFee: 400, min: 3500 },
     'lorry-10t': { base: 4500, perKm: 155, perMin: 25, stopFee: 500, min: 4500 },
     'lorry-14t': { base: 6000, perKm: 185, perMin: 30, stopFee: 600, min: 6000 },
 
-    // Tipper tonnage variants
+    // ── Axle-based rigid trucks (KeNHA / EAC Vehicle Load Control Act) ──
+    'rigid-truck-2axle': { base: 3000, perKm: 110, perMin: 18, stopFee: 350, min: 3000 },  // 18T
+    'rigid-truck-3axle': { base: 4500, perKm: 140, perMin: 22, stopFee: 500, min: 4500 },  // 26T
+    'rigid-truck-4axle': { base: 6000, perKm: 180, perMin: 28, stopFee: 600, min: 6000 },  // 30T
+    'semi-truck-4axle':  { base: 7000, perKm: 200, perMin: 32, stopFee: 700, min: 7000 },  // 38T
+    'semi-truck-5axle':  { base: 8000, perKm: 225, perMin: 35, stopFee: 800, min: 8000 },  // 44T
+    'semi-truck-6axle':  { base: 9500, perKm: 250, perMin: 40, stopFee: 900, min: 9500 },  // 50T
+    'semi-truck-7axle':  { base: 11000, perKm: 280, perMin: 45, stopFee: 1000, min: 11000 }, // 56T
+
+    // Tipper tonnage variants (legacy)
     'tipper-7t': { base: 3500, perKm: 120, perMin: 20, stopFee: 400, min: 3500 },
     'tipper-14t': { base: 5000, perKm: 160, perMin: 25, stopFee: 500, min: 5000 },
     'tipper-25t': { base: 7000, perKm: 200, perMin: 30, stopFee: 600, min: 7000 },
 
-    // Container sizes
+    // ── Axle-based tippers (KeNHA GVW; rigid dump trucks) ──
+    'tipper-2axle': { base: 3500, perKm: 120, perMin: 20, stopFee: 400, min: 3500 },  // 18T
+    'tipper-3axle': { base: 5000, perKm: 160, perMin: 25, stopFee: 500, min: 5000 },  // 26T
+    'tipper-4axle': { base: 7000, perKm: 200, perMin: 30, stopFee: 600, min: 7000 },  // 30T
+
+    // Container sizes (legacy)
     'container-20ft': { base: 8000, perKm: 180, perMin: 35, stopFee: 700, min: 8000 },
     'container-40ft': { base: 12000, perKm: 250, perMin: 45, stopFee: 900, min: 12000 },
 
-    // Tanker types (LPG vs Petroleum — different pricing)
+    // ── Axle-based container semi-trucks (Port/Shippers Council 34T cap) ──
+    'container-5axle': { base: 8000, perKm: 210, perMin: 35, stopFee: 800, min: 8000 },   // 44T (5-axle)
+    'container-6axle': { base: 9500, perKm: 240, perMin: 40, stopFee: 900, min: 9500 },   // 50T (6-axle)
+    'container-7axle': { base: 11000, perKm: 270, perMin: 45, stopFee: 1000, min: 11000 }, // 56T (7-axle)
+
+    // Tanker types (legacy)
     'lpg-tanker': { base: 10000, perKm: 220, perMin: 40, stopFee: 800, min: 10000 },
     'fuel-tanker': { base: 12000, perKm: 270, perMin: 45, stopFee: 1000, min: 12000 },
+
+    // ── Axle-based hazmat tankers (KeNHA GVW; strict cargo) ──
+    'lpg-tanker-6axle':  { base: 10000, perKm: 240, perMin: 40, stopFee: 900, min: 10000 },  // 50T, ~22-25T LPG payload
+    'fuel-tanker-3axle': { base: 8000, perKm: 200, perMin: 35, stopFee: 700, min: 8000 },    // 26T rigid, ~16-18kL
+    'fuel-tanker-6axle': { base: 12000, perKm: 270, perMin: 45, stopFee: 1000, min: 12000 }, // 50T semi, ~35-42kL
 
     // Legacy IDs (backward compatibility with existing orders)
     'lorry': { base: 4500, perKm: 155, perMin: 25, stopFee: 500, min: 4500 },

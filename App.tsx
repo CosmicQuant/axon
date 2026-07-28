@@ -21,24 +21,43 @@ import { StatusBar, Style } from '@capacitor/status-bar';
 import { Geolocation } from '@capacitor/geolocation';
 import MapLayer from './components/MapLayer';
 
+// ── Lazy loader with auto-retry on stale-asset MIME errors ───────
+// After a Hosting deploy, browsers may hold a cached index.html that
+// references old JS hashes that no longer exist. Firebase's SPA fallback
+// then serves /index.html (text/html) for the missing JS, triggering a
+// "Failed to fetch dynamically imported module" + MIME error. This wrapper
+// catches that error once and forces a cache-busting hard reload so the
+// user picks up the new index.html.
+const lazyRetry = (loader: () => Promise<any>) =>
+    lazy(() =>
+        loader().catch((err: any) => {
+            const isStaleModule = /Failed to fetch dynamically imported module|MIME|text\/html/i.test(err?.message || '');
+            if (isStaleModule && !sessionStorage.getItem('__axon_reloaded')) {
+                sessionStorage.setItem('__axon_reloaded', '1');
+                window.location.reload();
+            }
+            throw err;
+        })
+    );
+
 // Lazy-loaded components for performance
-const Hero = lazy(() => import('./components/Hero'));
-const BookingPage = lazy(() => import('./components/BookingPage'));
-const TrackingPage = lazy(() => import('./components/TrackingPage'));
-const DriverDashboard = lazy(() => import('./components/DriverDashboard'));
-const BusinessDashboard = lazy(() => import('./components/BusinessDashboard'));
-const BusinessLanding = lazy(() => import('./components/BusinessLanding'));
-const CustomerDashboard = lazy(() => import('./components/CustomerDashboard'));
-const CustomerHome = lazy(() => import('./components/CustomerHome'));
-const HistoryList = lazy(() => import('./components/HistoryList'));
-const PrivacyPolicy = lazy(() => import('./components/PrivacyPolicy'));
-const TermsOfService = lazy(() => import('./components/TermsOfService'));
-const AboutUs = lazy(() => import('./components/AboutUs'));
-const BlogPage = lazy(() => import('./components/BlogPage'));
-const FAQPage = lazy(() => import('./components/FAQPage'));
-const SecurityPage = lazy(() => import('./components/SecurityPage'));
-const ContactUs = lazy(() => import('./components/ContactUs'));
-const VulnerabilityReport = lazy(() => import('./components/VulnerabilityReport'));
+const Hero = lazyRetry(() => import('./components/Hero'));
+const BookingPage = lazyRetry(() => import('./components/BookingPage'));
+const TrackingPage = lazyRetry(() => import('./components/TrackingPage'));
+const DriverDashboard = lazyRetry(() => import('./components/DriverDashboard'));
+const BusinessDashboard = lazyRetry(() => import('./components/BusinessDashboard'));
+const BusinessLanding = lazyRetry(() => import('./components/BusinessLanding'));
+const CustomerDashboard = lazyRetry(() => import('./components/CustomerDashboard'));
+const CustomerHome = lazyRetry(() => import('./components/CustomerHome'));
+const HistoryList = lazyRetry(() => import('./components/HistoryList'));
+const PrivacyPolicy = lazyRetry(() => import('./components/PrivacyPolicy'));
+const TermsOfService = lazyRetry(() => import('./components/TermsOfService'));
+const AboutUs = lazyRetry(() => import('./components/AboutUs'));
+const BlogPage = lazyRetry(() => import('./components/BlogPage'));
+const FAQPage = lazyRetry(() => import('./components/FAQPage'));
+const SecurityPage = lazyRetry(() => import('./components/SecurityPage'));
+const ContactUs = lazyRetry(() => import('./components/ContactUs'));
+const VulnerabilityReport = lazyRetry(() => import('./components/VulnerabilityReport'));
 const AutonomousFulfillment = lazy(() => import('./components/AutonomousFulfillment'));
 const UnifiedLogisticsIntelligence = lazy(() => import('./components/UnifiedLogisticsIntelligence'));
 const ApiDocumentation = lazy(() => import('./components/ApiDocumentation'));

@@ -18,29 +18,29 @@ const BirdEyeMotorcycle = ({ size, accent }: { size: number; accent: string }) =
                 <stop offset="100%" stopColor={accent} stopOpacity="0.82" />
             </radialGradient>
         </defs>
-        {/* front wheel — tire ring + hub (top-down wheel shape) */}
-        <circle cx="24" cy="8" r="4.8" fill="#1f2937" />
-        <circle cx="24" cy="8" r="3.6" fill="#4b5563" />
-        <circle cx="24" cy="8" r="1.1" fill="#1f2937" />
-        {/* handlebars — wide V */}
-        <path d="M13 11 L20 16 M35 11 L28 16" stroke="#1f2937" strokeWidth="2.4" strokeLinecap="round" fill="none" />
-        {/* fairing/nose — tapered */}
+        {/* Front wheel — vertical pill aligned with travel (tyre seen edge-on from above) */}
+        <rect x="21.5" y="3" width="5" height="8" rx="2.5" fill="#111827" />
+        <rect x="22.5" y="4" width="3" height="6" rx="1.5" fill="#1f2937" />
+        <rect x="23.4" y="5.5" width="1.2" height="3" rx="0.6" fill="#4b5563" />
+        {/* Handlebars — wide V */}
+        <path d="M13 11 L20 16 M35 11 L28 16" stroke="#111827" strokeWidth="2.4" strokeLinecap="round" fill="none" />
+        {/* Nose fairing — tapered */}
         <path d="M19 13 L29 13 L30.8 20 L24 23 L17.2 20 Z" fill="url(#motoBody)" />
-        {/* tank */}
+        {/* Tank/body */}
         <rect x="18.7" y="18" width="10.6" height="9" rx="5" fill="url(#motoBody)" />
-        {/* rider torso */}
+        {/* Rider torso */}
         <path d="M20 25 L28 25 L27 31 L21 31 Z" fill="#1f2937" />
-        {/* rider head + helmet */}
+        {/* Rider head + helmet */}
         <circle cx="24" cy="22" r="3" fill="#111827" />
         <circle cx="24" cy="22" r="2" fill="#374151" />
-        {/* seat */}
+        {/* Seat */}
         <rect x="20.5" y="30" width="7" height="5" rx="2.5" fill="#0f172a" />
-        {/* rear wheel — tire ring + hub */}
-        <circle cx="24" cy="41" r="4.8" fill="#1f2937" />
-        <circle cx="24" cy="41" r="3.6" fill="#4b5563" />
-        <circle cx="24" cy="41" r="1.1" fill="#1f2937" />
-        {/* swing arm */}
+        {/* Swing arm */}
         <rect x="23" y="35" width="2" height="3" fill="#1f2937" opacity="0.7" />
+        {/* Rear wheel — vertical pill aligned with travel */}
+        <rect x="21.5" y="37" width="5" height="8" rx="2.5" fill="#111827" />
+        <rect x="22.5" y="38" width="3" height="6" rx="1.5" fill="#1f2937" />
+        <rect x="23.4" y="39.5" width="1.2" height="3" rx="0.6" fill="#4b5563" />
     </svg>
 );
 
@@ -168,7 +168,10 @@ const getBirdEyeSvg = (type: string): React.FC<{ size: number; accent: string }>
     if (t.includes('probox') || t.includes('car') || t === 'automobile') return BirdEyeCar;
     if (t.includes('van') || t.includes('minibus')) return BirdEyeVan;
     if (t.includes('pickup') || t.includes('pick-up') || t.includes('pick up')) return BirdEyePickup;
-    // All trucks: canter, lorry, tipper, container, tanker, etc.
+    if (t.includes('tipper')) return BirdEyeTruck;     // tipper body style
+    if (t.includes('tanker')) return BirdEyeVan;        // tank body (rounded)
+    if (t.includes('container')) return BirdEyeTruck;  // skeletal trailer = box
+    // All other trucks: rigid-truck-*, semi-truck-*, canter, etc.
     return BirdEyeTruck;
 };
 

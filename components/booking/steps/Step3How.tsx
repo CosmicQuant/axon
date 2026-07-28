@@ -7,7 +7,7 @@ import { useMapState } from '@/context/MapContext';
 import { httpsCallable } from 'firebase/functions';
 import {
     getEligibleVehicles, allowsFragile, allowsReturnTrip,
-    requiresHelpers, getSuggestedHelpers, requiresScheduling
+    requiresHelpers, getSuggestedHelpers, requiresScheduling, allowsConsolidated
 } from '../../../services/vehicleCapabilities';
 
 export const Step3How = () => {
@@ -31,6 +31,13 @@ export const Step3How = () => {
     const showHelpers = !isStandard && (requiresHelpers(data.vehicle) || (data.helpersCount || 0) > 0);
     const showReturnTrip = !isStandard && allowsReturnTrip(data.vehicle) && allowsFragile(data.vehicle);
     const mustSchedule = !isStandard && requiresScheduling(data.vehicle);
+    // Service-type lock: heavy/hazmat vehicles forbid consolidation. Hide the
+    // Standard toggle and force Express so the user can't accidentally clear
+    // the vehicle by picking "Standard".
+    const canConsolidate = allowsConsolidated(data.vehicle);
+    const visibleServiceTypes = canConsolidate
+        ? [{ id: 'Standard', label: '📦 Standard', desc: 'Consolidated & affordable', accent: 'brand' }, { id: 'Express', label: '⚡ Express', desc: 'Dedicated vehicle, fast', accent: 'orange' }]
+        : [{ id: 'Express', label: '⚡ Express', desc: 'Dedicated vehicle', accent: 'orange' }];
 
     // Auto-select first eligible vehicle + auto-prescribed helpers when heavy
     useEffect(() => {
@@ -51,6 +58,9 @@ export const Step3How = () => {
             }
             if (requiresScheduling(chosenId) && !data.isScheduled) {
                 updates.isScheduled = true;
+            }
+            if (!allowsConsolidated(chosenId) && data.serviceType !== 'Express') {
+                updates.serviceType = 'Express';
             }
             if (Object.keys(updates).length > 0) updateData(updates);
         }
@@ -115,12 +125,9 @@ export const Step3How = () => {
 
     return (
         <div className="space-y-4">
-            {/* Service Type Toggle */}
-            <div className="grid grid-cols-2 gap-2 px-0.5 pt-1">
-                {[
-                    { id: 'Standard', label: '📦 Standard', desc: 'Consolidated & affordable', accent: 'brand' },
-                    { id: 'Express', label: '⚡ Express', desc: 'Dedicated vehicle, fast', accent: 'orange' }
-                ].map(svc => (
+{/* Service Type Toggle — Standard hidden when vehicle forbids consolidation */}
+            <div className={`grid ${visibleServiceTypes.length === 1 ? 'grid-cols-1' : 'grid-cols-2'} gap-2 px-0.5 pt-1`}>
+                {visibleServiceTypes.map(svc => (
                     <button
                         key={svc.id}
                         onClick={() => updateData({ serviceType: svc.id as any, ...(svc.id === 'Standard' ? { vehicle: '' } : {}) })}

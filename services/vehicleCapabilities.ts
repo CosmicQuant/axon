@@ -4,10 +4,21 @@ import { VEHICLES, CARGO_VEHICLE_MAP, VehicleCapability, WeightUnit } from '../c
 // Old orders may carry simplified vehicle ids. Map them to the canonical
 // entry so historical data doesn't break the new capability model.
 const LEGACY_ALIASES: Record<string, string> = {
-    'tanker': 'fuel-tanker',           // legacy "tanker" → most common: fuel
-    'lorry': 'lorry-5t',
-    'container': 'container-20ft',
-    'tipper': 'tipper-7t',
+    'tanker': 'fuel-tanker-6axle',          // legacy "tanker" → most common: fuel semi
+    'fuel-tanker': 'fuel-tanker-6axle',     // old pre-axle taxonomy
+    'lpg-tanker': 'lpg-tanker-6axle',
+    'lorry': 'rigid-truck-3axle',
+    'lorry-5t': 'rigid-truck-3axle',
+    'lorry-7t': 'rigid-truck-3axle',
+    'lorry-10t': 'rigid-truck-4axle',
+    'lorry-14t': 'rigid-truck-4axle',
+    'container': 'container-5axle',
+    'container-20ft': 'container-5axle',
+    'container-40ft': 'container-6axle',
+    'tipper': 'tipper-3axle',
+    'tipper-7t': 'tipper-2axle',
+    'tipper-14t': 'tipper-3axle',
+    'tipper-25t': 'tipper-4axle',
     'motorbike': 'boda',
     'motorcycle': 'boda',
     'boda boda': 'boda',
@@ -108,6 +119,16 @@ export const getStrictSubcategories = (vehicleId?: string | null): string[] | nu
         if (vehicleIds.includes(v.id)) allowed.push(subcat);
     }
     return allowed;
+};
+
+// ── Consolidated (Standard shared-truck) allowed? ───────────────
+// Heavy/hazmat vehicles are dedicated ÃÂ¢ Standard consolidates parcels in a
+// shared truck, which is incompatible. Step3 hides the Standard toggle when
+// the chosen vehicle forbids consolidation, locking to Express.
+export const allowsConsolidated = (vehicleId?: string | null): boolean => {
+    const v = getVehicle(vehicleId);
+    if (!v) return true;              // unknown vehicle = allow (default UX)
+    return v.constraints.allowConsolidated !== false;
 };
 
 // ── Auto-set the category when a vehicle restricts it ────────────
