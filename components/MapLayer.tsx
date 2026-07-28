@@ -12,32 +12,40 @@ import { Truck, Navigation, MapPin, GripVertical, X, Compass, Flag, ArrowUp, Arr
 
 const BirdEyeMotorcycle = ({ size, accent }: { size: number; accent: string }) => (
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        {/* white contrast ring (map legibility) */}
-        <circle cx="24" cy="24" r="22" fill="white" opacity="0.92" />
-        {/* front wheel — bold, ringed */}
-        <circle cx="24" cy="8" r="5" fill="#111827" />
-        <circle cx="24" cy="8" r="2" fill="#6b7280" />
-        {/* handlebars — wide V reaching back */}
-        <path d="M14 12 L20 16 M34 12 L28 16" stroke="#111827" strokeWidth="2.2" strokeLinecap="round" fill="none" />
-        {/* fairing/nose — tapered pill front */}
-        <path d="M19 13 L29 13 L30.5 20 L24 23 L17.5 20 Z" fill={accent} />
-        {/* main body — rounded pill (tank + seat) */}
-        <rect x="18.5" y="20" width="11" height="13" rx="5.5" fill={accent} />
-        {/* rider head — distinct dark circle */}
-        <circle cx="24" cy="24" r="3.2" fill="#1f2937" />
-        {/* rider shoulders hint */}
-        <rect x="20" y="27" width="8" height="4" rx="2" fill="#1f2937" opacity="0.45" />
-        {/* seat rear lip */}
-        <rect x="20" y="31" width="8" height="2.5" rx="1.2" fill="#0f172a" opacity="0.25" />
-        {/* rear wheel — bold, ringed */}
-        <circle cx="24" cy="40" r="5" fill="#111827" />
-        <circle cx="24" cy="40" r="2" fill="#6b7280" />
+        <defs>
+            <radialGradient id="motoBody" cx="50%" cy="40%" r="60%">
+                <stop offset="0%" stopColor={accent} stopOpacity="1" />
+                <stop offset="100%" stopColor={accent} stopOpacity="0.82" />
+            </radialGradient>
+        </defs>
+        {/* front wheel — tire ring + hub (top-down wheel shape) */}
+        <circle cx="24" cy="8" r="4.8" fill="#1f2937" />
+        <circle cx="24" cy="8" r="3.6" fill="#4b5563" />
+        <circle cx="24" cy="8" r="1.1" fill="#1f2937" />
+        {/* handlebars — wide V */}
+        <path d="M13 11 L20 16 M35 11 L28 16" stroke="#1f2937" strokeWidth="2.4" strokeLinecap="round" fill="none" />
+        {/* fairing/nose — tapered */}
+        <path d="M19 13 L29 13 L30.8 20 L24 23 L17.2 20 Z" fill="url(#motoBody)" />
+        {/* tank */}
+        <rect x="18.7" y="18" width="10.6" height="9" rx="5" fill="url(#motoBody)" />
+        {/* rider torso */}
+        <path d="M20 25 L28 25 L27 31 L21 31 Z" fill="#1f2937" />
+        {/* rider head + helmet */}
+        <circle cx="24" cy="22" r="3" fill="#111827" />
+        <circle cx="24" cy="22" r="2" fill="#374151" />
+        {/* seat */}
+        <rect x="20.5" y="30" width="7" height="5" rx="2.5" fill="#0f172a" />
+        {/* rear wheel — tire ring + hub */}
+        <circle cx="24" cy="41" r="4.8" fill="#1f2937" />
+        <circle cx="24" cy="41" r="3.6" fill="#4b5563" />
+        <circle cx="24" cy="41" r="1.1" fill="#1f2937" />
+        {/* swing arm */}
+        <rect x="23" y="35" width="2" height="3" fill="#1f2937" opacity="0.7" />
     </svg>
 );
 
 const BirdEyeTuktuk = ({ size, accent }: { size: number; accent: string }) => (
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="24" cy="24" r="22" fill="white" opacity="0.9" />
         {/* single front wheel */}
         <ellipse cx="24" cy="9" rx="3.5" ry="3" fill="#111827" />
         {/* tapered nose */}
@@ -57,7 +65,6 @@ const BirdEyeTuktuk = ({ size, accent }: { size: number; accent: string }) => (
 
 const BirdEyeCar = ({ size, accent }: { size: number; accent: string }) => (
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="24" cy="24" r="22" fill="white" opacity="0.9" />
         {/* nose taper */}
         <path d="M16 6 L32 6 L35 11 L13 11 Z" fill={accent} />
         {/* hood to windshield */}
@@ -78,7 +85,6 @@ const BirdEyeCar = ({ size, accent }: { size: number; accent: string }) => (
 
 const BirdEyeVan = ({ size, accent }: { size: number; accent: string }) => (
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="24" cy="24" r="22" fill="white" opacity="0.9" />
         {/* nose */}
         <path d="M16 4 L32 4 L35 10 L13 10 Z" fill={accent} />
         {/* boxy van body */}
@@ -98,7 +104,6 @@ const BirdEyeVan = ({ size, accent }: { size: number; accent: string }) => (
 
 const BirdEyePickup = ({ size, accent }: { size: number; accent: string }) => (
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="24" cy="24" r="22" fill="white" opacity="0.9" />
         {/* nose */}
         <path d="M16 3 L32 3 L35 9 L13 9 Z" fill={accent} />
         {/* cab */}
@@ -121,7 +126,6 @@ const BirdEyePickup = ({ size, accent }: { size: number; accent: string }) => (
 
 const BirdEyeTruck = ({ size, accent }: { size: number; accent: string }) => (
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="24" cy="24" r="22" fill="white" opacity="0.9" />
         {/* cab nose */}
         <path d="M16 2 L32 2 L35 8 L13 8 Z" fill={accent} />
         {/* cab */}
