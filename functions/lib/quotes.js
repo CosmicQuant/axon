@@ -17,6 +17,7 @@ const {
     getRouteFromGoogleV2,
     computePrice,
 } = require('./pricing');
+const { validateVehicleCapability } = require('./capabilities');
 
 // ── CALLABLE CLOUD FUNCTION ────────────────────────────────────
 const calculateQuoteHandler = async (data, context) => {
@@ -83,6 +84,17 @@ const calculateQuoteHandler = async (data, context) => {
     }
 
     if (distanceKm < 1) distanceKm = 1;
+
+    // ── Capability guard: validate (vehicle, category, distanceKm) against the
+    // canonical capability map. Prevents spoofed API calls bypassing client UI.
+    // Authoritative check (server is the only pricing/capability source per spec).
+    const capCheck = validateVehicleCapability({ vehicle, category, distanceKm, subCategory });
+    if (!capCheck.ok) {
+        throw new functions.https.HttpsError(
+            'failed-precondition',
+            `This vehicle can't take this order: ${capCheck.reason}. Please choose a different vehicle.`
+        );
+    }
 
     const result = computePrice({
         distanceKm, durationMinutes, vehicle, serviceType,

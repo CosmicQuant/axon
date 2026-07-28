@@ -2,6 +2,7 @@ import React from 'react';
 import { Banknote, Check, ArrowLeft, ChevronRight } from 'lucide-react';
 import { useBooking } from '../BookingContext';
 import { VEHICLES } from '../constants';
+import { getEligibleVehicles, getWeightUnitLabel, allowsReturnTrip } from '../../../services/vehicleCapabilities';
 import mpesaLogo from '../../../assets/mpesa.png';
 
 interface Step5Props {
@@ -12,17 +13,17 @@ export const Step5Payment: React.FC<Step5Props> = ({ submit }) => {
     const { data, updateData, prevStep, setStep } = useBooking();
     const routeStops = [data.pickup, ...data.waypoints, data.dropoff].filter(Boolean);
     const weightVal = parseFloat(data.dimensions.weight) || 0;
-    const eligibleVehicles = VEHICLES.filter(v => {
-        if (data.distanceKm > v.maxDist) return false;
-        if (!v.allowedCats.includes(data.category)) return false;
-        if (data.category === 'A' && weightVal > v.maxWeight) return false;
-        return true;
-    });
-    const activeVehicle = VEHICLES.find(v => v.id === data.vehicle) || eligibleVehicles[0];
+    const eligibleVehicles = getEligibleVehicles({ category: data.category, weightKg: weightVal, distanceKm: data.distanceKm, subCategory: data.subCategory });
+    const activeVehicle = eligibleVehicles.find(v => v.id === data.vehicle) || eligibleVehicles[0];
     const displayPrice = data.price || 0;
+    const weightUnit = getWeightUnitLabel(data.vehicle);
+
+    // Cash only available for Express (Standard = consolidated, M-Pesa only).
+    const allowCash = data.serviceType !== 'Standard';
+    const showReturn = data.serviceType !== 'Standard' && allowsReturnTrip(data.vehicle);
 
     const badges = [
-        data.isReturnTrip && 'Return',
+        showReturn && data.isReturnTrip && 'Return',
         data.helpersCount > 0 && `${data.helpersCount} loader${data.helpersCount > 1 ? 's' : ''}`,
         data.isFragile && 'Fragile',
         data.isScheduled && data.pickupTime ? 'Scheduled' : 'Now',
@@ -30,21 +31,27 @@ export const Step5Payment: React.FC<Step5Props> = ({ submit }) => {
 
     return (
         <div className="space-y-2">
-            {/* Payment method — primary focus */}
-            <div className="grid grid-cols-2 gap-2 pt-1">
+            {/* Payment method — primary focus. Cash gated to Express only. */}
+            <div className={`grid ${allowCash ? 'grid-cols-2' : 'grid-cols-1'} gap-2 pt-1`}>
                 <button
                     onClick={() => updateData({ paymentMethod: 'M-Pesa' })}
                     className={`rounded-xl border overflow-hidden relative flex items-center justify-center transition-all h-12 ${data.paymentMethod === 'M-Pesa' ? 'border-green-500 bg-green-50/50 ring-1 ring-green-500' : 'border-gray-200 bg-white hover:bg-gray-50'}`}
                 >
                     <img src={mpesaLogo} alt="M-Pesa" className={`h-full w-full object-cover mix-blend-multiply ${data.paymentMethod === 'M-Pesa' ? '' : 'grayscale opacity-50'}`} />
                 </button>
-                <button
-                    onClick={() => updateData({ paymentMethod: 'Cash' })}
-                    className={`rounded-xl border flex items-center justify-center gap-2 transition-all h-12 ${data.paymentMethod === 'Cash' ? 'border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-500' : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'}`}
-                >
-                    <Banknote size={18} className={data.paymentMethod === 'Cash' ? 'text-brand-600' : ''} />
-                    <span className="font-bold text-xs">Cash</span>
-                </button>
+                {allowCash ? (
+                    <button
+                        onClick={() => updateData({ paymentMethod: 'Cash' })}
+                        className={`rounded-xl border flex items-center justify-center gap-2 transition-all h-12 ${data.paymentMethod === 'Cash' ? 'border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-500' : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'}`}
+                    >
+                        <Banknote size={18} className={data.paymentMethod === 'Cash' ? 'text-brand-600' : ''} />
+                        <span className="font-bold text-xs">Cash</span>
+                    </button>
+                ) : (
+                    <div className="rounded-xl border border-gray-100 bg-gray-50 flex items-center justify-center gap-2 h-12 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                        M-Pesa only · Standard
+                    </div>
+                )}
             </div>
 
             {/* Price row — always same height */}
@@ -92,7 +99,9 @@ export const Step5Payment: React.FC<Step5Props> = ({ submit }) => {
                     <button onClick={() => setStep(1)} className={`${data.serviceType === 'Standard' ? 'w-full' : 'flex-1'} flex items-center justify-between px-3 py-2.5 rounded-xl bg-blue-50 border border-blue-200/60 hover:bg-blue-100/70 transition-colors`}>
                         <div className="min-w-0">
                             <div className="text-[9px] font-bold uppercase tracking-wider text-blue-400">Package</div>
-                            <div className="text-xs font-bold text-gray-900 truncate">{data.subCategory || 'Not set'}</div>
+                            <div className="text-xs font-bold text-gray-900 truncate">
+                                {data.subCategory || 'Not set'}{weightVal > 0 && <span className="text-gray-500 font-normal"> · {weightVal} {weightUnit}</span>}
+                            </div>
                         </div>
                         <ChevronRight size={14} className="text-blue-300 flex-shrink-0" />
                     </button>

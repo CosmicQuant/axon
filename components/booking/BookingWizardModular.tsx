@@ -279,9 +279,9 @@ const WizardContent: React.FC<BookingWizardProps> = ({ prefillData, onOrderCompl
 
     const weightVal = parseFloat(data.dimensions.weight) || 0;
     const eligibleVehicles = VEHICLES.filter(v => {
-        if (data.distanceKm > v.maxDist) return false;
-        if (!v.allowedCats.includes(data.category)) return false;
-        if (data.category === 'A' && weightVal > v.maxWeight) return false;
+        if (data.distanceKm > v.constraints.maxDist) return false;
+        if (!v.constraints.allowedCats.includes(data.category)) return false;
+        if (data.category === 'A' && weightVal > v.constraints.maxWeight) return false;
         return true;
     });
     const activeVehicle = VEHICLES.find(v => v.id === data.vehicle) || eligibleVehicles[0];

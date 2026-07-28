@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ArrowRight, Camera, ShieldCheck, AlertTriangle, X, Loader2 } from 'lucide-react';
 import { useBooking } from '../BookingContext';
+import { allowsFragile, getWeightUnitLabel } from '../../../services/vehicleCapabilities';
 
 export const Step2What = () => {
     const { data, updateData, nextStep, prevStep } = useBooking();
@@ -125,9 +126,10 @@ export const Step2What = () => {
                             <div className="grid grid-cols-2 gap-3 px-1">
                                 {['Length', 'Width', 'Height', 'Weight'].map((dim) => {
                                     const prop = dim.toLowerCase() as keyof typeof data.dimensions;
+                                    const unitLabel = dim === 'Weight' ? `(${getWeightUnitLabel(data.vehicle)})` : '(cm)';
                                     return (
                                         <div key={dim} className="space-y-1">
-                                            <label className="text-[10px] font-bold text-gray-500 uppercase">{dim} {dim === 'Weight' ? '(kg)' : '(cm)'}</label>
+                                            <label className="text-[10px] font-bold text-gray-500 uppercase">{dim} {unitLabel}</label>
                                             <input
                                                 type="number"
                                                 value={data.dimensions[prop]}
@@ -192,13 +194,19 @@ export const Step2What = () => {
                                     <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1">
                                         <AlertTriangle size={10} className="text-amber-500" /> Handle with care?
                                     </label>
-                                    <button
-                                        onClick={() => updateData({ isFragile: !data.isFragile })}
-                                        className={`w-full py-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${data.isFragile ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-gray-200 bg-white text-gray-500'}`}
-                                    >
-                                        <div className={`w-3 h-3 rounded-full ${data.isFragile ? 'bg-amber-500 animate-pulse' : 'bg-gray-200'}`} />
-                                        {data.isFragile ? 'Fragile' : 'Standard'}
-                                    </button>
+                                    {allowsFragile(data.vehicle) ? (
+                                        <button
+                                            onClick={() => updateData({ isFragile: !data.isFragile })}
+                                            className={`w-full py-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${data.isFragile ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-gray-200 bg-white text-gray-500'}`}
+                                        >
+                                            <div className={`w-3 h-3 rounded-full ${data.isFragile ? 'bg-amber-500 animate-pulse' : 'bg-gray-200'}`} />
+                                            {data.isFragile ? 'Fragile' : 'Standard'}
+                                        </button>
+                                    ) : (
+                                        <div className="w-full py-2.5 rounded-xl border border-gray-100 bg-gray-50 text-xs font-bold text-gray-300 flex items-center justify-center gap-2">
+                                            <AlertTriangle size={12} /> Not available for this vehicle
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

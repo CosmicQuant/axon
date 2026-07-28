@@ -1735,11 +1735,11 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
                               <button
                                 key={v.id}
                                 onClick={() => setEditVehicle(v.id)}
-                                className={`flex-shrink-0 w-[80px] p-2 rounded-[1rem] border flex flex-col items-center text-center transition-all duration-200 ${editVehicle === v.id ? `border-gray-300 ${v.bgLight} shadow-sm ring-1 ring-gray-300 scale-[1.02]` : 'border-gray-200 bg-white hover:border-gray-300 scale-100'}`}
+                                className={`flex-shrink-0 w-[80px] p-2 rounded-[1rem] border flex flex-col items-center text-center transition-all duration-200 ${editVehicle === v.id ? `border-gray-300 ${v.accentBgLight} shadow-sm ring-1 ring-gray-300 scale-[1.02]` : 'border-gray-200 bg-white hover:border-gray-300 scale-100'}`}
                               >
                                 <img src={v.img} alt={v.label} className="w-10 h-10 object-contain mb-0.5" />
                                 <div className="font-bold text-[11px] leading-tight text-gray-900 line-clamp-1">{v.label}</div>
-                                <div className="text-[9px] font-medium text-gray-500 mt-0.5">≤ {v.maxWeight >= 1000 ? `${v.maxWeight / 1000}T` : `${v.maxWeight}kg`}</div>
+                                <div className="text-[9px] font-medium text-gray-500 mt-0.5">≤ {v.constraints.maxWeight >= 1000 ? `${v.constraints.maxWeight / 1000}T` : `${v.constraints.maxWeight}kg`}</div>
                               </button>
                             ))}
                           </div>

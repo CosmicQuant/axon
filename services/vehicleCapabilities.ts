@@ -1,0 +1,166 @@
+import { VEHICLES, CARGO_VEHICLE_MAP, VehicleCapability, WeightUnit } from '../components/booking/constants';
+
+// ── Legacy alias map ─────────────────────────────────────────────
+// Old orders may carry simplified vehicle ids. Map them to the canonical
+// entry so historical data doesn't break the new capability model.
+const LEGACY_ALIASES: Record<string, string> = {
+    'tanker': 'fuel-tanker',           // legacy "tanker" → most common: fuel
+    'lorry': 'lorry-5t',
+    'container': 'container-20ft',
+    'tipper': 'tipper-7t',
+    'motorbike': 'boda',
+    'motorcycle': 'boda',
+    'boda boda': 'boda',
+    'bodaboda': 'boda',
+    'cargo van': 'van',
+    'van': 'van',
+    'pickup truck': 'pickup',
+    'pick-up': 'pickup',
+    'tuk-tuk': 'tuktuk',
+    'tuk tuk': 'tuktuk',
+    'tuktuk': 'tuktuk',
+    'auto rickshaw': 'tuktuk',
+};
+
+const normalizeVehicleId = (raw: string | undefined | null): string => {
+    if (!raw) return '';
+    const t = String(raw).toLowerCase().trim();
+    return LEGACY_ALIASES[t] || t;
+};
+
+// ── Core lookups ─────────────────────────────────────────────────
+export const getVehicle = (rawId?: string | null): VehicleCapability | null => {
+    if (!rawId) return null;
+    const id = normalizeVehicleId(rawId);
+    return VEHICLES.find(v => v.id === id) || null;
+};
+
+// ── Weight unit display ──────────────────────────────────────────
+export const getWeightUnitLabel = (vehicleId?: string | null): string => {
+    const v = getVehicle(vehicleId);
+    if (!v) return 'kg';
+    const u = v.constraints.weightUnit;
+    return u === 'litres' ? 'litres' : u === 'm3' ? 'm³' : u;
+};
+
+// ── Smart-filter eligibility (Option A) ──────────────────────────
+// Returns vehicles that match the chosen category + optional weight cap +
+// optional distance cap + cargo subCategory restriction.
+export interface EligibilityInputs {
+    category?: 'A' | 'B' | string;
+    weightKg?: number;     // customer's stated weight (always normalized to kg)
+    distanceKm?: number;
+    subCategory?: string;
+}
+
+// Convert weight in any unit to kg for cross-vehicle comparison.
+// Tipper/lorry use tonnes internally; tanker uses litres.
+const toKg = (value: number, unit: WeightUnit): number => {
+    if (unit === 'tonnes') return value * 1000;
+    if (unit === 'litres') return value * 0.84;            // petrol ≈ 0.84 kg/L
+    if (unit === 'm3') return value * 1000;                // water ≈ 1000 kg/m³
+    return value;                                          // kg
+};
+
+export const isEligible = (vehicle: VehicleCapability, inputs: EligibilityInputs): boolean => {
+    // Category gate (empty/unknown category = allow all)
+    if (inputs.category) {
+        const cat = String(inputs.category) as 'A' | 'B';
+        if (!vehicle.constraints.allowedCats.includes(cat)) return false;
+    }
+    // Distance gate
+    if (typeof inputs.distanceKm === 'number' && inputs.distanceKm > vehicle.constraints.maxDist) {
+        return false;
+    }
+    // Weight gate — compare normalized kg
+    if (typeof inputs.weightKg === 'number' && inputs.weightKg > 0) {
+        const vehicleMaxKg = toKg(vehicle.constraints.maxWeight, vehicle.constraints.weightUnit);
+        if (inputs.weightKg > vehicleMaxKg) return false;
+    }
+    // Cargo subCategory restriction (e.g. LPG → only LPG tanker)
+    if (inputs.subCategory) {
+        const cargoAllowed = CARGO_VEHICLE_MAP[inputs.subCategory];
+        if (cargoAllowed && !cargoAllowed.includes(vehicle.id)) return false;
+    }
+    return true;
+};
+
+export const getEligibleVehicles = (inputs: EligibilityInputs): VehicleCapability[] => {
+    // Option A: Smart filter — show ONLY matching vehicles, no greyed-out extras.
+    return VEHICLES.filter(v => isEligible(v, inputs));
+};
+
+// ── Flow gating helpers ──────────────────────────────────────────
+export const requiresScheduling = (vehicleId?: string | null): boolean => {
+    const v = getVehicle(vehicleId);
+    return !!v && !v.constraints.allowAsap;
+};
+
+export const allowsMultiStop = (vehicleId?: string | null): boolean => {
+    const v = getVehicle(vehicleId);
+    return !!v && v.constraints.maxStops > 1;
+};
+
+export const getMaxStops = (vehicleId?: string | null, serviceType?: string): number => {
+    // Standard consolidated → single dropoff, always.
+    if (serviceType === 'Standard') return 1;
+    const v = getVehicle(vehicleId);
+    if (!v) return 5; // default to 5 waypoints (preserves prior UX for unknown vehicles)
+    return v.constraints.maxStops;
+};
+
+export const allowsFragile = (vehicleId?: string | null): boolean => {
+    const v = getVehicle(vehicleId);
+    return v ? v.constraints.allowFragile : true;
+};
+
+export const allowsReturnTrip = (vehicleId?: string | null): boolean => {
+    const v = getVehicle(vehicleId);
+    return v ? v.constraints.allowReturn : true;
+};
+
+export const requiresHelpers = (vehicleId?: string | null): boolean => {
+    const v = getVehicle(vehicleId);
+    return !!v && v.constraints.requiresHelpers;
+};
+
+export const getSuggestedHelpers = (vehicleId?: string | null): number => {
+    const v = getVehicle(vehicleId);
+    return v?.constraints.suggestedHelpers || 0;
+};
+
+export const isHazmat = (vehicleId?: string | null): boolean => {
+    const v = getVehicle(vehicleId);
+    return !!v && v.constraints.cargoHazardous !== false;
+};
+
+export const getHazardClass = (vehicleId?: string | null): string | null => {
+    const v = getVehicle(vehicleId);
+    const h = v?.constraints.cargoHazardous;
+    return h ? String(h) : null;
+};
+
+// ── Server-side guard ────────────────────────────────────────────
+// Used by quotes.js + orders.js to reject an order whose (vehicle, category,
+// weight, distance) combination violates the capability map. Prevents spoofed
+// API calls bypassing client UI gates. Mirrors the client logic so any change
+// here must be applied identically on the server (copy-paste safe — no React).
+export const validateVehicleCapability = (vehicleId: string, inputs: EligibilityInputs): { ok: boolean; reason?: string } => {
+    const v = getVehicle(vehicleId);
+    if (!v) return { ok: false, reason: `Unknown vehicle id: ${vehicleId}` };
+    if (!isEligible(v, inputs)) {
+        const reasons: string[] = [];
+        if (inputs.category && !v.constraints.allowedCats.includes(inputs.category as 'A' | 'B')) {
+            reasons.push(`category ${inputs.category} not allowed for ${v.label}`);
+        }
+        if (typeof inputs.distanceKm === 'number' && inputs.distanceKm > v.constraints.maxDist) {
+            reasons.push(`distance ${inputs.distanceKm}km exceeds ${v.label} max ${v.constraints.maxDist}km`);
+        }
+        if (typeof inputs.weightKg === 'number' && inputs.weightKg > 0) {
+            const maxKg = toKg(v.constraints.maxWeight, v.constraints.weightUnit);
+            if (inputs.weightKg > maxKg) reasons.push(`weight ${inputs.weightKg}kg exceeds ${v.label} capacity`);
+        }
+        return { ok: false, reason: reasons.join('; ') || 'vehicle/category/weight mismatch' };
+    }
+    return { ok: true };
+};

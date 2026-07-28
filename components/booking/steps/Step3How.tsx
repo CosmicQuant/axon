@@ -1,10 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Loader2, Users } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, Users, Clock } from 'lucide-react';
 import { useBooking } from '../BookingContext';
 import { VEHICLES, CARGO_VEHICLE_MAP } from '../constants';
 import { useMapState } from '@/context/MapContext';
 import { httpsCallable } from 'firebase/functions';
+import {
+    getEligibleVehicles, allowsFragile, allowsReturnTrip,
+    requiresHelpers, getSuggestedHelpers, requiresScheduling
+} from '../../../services/vehicleCapabilities';
 
 export const Step3How = () => {
     const { data, updateData, nextStep, prevStep } = useBooking();
@@ -15,25 +19,42 @@ export const Step3How = () => {
     const isStandard = data.serviceType === 'Standard';
     const weightVal = parseFloat(data.dimensions.weight) || 0;
 
-    const eligibleVehicles = VEHICLES.filter(v => {
-        if (data.distanceKm > v.maxDist) return false;
-        if (!v.allowedCats.includes(data.category)) return false;
-        if (data.category === 'A' && weightVal > v.maxWeight) return false;
-        // Sub-category restriction: if cargo type maps to specific vehicles, enforce it
-        const cargoAllowed = CARGO_VEHICLE_MAP[data.subCategory];
-        if (cargoAllowed && !cargoAllowed.includes(v.id)) return false;
-        return true;
-    });
-    const activeVehicle = VEHICLES.find(v => v.id === data.vehicle) || eligibleVehicles[0];
+    // Smart filter (Option A): use the capability service so all gating logic
+    // lives in one place (vehicleCapabilities.ts). Also normalizes weight units.
+    const eligibleVehicles = useMemo(
+        () => getEligibleVehicles({ category: data.category, weightKg: weightVal, distanceKm: data.distanceKm, subCategory: data.subCategory }),
+        [data.category, weightVal, data.distanceKm, data.subCategory]
+    );
+    const activeVehicle = eligibleVehicles.find(v => v.id === data.vehicle) || eligibleVehicles[0];
 
-    // Auto-select first eligible vehicle if none selected
+    // ── Vehicle-aware derived flags ──
+    const showHelpers = !isStandard && (requiresHelpers(data.vehicle) || (data.helpersCount || 0) > 0);
+    const showReturnTrip = !isStandard && allowsReturnTrip(data.vehicle) && allowsFragile(data.vehicle);
+    const mustSchedule = !isStandard && requiresScheduling(data.vehicle);
+
+    // Auto-select first eligible vehicle + auto-prescribed helpers when heavy
     useEffect(() => {
         if (isStandard) {
             if (data.vehicle) updateData({ vehicle: '' });
-        } else if (eligibleVehicles.length > 0 && !data.vehicle) {
-            updateData({ vehicle: eligibleVehicles[0].id });
+            return;
         }
-    }, [isStandard, eligibleVehicles, data.vehicle, updateData]);
+        if (eligibleVehicles.length > 0) {
+            let updates: any = {};
+            if (!data.vehicle || !eligibleVehicles.some(v => v.id === data.vehicle)) {
+                updates.vehicle = eligibleVehicles[0].id;
+            }
+            // If the chosen vehicle requires helpers, pre-select the suggested count
+            const chosenId = updates.vehicle ?? data.vehicle;
+            const suggested = getSuggestedHelpers(chosenId);
+            if (suggested > 0 && (data.helpersCount || 0) < suggested) {
+                updates.helpersCount = suggested;
+            }
+            if (requiresScheduling(chosenId) && !data.isScheduled) {
+                updates.isScheduled = true;
+            }
+            if (Object.keys(updates).length > 0) updateData(updates);
+        }
+    }, [isStandard, eligibleVehicles, data.vehicle, data.helpersCount, data.isScheduled, updateData]);
 
     // Live Quote Fetcher: Triggered whenever selection changes
     useEffect(() => {
@@ -139,11 +160,11 @@ export const Step3How = () => {
                                     eligibleVehicles.map(v => (
                                         <button
                                             key={v.id} onClick={() => updateData({ vehicle: v.id })}
-                                            className={`flex-shrink-0 w-[80px] p-2 rounded-[1rem] border flex flex-col items-center text-center transition-all duration-200 ${data.vehicle === v.id ? `border-gray-300 ${v.bgLight} shadow-sm ring-1 ring-gray-300 scale-[1.02]` : 'border-gray-200 bg-white hover:border-gray-300 scale-100'}`}
+                                            className={`flex-shrink-0 w-[80px] p-2 rounded-[1rem] border flex flex-col items-center text-center transition-all duration-200 ${data.vehicle === v.id ? `border-gray-300 ${v.accentBgLight} shadow-sm ring-1 ring-gray-300 scale-[1.02]` : 'border-gray-200 bg-white hover:border-gray-300 scale-100'}`}
                                         >
                                             <img src={v.img} alt={v.label} className="w-10 h-10 object-contain mb-0.5" />
                                             <div className="font-bold text-[11px] leading-tight text-gray-900 line-clamp-1">{v.label}</div>
-                                            <div className="text-[9px] font-medium text-gray-500 mt-0.5">≤ {v.maxWeight >= 1000 ? `${v.maxWeight / 1000}T` : `${v.maxWeight}kg`}</div>
+                                            <div className="text-[9px] font-medium text-gray-500 mt-0.5">≤ {v.constraints.maxWeight.toLocaleString()}{v.constraints.weightUnit === 'litres' ? ' L' : v.constraints.weightUnit === 'tonnes' ? 'T' : 'kg'}</div>
                                         </button>
                                     ))
                                 )}
@@ -157,29 +178,43 @@ export const Step3How = () => {
                 )}
             </AnimatePresence>
 
-            {/* Need Helpers? Toggle */}
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center text-brand-600">
-                        <Users size={18} />
+            {/* Helpers — gated by vehicle capability. Hidden for boda/tuktuk/probox/van
+                (loaders not relevant); shown with pre-set suggested count for heavy/hazmat. */}
+            {showHelpers && (
+                <div className={`${requiresHelpers(data.vehicle) ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'} border rounded-xl p-3 flex items-center justify-between`}>
+                    <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${requiresHelpers(data.vehicle) ? 'bg-amber-100 text-amber-600' : 'bg-brand-100 text-brand-600'}`}>
+                            <Users size={18} />
+                        </div>
+                        <div>
+                            <h4 className="text-sm font-bold text-gray-900">{requiresHelpers(data.vehicle) ? 'Loaders required' : 'Add loaders?'}</h4>
+                            <p className="text-[10px] text-gray-500">+KES 500 per helper{requiresHelpers(data.vehicle) ? ' · for heavy cargo' : ''}</p>
+                        </div>
                     </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => updateData({ helpersCount: Math.max(0, (data.helpersCount || 0) - 1) })}
+                            className="w-8 h-8 rounded-full bg-white border border-gray-200 font-bold text-gray-700 hover:bg-gray-100 flex items-center justify-center"
+                        >-</button>
+                        <span className="font-bold text-sm w-4 text-center">{data.helpersCount || 0}</span>
+                        <button
+                            onClick={() => updateData({ helpersCount: (data.helpersCount || 0) + 1 })}
+                            className="w-8 h-8 rounded-full bg-white border border-gray-200 font-bold text-gray-700 hover:bg-gray-100 flex items-center justify-center"
+                        >+</button>
+                    </div>
+                </div>
+            )}
+
+            {/* Heavy/hazmat scheduled-only notice */}
+            {mustSchedule && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-3">
+                    <Clock className="w-5 h-5 text-amber-600 flex-shrink-0" />
                     <div>
-                        <h4 className="text-sm font-bold text-gray-900">Need Loaders?</h4>
-                        <p className="text-[10px] text-gray-500">+KES 500 per helper</p>
+                        <h4 className="text-sm font-bold text-amber-900">Scheduled delivery</h4>
+                        <p className="text-[10px] text-amber-700">Heavy/hazmat vehicles must pre-book. Pickup happens at your chosen time, not ASAP.</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => updateData({ helpersCount: Math.max(0, (data.helpersCount || 0) - 1) })}
-                        className="w-8 h-8 rounded-full bg-white border border-gray-200 font-bold text-gray-700 hover:bg-gray-100 flex items-center justify-center"
-                    >-</button>
-                    <span className="font-bold text-sm w-4 text-center">{data.helpersCount || 0}</span>
-                    <button
-                        onClick={() => updateData({ helpersCount: (data.helpersCount || 0) + 1 })}
-                        className="w-8 h-8 rounded-full bg-white border border-gray-200 font-bold text-gray-700 hover:bg-gray-100 flex items-center justify-center"
-                    >+</button>
-                </div>
-            </div>
+            )}
 
             <div className="flex gap-2 sticky bottom-0 bg-white z-10">
                 <button onClick={() => prevStep()} className="w-12 h-[48px] bg-gray-100 text-gray-700 rounded-xl flex items-center justify-center hover:bg-gray-200"><ArrowLeft size={16} /></button>

@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useUserOrders } from '../../../hooks/useOrders';
 import { mapService } from '../../../services/mapService';
 import { isLocationSupported, findTown, UNSUPPORTED_MESSAGE } from '../../../services/serviceArea';
+import { getMaxStops, allowsReturnTrip } from '../../../services/vehicleCapabilities';
 
 export const Step1Where = () => {
     const { data, updateData, nextStep } = useBooking();
@@ -21,7 +22,10 @@ export const Step1Where = () => {
         }
     }, [data.dropoff, data.pickup]);
 
-    const maxDropoffsReached = data.waypoints.length >= 5;
+    // Multi-stop cap: Standard consolidated = single dropoff; vehicles carry their own max.
+    // +1 accounts for the existing dropoff field; waypoints are intermediate stops.
+    const maxStops = getMaxStops(data.vehicle || undefined, data.serviceType);
+    const maxDropoffsReached = data.waypoints.length >= Math.max(0, maxStops - 1);
 
     const [areaError, setAreaError] = useState<string | null>(null);
 
@@ -594,6 +598,7 @@ export const Step1Where = () => {
                                 Later
                             </button>
                         </div>
+                        {allowsReturnTrip(data.vehicle) && (
                         <button
                             onClick={() => updateData({ isReturnTrip: !data.isReturnTrip })}
                             className={`py-2 text-[10px] font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all border ${data.isReturnTrip
@@ -604,6 +609,7 @@ export const Step1Where = () => {
                             <RefreshCw size={11} className={data.isReturnTrip ? 'text-brand-600' : ''} />
                             {data.isReturnTrip ? 'Return On' : 'Return Off'}
                         </button>
+                        )}
                     </div>
                     <AnimatePresence>
                         {data.isScheduled && (
