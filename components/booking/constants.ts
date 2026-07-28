@@ -29,6 +29,11 @@ export interface VehicleCapability {
         requiresHelpers: boolean;       // mandatory helpers
         suggestedHelpers: number;        // auto-preselection (editable)
         cargoHazardous: HazardClass;     // none | gas | flammable | misc
+        // Strict cargo filtering: specialized vehicles (tippers, tankers) only
+        // carry specific cargo types. Step 2 will only show subcategories whose
+        // CARGO_VEHICLE_MAP entry explicitly lists this vehicle id. Also forces
+        // the category to the vehicle's only allowed category (no default 'A').
+        strictCargoFilter?: boolean;
     };
 }
 
@@ -41,7 +46,7 @@ export const VEHICLES: VehicleCapability[] = [
         accentText: 'text-orange-500', accentBg: 'bg-orange-500', accentBgLight: 'bg-orange-50',
         pricePerKm: 25, tier: 'light',
         constraints: { maxDist: 65, maxWeight: 50, maxStops: 2, allowedCats: ['A'],
-            weightUnit: 'kg', allowFragile: false, allowReturn: false,
+            weightUnit: 'kg', allowFragile: false, allowReturn: true,
             allowAsap: true, allowScheduled: true, requiresHelpers: false, suggestedHelpers: 0,
             cargoHazardous: false },
     },
@@ -135,27 +140,27 @@ export const VEHICLES: VehicleCapability[] = [
         accentText: 'text-amber-600', accentBg: 'bg-amber-600', accentBgLight: 'bg-amber-50',
         pricePerKm: 140, tier: 'heavy',
         constraints: { maxDist: UNLIMITED, maxWeight: 7000, maxStops: 1, allowedCats: ['B'],
-            weightUnit: 'tonnes', allowFragile: false, allowReturn: false,
+            weightUnit: 'tonnes', allowFragile: false, allowReturn: true,
             allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 2,
-            cargoHazardous: false },
+            cargoHazardous: false, strictCargoFilter: true },
     },
     {
         id: 'tipper-14t', label: 'Tipper 14T', img: '/icons3d/tipper_truck.svg',
         accentText: 'text-amber-700', accentBg: 'bg-amber-700', accentBgLight: 'bg-amber-50',
         pricePerKm: 180, tier: 'heavy',
         constraints: { maxDist: UNLIMITED, maxWeight: 14000, maxStops: 1, allowedCats: ['B'],
-            weightUnit: 'tonnes', allowFragile: false, allowReturn: false,
+            weightUnit: 'tonnes', allowFragile: false, allowReturn: true,
             allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
-            cargoHazardous: false },
+            cargoHazardous: false, strictCargoFilter: true },
     },
     {
         id: 'tipper-25t', label: 'Tipper 25T', img: '/icons3d/tipper_truck.svg',
         accentText: 'text-amber-800', accentBg: 'bg-amber-800', accentBgLight: 'bg-amber-100',
         pricePerKm: 220, tier: 'heavy',
         constraints: { maxDist: UNLIMITED, maxWeight: 25000, maxStops: 1, allowedCats: ['B'],
-            weightUnit: 'tonnes', allowFragile: false, allowReturn: false,
+            weightUnit: 'tonnes', allowFragile: false, allowReturn: true,
             allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
-            cargoHazardous: false },
+            cargoHazardous: false, strictCargoFilter: true },
     },
 
     // ── Tier: heavy (containers) ───────────────────────────────
@@ -185,9 +190,9 @@ export const VEHICLES: VehicleCapability[] = [
         accentText: 'text-sky-600', accentBg: 'bg-sky-600', accentBgLight: 'bg-sky-50',
         pricePerKm: 250, tier: 'hazmat',
         constraints: { maxDist: UNLIMITED, maxWeight: 20000, maxStops: 1, allowedCats: ['B'],
-            weightUnit: 'tonnes', allowFragile: false, allowReturn: false,
+            weightUnit: 'tonnes', allowFragile: false, allowReturn: true,
             allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
-            cargoHazardous: 'Class2' },
+            cargoHazardous: 'Class2', strictCargoFilter: true },
     },
     // Fuel: petrol/diesel/kerosene (vented) — Class 3 flammable, litres
     {
@@ -195,9 +200,9 @@ export const VEHICLES: VehicleCapability[] = [
         accentText: 'text-red-600', accentBg: 'bg-red-600', accentBgLight: 'bg-red-50',
         pricePerKm: 300, tier: 'hazmat',
         constraints: { maxDist: UNLIMITED, maxWeight: 30000, maxStops: 1, allowedCats: ['B'],
-            weightUnit: 'litres', allowFragile: false, allowReturn: false,
+            weightUnit: 'litres', allowFragile: false, allowReturn: true,
             allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
-            cargoHazardous: 'Class3' },
+            cargoHazardous: 'Class3', strictCargoFilter: true },
     },
 ];
 

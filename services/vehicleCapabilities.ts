@@ -96,6 +96,31 @@ export const requiresScheduling = (vehicleId?: string | null): boolean => {
     return !!v && !v.constraints.allowAsap;
 };
 
+// ── Strict cargo filter (specialized vehicles) ─────────────────
+// Returns the subcategory IDs allowed for this vehicle, using the inverted
+// CARGO_VEHICLE_MAP. Only vehicles flagged strictCargoFilter use this;
+// general vehicles return null (meaning: show the full category list).
+export const getStrictSubcategories = (vehicleId?: string | null): string[] | null => {
+    const v = getVehicle(vehicleId);
+    if (!v || !v.constraints.strictCargoFilter) return null;
+    const allowed: string[] = [];
+    for (const [subcat, vehicleIds] of Object.entries(CARGO_VEHICLE_MAP)) {
+        if (vehicleIds.includes(v.id)) allowed.push(subcat);
+    }
+    return allowed;
+};
+
+// ── Auto-set the category when a vehicle restricts it ────────────
+// If the vehicle's allowedCats has exactly one entry, that's the only valid
+// category (e.g. tankers → B, boda → A). The Step2 effect uses this to lock
+// the category so the subcategory grid matches the vehicle.
+export const getForcedCategory = (vehicleId?: string | null): string | null => {
+    const v = getVehicle(vehicleId);
+    if (!v) return null;
+    if (v.constraints.allowedCats.length === 1) return v.constraints.allowedCats[0];
+    return null;
+};
+
 export const allowsMultiStop = (vehicleId?: string | null): boolean => {
     const v = getVehicle(vehicleId);
     return !!v && v.constraints.maxStops > 1;

@@ -342,14 +342,14 @@ const CustomerHome: React.FC = () => {
                         {/* 2×2 heavy truck grid — 3D icons, layered depth */}
                         <div className="grid grid-cols-2 gap-1.5">
                             {[
-                                { v: 'Lorry 10T', img: '/icons3d/articulated_lorry.png', sub: '10,000 kg', from: 'from-slate-700', to: 'to-slate-900', txt: 'text-slate-200' },
-                                { v: 'Container', img: '/icons3d/container_truck.svg', sub: '20ft & 40ft', from: 'from-blue-600', to: 'to-indigo-800', txt: 'text-blue-200' },
-                                { v: 'Tipper', img: '/icons3d/tipper_truck.svg', sub: 'Sand, ballast', from: 'from-amber-500', to: 'to-orange-700', txt: 'text-amber-200' },
-                                { v: 'Tanker', img: '/icons3d/tanker_truck.svg', sub: 'LPG & Petroleum', from: 'from-rose-600', to: 'to-red-800', txt: 'text-rose-200' },
+                                { v: 'lorry-10t', label: 'Lorry 10T', img: '/icons3d/articulated_lorry.png', sub: '10,000 kg', from: 'from-slate-700', to: 'to-slate-900', txt: 'text-slate-200' },
+                                { v: 'container-20ft', label: 'Container', img: '/icons3d/container_truck.svg', sub: '20ft & 40ft', from: 'from-blue-600', to: 'to-indigo-800', txt: 'text-blue-200' },
+                                { v: 'tipper-7t', label: 'Tipper', img: '/icons3d/tipper_truck.svg', sub: 'Sand, ballast', from: 'from-amber-500', to: 'to-orange-700', txt: 'text-amber-200' },
+                                { v: 'fuel-tanker', label: 'Fuel Tanker', img: '/icons3d/tanker_truck.svg', sub: 'Petrol & Diesel', from: 'from-rose-600', to: 'to-red-800', txt: 'text-rose-200' },
                             ].map(t => (
                                 <button key={t.v} onClick={() => handleQuickAction({ vehicle: t.v })} className={`group relative overflow-hidden bg-gradient-to-br ${t.from} ${t.to} rounded-2xl p-2.5 text-left shadow-lg ring-1 ring-white/10 hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200`}>
-                                    <img src={t.img} alt={t.v} className="w-10 h-10 object-contain mb-1 drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)] group-hover:scale-110 group-hover:-rotate-2 transition-transform duration-300" />
-                                    <p className="text-white font-black text-[11px] leading-tight tracking-tight">{t.v}</p>
+                                    <img src={t.img} alt={t.label} className="w-10 h-10 object-contain mb-1 drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)] group-hover:scale-110 group-hover:-rotate-2 transition-transform duration-300" />
+                                    <p className="text-white font-black text-[11px] leading-tight tracking-tight">{t.label}</p>
                                     <p className={`${t.txt} text-[9px] font-semibold`}>{t.sub}</p>
                                 </button>
                             ))}
@@ -358,10 +358,10 @@ const CustomerHome: React.FC = () => {
                         {/* 4-column mid-tier vehicles — glass cards + 3D icons */}
                         <div className="grid grid-cols-4 gap-1.5">
                             {[
-                                { v: 'Pickup Truck', label: 'Pickup', img: '/icons3d/pickup_truck.png', ring: 'ring-teal-200/70', bg: 'bg-teal-50/80' },
-                                { v: 'Probox', label: 'Probox', img: '/icons3d/automobile.png', ring: 'ring-violet-200/70', bg: 'bg-violet-50/80' },
-                                { v: 'Cargo Van', label: 'Van', img: '/icons3d/delivery_truck.png', ring: 'ring-sky-200/70', bg: 'bg-sky-50/80' },
-                                { v: 'Tuk-Tuk', label: 'Tuk-Tuk', img: '/icons3d/auto_rickshaw.png', ring: 'ring-orange-200/70', bg: 'bg-orange-50/80' },
+                                { v: 'pickup', label: 'Pickup', img: '/icons3d/pickup_truck.png', ring: 'ring-teal-200/70', bg: 'bg-teal-50/80' },
+                                { v: 'probox', label: 'Probox', img: '/icons3d/automobile.png', ring: 'ring-violet-200/70', bg: 'bg-violet-50/80' },
+                                { v: 'van', label: 'Van', img: '/icons3d/delivery_truck.png', ring: 'ring-sky-200/70', bg: 'bg-sky-50/80' },
+                                { v: 'tuktuk', label: 'Tuk-Tuk', img: '/icons3d/auto_rickshaw.png', ring: 'ring-orange-200/70', bg: 'bg-orange-50/80' },
                             ].map(t => (
                                 <button key={t.v} onClick={() => handleQuickAction({ vehicle: t.v })} className={`group ${t.bg} backdrop-blur-sm rounded-2xl p-1.5 pt-2 text-center shadow-sm ring-1 ${t.ring} hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200`}>
                                     <img src={t.img} alt={t.label} className="w-7 h-7 object-contain mx-auto mb-0.5 drop-shadow-sm group-hover:scale-110 transition-transform duration-300" />
@@ -370,8 +370,18 @@ const CustomerHome: React.FC = () => {
                             ))}
                         </div>
 
+                        {/* LPG Tanker — wide strip (hazmat, separate from Fuel) */}
+                        <button onClick={() => handleQuickAction({ vehicle: 'lpg-tanker' })} className="group relative overflow-hidden flex items-center gap-2.5 bg-gradient-to-r from-sky-600 to-cyan-700 rounded-2xl px-3 py-2.5 shadow-lg shadow-sky-300/40 ring-1 ring-white/10 hover:shadow-xl transition-all text-left active:scale-[0.98]">
+                            <img src="/icons3d/tanker_truck.svg" alt="LPG Tanker" className="w-9 h-9 object-contain flex-shrink-0 drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)] group-hover:scale-110 transition-transform duration-300" />
+                            <div className="flex-1 min-w-0">
+                                <p className="text-[12px] font-black text-white tracking-tight">LPG Gas Tanker</p>
+                                <p className="text-[9px] text-sky-200 font-medium">Pressurized gas · Tonnage</p>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-white/60 flex-shrink-0 group-hover:translate-x-1 transition-transform" />
+                        </button>
+
                         {/* Boda — wide strip with 3D motorcycle */}
-                        <button onClick={() => handleQuickAction({ vehicle: 'Boda Boda' })} className="group relative overflow-hidden flex items-center gap-2.5 bg-gradient-to-r from-indigo-600 to-purple-700 rounded-2xl px-3 py-2.5 shadow-lg shadow-indigo-300/40 ring-1 ring-white/10 hover:shadow-xl hover:shadow-indigo-400/50 transition-all text-left active:scale-[0.98]">
+                        <button onClick={() => handleQuickAction({ vehicle: 'boda' })} className="group relative overflow-hidden flex items-center gap-2.5 bg-gradient-to-r from-indigo-600 to-purple-700 rounded-2xl px-3 py-2.5 shadow-lg shadow-indigo-300/40 ring-1 ring-white/10 hover:shadow-xl hover:shadow-indigo-400/50 transition-all text-left active:scale-[0.98]">
                             <img src="/icons3d/motorcycle.png" alt="Boda" className="w-9 h-9 object-contain flex-shrink-0 drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)] group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300" />
                             <div className="flex-1 min-w-0">
                                 <p className="text-[12px] font-black text-white tracking-tight">Boda Boda</p>

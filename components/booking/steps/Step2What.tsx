@@ -1,18 +1,27 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ArrowRight, Camera, ShieldCheck, AlertTriangle, X, Loader2 } from 'lucide-react';
 import { useBooking } from '../BookingContext';
-import { allowsFragile, getWeightUnitLabel } from '../../../services/vehicleCapabilities';
+import { allowsFragile, getWeightUnitLabel, getVehicle, getStrictSubcategories, getForcedCategory } from '../../../services/vehicleCapabilities';
 
 export const Step2What = () => {
     const { data, updateData, nextStep, prevStep } = useBooking();
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-    const tabs = [
+    // ── Gate category tabs by pre-selected vehicle's allowedCats ──
+    // If the user clicked a vehicle from the home catalog, the tabs should
+    // only show categories that vehicle can carry. A tanker (Cat B only) hides
+    // the "Standard" parcel tab. A boda (Cat A only) hides the "Bulky" tab.
+    const preselectedVehicle = getVehicle(data.vehicle);
+    const allowedCats = preselectedVehicle?.constraints.allowedCats;
+    const allTabs = [
         { id: 'A', label: '📦 Standard' },
         { id: 'B', label: '🏗️ Bulky / Heavy' }
     ];
+    const tabs = allowedCats
+        ? allTabs.filter(t => allowedCats.includes(t.id))
+        : allTabs;
 
     const subcategories = {
         'A': [
@@ -36,6 +45,33 @@ export const Step2What = () => {
     };
 
     const activeItems = subcategories[data.category as keyof typeof subcategories];
+
+    // ── Auto-lock category + strict subcategory filter ──
+    // If the pre-selected vehicle restricts allowedCats to one (e.g. tanker → B,
+    // boda → A), force the category so the grid matches. For specialized
+    // vehicles (tippers/tankers), only show subcategories explicitly in the
+    // CARGO_VEHICLE_MAP for that vehicle. Auto-select when only one option.
+    const strictSubs = getStrictSubcategories(data.vehicle);
+    const visibleItems = strictSubs && strictSubs.length > 0
+        ? activeItems.filter((item: any) => strictSubs.includes(item.id))
+        : activeItems;
+
+    useEffect(() => {
+        const forcedCat = getForcedCategory(data.vehicle);
+        if (forcedCat && data.category !== forcedCat) {
+            updateData({ category: forcedCat as any });
+            return; // re-render with new category, then subcat logic fires next pass
+        }
+        // When strict + only one compatible subcategory → auto-select it
+        const subs = getStrictSubcategories(data.vehicle);
+        if (subs && subs.length === 1 && data.subCategory !== subs[0]) {
+            updateData({ subCategory: subs[0] });
+        } else if (subs && subs.length > 0 && data.subCategory && !subs.includes(data.subCategory)) {
+            // Current subcategory not compatible with this vehicle → clear it
+            updateData({ subCategory: '' });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [data.vehicle, data.category, data.subCategory]);
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -82,7 +118,7 @@ export const Step2What = () => {
                         transition={{ duration: 0.2 }}
                         className="grid grid-cols-2 gap-3 max-h-[34vh] overflow-y-auto no-scrollbar p-1 pb-4"
                     >
-                        {activeItems.map((item: any) => {
+                        {visibleItems.map((item: any) => {
                             const isSelected = data.subCategory === item.id;
                             const isA = data.category === 'A';
                             return (
