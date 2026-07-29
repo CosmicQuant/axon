@@ -1,6 +1,21 @@
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { GoogleMap, MarkerF, Polyline, InfoWindow, OverlayView } from '@react-google-maps/api';
+
+// Heatmap styling for the driver demand layer. Kept as a module constant so
+// the native HeatmapLayer's options reference is stable across renders.
+const HEATMAP_OPTIONS = {
+    radius: 45,
+    opacity: 0.7,
+    dissipating: true,
+    gradient: [
+        'rgba(22, 163, 74, 0)',
+        'rgba(34, 197, 94, 0.6)',
+        'rgba(250, 204, 21, 0.8)',
+        'rgba(249, 115, 22, 0.9)',
+        'rgba(239, 68, 68, 1)'
+    ]
+};
 import { useMapState } from '@/context/MapContext';
 import { APP_CONFIG } from '@/config';
 import { Truck, Navigation, MapPin, GripVertical, X, Compass, Flag, ArrowUp, ArrowUpRight, ArrowRight, ArrowDownRight, ArrowDown, ArrowLeft, ArrowUpLeft, CornerUpLeft, CornerUpRight, Merge, Navigation2 } from 'lucide-react';
@@ -348,17 +363,66 @@ const MapLayer: React.FC = () => {
         nextManeuver,
         driverAccuracy,
         setDriverAccuracy,
+        heatPoints,
         userInteractedAt,
         markUserInteraction,
         clearUserInteraction
     } = useMapState();
 
     const isMapAnimatingRef = useRef(false);
+    const [map, setMap] = useState<google.maps.Map | null>(null);
+
+    // ── Driver demand heat-map (imperative, runtime-loaded visualization lib) ──
+    // visualization is NOT in the app-wide GOOGLE_MAPS_LIBRARIES (so customer /
+    // business maps don't pay for it). It is imported on demand here via
+    // google.maps.importLibrary('visualization'), and the native HeatmapLayer
+    // instance is kept alive across data changes — only its data/options are
+    // updated, and it is attached/detached (setMap) rather than recreated.
+    // `heatData` is memoized so setData only fires when demand actually changes,
+    // not on every driverCoords / availableOrders snapshot tick.
+    const heatLayerRef = useRef<any>(null);
+    const visLibRef = useRef<any>(null);
+    const heatData = useMemo(
+        () => heatPoints.map(p => ({ location: new google.maps.LatLng(p.lat, p.lng), weight: p.weight ?? 1 })),
+        [heatPoints]
+    );
+    const showHeat = orderState === 'DRIVER_IDLE' && heatPoints.length > 0;
+
+    useEffect(() => {
+        if (!map) return;
+        let active = true;
+        (async () => {
+            try {
+                if (!showHeat) {
+                    if (heatLayerRef.current) heatLayerRef.current.setMap(null);
+                    return;
+                }
+                if (!visLibRef.current) {
+                    visLibRef.current = await (google.maps as any).importLibrary('visualization');
+                }
+                if (!active || !visLibRef.current) return;
+                if (!heatLayerRef.current) {
+                    heatLayerRef.current = new visLibRef.current.HeatmapLayer();
+                }
+                heatLayerRef.current.setData(heatData);
+                heatLayerRef.current.setOptions(HEATMAP_OPTIONS);
+                heatLayerRef.current.setMap(map);
+            } catch (e) {
+                if (import.meta.env.DEV) console.warn('Heatmap layer error:', e);
+            }
+        })();
+        return () => { active = false; };
+    }, [map, showHeat, heatData]);
+
+    useEffect(() => {
+        return () => {
+            if (heatLayerRef.current) { heatLayerRef.current.setMap(null); heatLayerRef.current = null; }
+        };
+    }, [map]);
     const animationFrameRef = useRef<number | null>(null);
     const prewarmDivRef = useRef<HTMLDivElement | null>(null);
     const prewarmMapRef = useRef<google.maps.Map | null>(null);
     const prevOrderStateRef = useRef(orderState);
-    const [map, setMap] = useState<google.maps.Map | null>(null);
     const [decodedPath, setDecodedPath] = useState<google.maps.LatLngLiteral[]>([]);
     const [mapVisible, setMapVisible] = useState(false);
     const cameraTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -1062,8 +1126,8 @@ const MapLayer: React.FC = () => {
                             zIndex: 100,
                             visible: decodedPath.length > 0
                         }}
-                    />
-                </GoogleMap>
+/>
+                    </GoogleMap>
 
                 {/* ── Phase 3: Navigation banner (next maneuver) — Uber/Bolt style ── */}
                 {orderState === 'IN_TRANSIT' && nextManeuver && !isMapSelecting && (

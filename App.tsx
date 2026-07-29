@@ -411,7 +411,7 @@ const App = () => {
                     <CustomerHome />
                   ) : (
                     <Hero
-                      onStartBooking={(prefill) => {
+                      onStartBooking={(prefill?: any) => {
                         navigate('/book', { state: { prefill } });
                       }}
                       onBusinessClick={() => {
@@ -454,7 +454,7 @@ const App = () => {
                       setAuthModalDesc('Access your institutional dashboard.');
                       setShowAuthModal(true);
                     }}
-                    onNavigateToDashboard={(tab) => {
+                    onNavigateToDashboard={(tab: string) => {
                       if (isAuthenticated) {
                         navigate('/business-dashboard', { state: { initialTab: tab } });
                       }
@@ -472,8 +472,8 @@ const App = () => {
                 <Route path="/history" element={
                   <ProtectedRoute allowedRoles={['customer', 'business', 'driver']}>
                     <HistoryList
-                      onTrackOrder={(orderId) => navigate(`/track/${orderId}`)}
-                      onReorder={(prefill) => {
+                      onTrackOrder={(orderId: string) => navigate(`/track/${orderId}`)}
+                      onReorder={(prefill: any) => {
                         if (user?.role === 'driver') {
                           setAuthModalRole('customer');
                           setAuthModalTitle('Customer Access Required');
@@ -504,16 +504,16 @@ const App = () => {
                     <BusinessDashboard
                       user={user!}
                       initialTab={location.state?.initialTab}
-                      onNewRequest={(prefill) => navigate('/book', { state: { prefill } })}
+                      onNewRequest={(prefill?: any) => navigate('/book', { state: { prefill } })}
                       onGoHome={() => navigate('/')}
-                      onTrackOrder={(orderId) => navigate(`/track/${orderId}`)}
+                      onTrackOrder={(orderId: string) => navigate(`/track/${orderId}`)}
                     />
                   </ProtectedRoute>
                 } />
 
                 <Route path="/privacy" element={<PrivacyPolicy />} />
                 <Route path="/terms" element={<TermsOfService />} />
-                <Route path="/about" element={<AboutUs onOpenAuth={(role, view, title, desc) => {
+                <Route path="/about" element={<AboutUs onOpenAuth={(role?: 'customer' | 'driver' | 'business', view?: 'LOGIN' | 'SIGNUP', title?: string, desc?: string) => {
                   if (role) setAuthModalRole(role);
                   if (view) setAuthModalView(view);
                   if (title) setAuthModalTitle(title);

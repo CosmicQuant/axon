@@ -11,7 +11,6 @@ import { collection, query, where, onSnapshot, limit, doc, updateDoc } from 'fir
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { usePrompt } from '../context/PromptContext';
-import { LOCATION_COORDINATES } from '../constants';
 import { useNavigate } from 'react-router-dom';
 import {
    LayoutDashboard, LayoutGrid, Map, Package, Wallet, User as UserIcon, LogOut,
@@ -22,6 +21,7 @@ import {
    Lock, ShieldCheck, Key, QrCode, RefreshCw, Power, Smartphone, ShieldAlert, FileCheck, Eye, EyeOff, Flag
 } from 'lucide-react';
 import { MarketplaceJobCard } from './driver/MarketplaceJobCard';
+import { TripRequestModal } from './driver/TripRequestModal';
 import MapLayer from './MapLayer';
 
 // ── MODULE-SCOPE SUB-COMPONENTS (avoids remount on every parent render) ──
@@ -112,7 +112,13 @@ interface DashboardContentProps extends DriverDashboardProps {
 const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHome, onViewChange, currentView: propCurrentView }) => {
    const { logout, updateUser, deleteAccount } = useAuth();
    const { showAlert, showConfirm } = usePrompt();
-   const { isLoaded, setPickupCoords, setDropoffCoords, setWaypointCoords, setOrderState, fitBounds, setDriverCoords, setDriverBearing, setDriverVehicleType, setRoutePolyline, setNextManeuver, setDriverAccuracy, requestUserLocation, driverCoords, setBottomSheetHeight, setCameraMode, setHeadingUp } = useMapState();
+   const { isLoaded, setPickupCoords, setDropoffCoords, setWaypointCoords, setOrderState, fitBounds, setDriverCoords, setDriverBearing, setDriverVehicleType, setRoutePolyline, setNextManeuver, setDriverAccuracy, requestUserLocation, driverCoords, setBottomSheetHeight, setCameraMode, setHeadingUp, setHeatPoints } = useMapState();
+
+   // Refs mirror the fastest-changing values so effects keyed on slower
+   // signals (availableOrders) can read the latest driverCoords without
+   // re-running the effect on every GPS fix.
+   const driverCoordsRef = useRef(driverCoords);
+   driverCoordsRef.current = driverCoords;
 
    const [internalView, setInternalView] = useState<DashboardView>('JOBS');
 
@@ -156,6 +162,10 @@ const DriverDashboardContent: React.FC<DashboardContentProps> = ({ user, onGoHom
 
    // Data State
    const [availableOrders, setAvailableOrders] = useState<DeliveryOrder[]>([]);
+   // Uber-style incoming trip request (auto-presented, one at a time, only new arrivals)
+   const [tripRequest, setTripRequest] = useState<DeliveryOrder | null>(null);
+   const lastAvailableIdsRef = useRef<Set<string>>(new Set());
+   const lastHeatSigRef = useRef<string>('');
    const [myJobs, setMyJobs] = useState<DeliveryOrder[]>([]);
    const [metrics, setMetrics] = useState<DriverMetrics | null>(null);
    const [loading, setLoading] = useState(false);
@@ -724,6 +734,121 @@ if (p && d) {
       };
    }, [user.id]);
 
+   // ── Auto-arrive (Uber-style proximity state advance) ───────────
+   // Fires once per stop. Within 200 m of pickup while still
+   // "driver_assigned", silently advances to "arriving_pickup" so the
+   // customer's tracking flips to "arriving". At-pickup start and
+   // dropoff completion still require driver intent (verification codes),
+   // so we surface an "Arrived" banner that raises the sheet instead.
+   const autoArriveStateRef = useRef<{ stopId: string | null; advanced: boolean; expanded: boolean }>({ stopId: null, advanced: false, expanded: false });
+   const [arrivedBanner, setArrivedBanner] = useState<string | null>(null);
+
+useEffect(() => {
+      if (!activeJob || !driverCoords || !nextStop) {
+         setArrivedBanner(null);
+         return;
+      }
+      const stop = nextStopRef.current || nextStop;
+      const job = activeJobRef.current || activeJob;
+      const stopCoords = stop?.coords;
+      if (!stop || !stopCoords || stopCoords.lat === 0 || stopCoords.lng === 0) return;
+
+      const distKm = mapService.calculateDistance(driverCoords, stopCoords);
+
+      // Per-stop guard: reset only when the next stop genuinely changes (not on
+      // every GPS tick). Keys each once-only event off the same stopId bearer.
+      const arriveState = autoArriveStateRef.current;
+      if (arriveState.stopId !== stop.id) {
+         autoArriveStateRef.current = { stopId: stop.id, advanced: false, expanded: false };
+      }
+      const st = autoArriveStateRef.current;
+
+      // Auto-expand the sheet ONCE per stop entry into the 50 m zone, so the
+      // single primary CTA is visible. Driven by a dedicated flag (not
+      // isDrawerCollapsed) so toggling the sheet afterward isn't undone.
+      if (distKm <= 0.05 && !st.expanded) {
+         st.expanded = true;
+         setArrivedBanner(stop.label || 'stop');
+         setIsDrawerCollapsed(false);
+      } else if (distKm > 0.05) {
+         if (st.expanded) st.expanded = false;
+         setArrivedBanner(null);
+      }
+
+      // 200 m geofence: auto-advance "heading to pickup" -> "arriving" (safe,
+      // forward-only) once per stop so the customer's tracking flips to Arriving.
+      if (distKm <= 0.2
+         && stop.id === 'pickup-start'
+         && job.status === 'driver_assigned'
+         && !st.advanced) {
+         st.advanced = true;
+         handleConfirmHeadingToPickup(job);
+      }
+   }, [driverCoords, nextStop?.id, activeJob?.status, activeJob?.id]);
+
+   // ── Incoming trip-request presenter (Uber-style) ───────────────
+   // Present the nearest GENUINELY-NEW order as a full-screen request card
+   // when online, idle, and on the JOBS (map) screen — one card per new
+   // arrival. Declining a request does NOT cascade the rest of the backlog;
+   // only future new arrivals surface another card (no spam).
+   useEffect(() => {
+      if (!isOnline || hasActiveJob || tripRequest || currentView !== 'JOBS') {
+         // Keep the "seen" baseline in sync even when not eligible so newly
+         // arriving orders while inactive aren't all dumped at once on return.
+         lastAvailableIdsRef.current = new Set(availableOrders.map(o => o.id));
+         return;
+      }
+      const loc = driverCoordsRef.current;
+      const currentIds = new Set(availableOrders.map(o => o.id));
+      const newOrders = availableOrders.filter(o => o.pickupCoords && !lastAvailableIdsRef.current.has(o.id));
+      lastAvailableIdsRef.current = currentIds;
+      if (newOrders.length === 0 || !loc) return;
+      const nearest = newOrders
+         .map(o => ({ o, d: mapService.calculateDistance(loc, o.pickupCoords!) }))
+         .filter(({ d }) => d <= 40) // 40 km radius of actionable offers
+         .sort((a, b) => a.d - b.d)
+         .map(({ o }) => o)[0];
+      if (nearest) setTripRequest(nearest);
+   }, [isOnline, hasActiveJob, tripRequest, currentView, availableOrders]);
+
+   const handleTripRequestAccept = async () => {
+      const o = tripRequest;
+      setTripRequest(null);
+      if (o) await handleAcceptJob(o);
+   };
+   const handleTripRequestDecline = () => setTripRequest(null);
+
+   // Surge density (orders within 3km of the driver) — memoized so the trip
+   // request modal doesn't re-run ~50 distance calls on every GPS/snapshot tick.
+   const nearbyDemand = useMemo(
+      () => availableOrders.filter(o => o.pickupCoords && driverCoords &&
+         mapService.calculateDistance(driverCoords, o.pickupCoords) <= 3).length,
+      [availableOrders, driverCoords]
+   );
+
+   // ── Demand heat-map (idle online) — drives the Maps HeatmapLayer ─
+   // Weighted by fare so high-value clusters glow hotter. Only populated
+   // while online with no active job; cleared otherwise so the layer never
+   // shows during a trip.
+   useEffect(() => {
+      if (!isOnline || hasActiveJob || currentView !== 'JOBS') {
+         if (lastHeatSigRef.current !== '') { lastHeatSigRef.current = ''; setHeatPoints([]); }
+         return;
+      }
+      const pts = availableOrders
+         .filter(o => o.pickupCoords)
+         .map(o => ({
+            lat: o.pickupCoords!.lat,
+            lng: o.pickupCoords!.lng,
+            weight: Math.max(1, Math.round((o.price || 0) / 500)) // ~1 weight per KES 500
+         }));
+      const sig = pts.map(p => `${p.lat},${p.lng},${p.weight}`).sort().join('|');
+      if (sig !== lastHeatSigRef.current) {
+         lastHeatSigRef.current = sig;
+         setHeatPoints(pts);
+      }
+   }, [isOnline, hasActiveJob, currentView, availableOrders, setHeatPoints]);
+
    // Handlers
    const handleAcceptJob = async (order: DeliveryOrder) => {
       if (hasActiveJob) {
@@ -1099,7 +1224,7 @@ if (p && d) {
        }
     };
 
-    const closeVerificationModal = () => {
+const closeVerificationModal = () => {
       setVerifyingOrder(null);
       setVerifyingStopId(null);
       setVerificationInput('');
@@ -1109,45 +1234,23 @@ if (p && d) {
       setDeliveryConfirmationFile(null);
    };
 
-   const openGoogleMaps = (locationName?: string) => {
-      // If there's an active job, open full route with ordered waypoints
-      if (activeJob && allStops.length > 0) {
-         const remaining = allStops.filter(s => s.status !== 'completed');
-         if (remaining.length > 0) {
-            const destination = remaining[remaining.length - 1];
-            const waypoints = remaining.slice(0, -1);
-
-            let url = `https://www.google.com/maps/dir/?api=1`;
-            if (destination.lat && destination.lng) {
-               url += `&destination=${destination.lat},${destination.lng}`;
-            } else {
-               url += `&destination=${encodeURIComponent(destination.address)}`;
-            }
-            if (waypoints.length > 0) {
-               const wpStr = waypoints
-                  .map(w => (w.lat && w.lng) ? `${w.lat},${w.lng}` : encodeURIComponent(w.address))
-                  .join('|');
-               url += `&waypoints=${wpStr}`;
-            }
-            url += `&travelmode=driving`;
-            window.open(url, '_blank');
-            return;
-         }
+   // ── Leg-by-leg turn-by-turn handoff (Uber pattern) ─────────────
+   // Navigates to the SINGLE next stop only — cleaner turn-by-turn than
+   // funneling the whole multi-stop route through one trip in Google Maps,
+   // which buries the next maneuver. Re-called per leg as stops complete.
+   const openGoogleMapsLeg = () => {
+      if (!activeJob) return;
+      const stop = nextStopRef.current;
+      if (!stop) return;
+      let dest: string;
+      if (stop.lat && stop.lng) {
+         dest = `${stop.lat},${stop.lng}`;
+      } else {
+         dest = encodeURIComponent(stop.address || activeJob.dropoff);
       }
-      // Fallback: single destination
-      if (locationName) {
-         const normalize = (s: string) => s.toLowerCase().trim();
-         const target = normalize(locationName);
-         const keys = Object.keys(LOCATION_COORDINATES).sort((a, b) => b.length - a.length);
-         const match = keys.find(k => target.includes(normalize(k)));
-         let destinationQuery = encodeURIComponent(locationName);
-         if (match) {
-            const [lat, lng] = LOCATION_COORDINATES[match];
-            destinationQuery = `${lat},${lng}`;
-         }
-         const url = `https://www.google.com/maps/dir/?api=1&destination=${destinationQuery}`;
-         window.open(url, '_blank');
-      }
+      // travelmode=driving; dir_action=navigate launches turn-by-turn directly
+      const url = `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving&dir_action=navigate`;
+      window.open(url, '_blank');
    };
 
     // --- SUB-COMPONENTS (moved to module scope above) ---
@@ -1241,15 +1344,6 @@ if (p && d) {
             {currentView === 'JOBS' && (
                <div className="absolute inset-0 z-0 pointer-events-auto">
                   <MapLayer />
-                  {/* Locate Me Button */}
-                  <div className="absolute top-24 right-4 z-20 pointer-events-auto">
-                     <button
-                        onClick={() => requestUserLocation()}
-                        className="w-12 h-12 bg-white/80 backdrop-blur-md rounded-2xl shadow-xl flex items-center justify-center text-gray-600 hover:text-brand-600 transition-all active:scale-95 border border-gray-100"
-                     >
-                        <Navigation className="w-6 h-6" />
-                     </button>
-                  </div>
                </div>
             )}
 
@@ -2195,13 +2289,35 @@ if (p && d) {
                )}
             </div>
 
+            {/* Arrived banner — Uber-style proximity prompt (raises the sheet to the single CTA) */}
+            {currentView === 'JOBS' && arrivedBanner && (
+               <div className="absolute top-24 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+                  <div className="pointer-events-auto flex items-center gap-3 bg-emerald-600 text-white px-5 py-3 rounded-2xl shadow-2xl shadow-emerald-500/30 border border-emerald-400/40 animate-in slide-in-from-top-4 duration-300">
+                     <MapPin className="w-5 h-5 animate-bounce" style={{ animationDuration: '1.2s' }} />
+                     <div className="flex flex-col">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-emerald-100">You've arrived</span>
+                        <span className="text-sm font-black truncate max-w-[60vw]">{arrivedBanner}</span>
+                     </div>
+                  </div>
+               </div>
+            )}
+
             {/* Active Job Overlay (Map View) */}
             {currentView === 'JOBS' && (
                <div ref={bottomSheetRef} className="absolute inset-x-0 bottom-0 z-10 pointer-events-none">
                   {hasActiveJob ? (
                       <div className={`w-full md:absolute md:left-auto md:right-8 md:w-96 bg-white/95 backdrop-blur-xl rounded-t-[2.5rem] md:rounded-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] md:shadow-2xl border-t md:border border-gray-200 transition-all duration-300 pointer-events-auto pb-[env(safe-area-inset-bottom)] ${Capacitor.isNativePlatform() ? 'md:mb-0 md:bottom-28' : 'md:mb-0 md:bottom-8'} ${isDrawerCollapsed ? 'p-4' : 'p-6 pt-4'}`}>
-                        {/* Mobile Drag Handle */}
-                        <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-4 md:hidden" />
+                        {/* Drag / snap handle — tappable to expand/collapse (mobile + desktop) */}
+                        <button
+                           onClick={() => setIsDrawerCollapsed(!isDrawerCollapsed)}
+                           className="mx-auto mb-3 flex flex-col items-center gap-1 w-full touch-none active:scale-[0.98] transition-transform"
+                           aria-label={isDrawerCollapsed ? 'Expand trip details' : 'Collapse trip details'}
+                        >
+                           <span className={`w-12 h-1.5 rounded-full transition-colors ${isDrawerCollapsed ? 'bg-gray-300' : 'bg-brand-400'}`} />
+                           <span className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">
+                              {isDrawerCollapsed ? 'Details' : 'Collapse'}
+                           </span>
+                        </button>
 
                         <div className="flex items-center justify-between mb-4">
                            <div className="flex items-center space-x-2">
@@ -2229,7 +2345,8 @@ if (p && d) {
                            </div>
                            <button
                               onClick={() => setIsDrawerCollapsed(!isDrawerCollapsed)}
-                              className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                              className="p-1.5 hover:bg-gray-100 rounded-full transition-colors active:scale-90"
+                              aria-label={isDrawerCollapsed ? 'Expand' : 'Collapse'}
                            >
                               {isDrawerCollapsed ? <ChevronUp className="w-5 h-5 text-gray-600" /> : <ChevronDown className="w-5 h-5 text-gray-600" />}
                            </button>
@@ -2383,12 +2500,12 @@ if (p && d) {
                                  </div>
                               </div>
                               <div className="flex space-x-2">
-                                 <button className="p-2 bg-gray-100 rounded-full text-gray-900 hover:bg-gray-200" onClick={() => { if (activeJob?.recipient?.phone) window.open(`tel:${activeJob.recipient.phone}`); }}>
-                                    <Phone className="w-4 h-4" />
-                                 </button>
-                                 <button className="p-2 bg-brand-500 rounded-full text-white hover:bg-brand-600" onClick={() => openGoogleMaps()}>
-                                    <Navigation className="w-4 h-4" />
-                                 </button>
+<button className="p-2 bg-gray-100 rounded-full text-gray-900 hover:bg-gray-200 active:scale-95" onClick={() => { if (activeJob?.recipient?.phone) window.open(`tel:${activeJob.recipient.phone}`); }} aria-label="Call recipient">
+                                     <Phone className="w-4 h-4" />
+                                  </button>
+                                  <button className="p-3.5 bg-brand-600 rounded-full text-white hover:bg-brand-700 active:scale-95 shadow-lg shadow-brand-500/30 transition-all" onClick={openGoogleMapsLeg} aria-label="Navigate to next stop">
+                                     <Navigation className="w-5 h-5" />
+                                  </button>
                               </div>
                            </div>
                         )}
@@ -2415,6 +2532,17 @@ if (p && d) {
                </div>
             )}
          </main>
+
+          {/* Uber-style incoming trip request (auto-presented) */}
+          {tripRequest && (
+             <TripRequestModal
+                order={tripRequest}
+                driverCoords={driverCoords}
+                nearbyDemand={nearbyDemand}
+                onAccept={handleTripRequestAccept}
+                onDecline={handleTripRequestDecline}
+             />
+          )}
 
           {/* Verification Modal */}
           {verifyingOrder && (

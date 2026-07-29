@@ -342,7 +342,7 @@ const CustomerHome: React.FC = () => {
                         {/* 2×2 heavy truck grid — 3D icons, layered depth */}
                         <div className="grid grid-cols-2 gap-1.5">
                             {[
-                                { v: 'rigid-truck-3axle', label: 'Truck 26T', img: '/icons3d/articulated_lorry.png', sub: '3-axle rigid', from: 'from-slate-700', to: 'to-slate-900', txt: 'text-slate-200' },
+                                { v: 'rigid-truck-3axle', label: 'Truck', img: '/icons3d/articulated_lorry.png', sub: '', from: 'from-slate-700', to: 'to-slate-900', txt: 'text-slate-200' },
                                 { v: 'container-5axle', label: 'Container', img: '/icons3d/container_truck.svg', sub: '20ft & 40ft', from: 'from-blue-600', to: 'to-indigo-800', txt: 'text-blue-200' },
                                 { v: 'tipper-3axle', label: 'Tipper', img: '/icons3d/tipper_truck.svg', sub: 'Sand, ballast', from: 'from-amber-500', to: 'to-orange-700', txt: 'text-amber-200' },
                                 { v: 'fuel-tanker-6axle-30kl', label: 'Fuel Tanker', img: '/icons3d/tanker_truck.svg', sub: 'Petrol & Diesel', from: 'from-rose-600', to: 'to-red-800', txt: 'text-rose-200' },

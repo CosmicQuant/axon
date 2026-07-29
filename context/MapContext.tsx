@@ -125,6 +125,11 @@ interface MapContextType {
     driverAccuracy: number;
     setDriverAccuracy: (accuracy: number) => void;
 
+    // Demand heat-map points (driver, idle online). Each point is an order
+    // pickup location weighted by fare, rendered as a Maps HeatmapLayer.
+    heatPoints: { lat: number; lng: number; weight?: number }[];
+    setHeatPoints: (points: { lat: number; lng: number; weight?: number }[]) => void;
+
     // User interaction tracking — when the user manually pans/zooms,
     // follow mode pauses for 8 seconds. Maps to a timestamp.
     userInteractedAt: number;
@@ -177,6 +182,7 @@ export const MapProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const [headingUp, setHeadingUp] = useState<boolean>(false);
     const [nextManeuver, setNextManeuver] = useState<NextManeuver | null>(null);
     const [driverAccuracy, setDriverAccuracy] = useState<number>(0);
+    const [heatPoints, setHeatPoints] = useState<{ lat: number; lng: number; weight?: number }[]>([]);
     const [userInteractedAt, setUserInteractedAt] = useState<number>(0);
     const [pickupCoords, setPickupCoordsInternal] = useState<Coordinates | null>(null);
     const [dropoffCoords, setDropoffCoordsInternal] = useState<Coordinates | null>(null);
@@ -577,6 +583,8 @@ export const MapProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setNextManeuver,
             driverAccuracy,
             setDriverAccuracy,
+            heatPoints,
+            setHeatPoints,
             userInteractedAt,
             markUserInteraction,
             clearUserInteraction,

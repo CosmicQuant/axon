@@ -56,7 +56,15 @@ const WizardContent: React.FC<BookingWizardProps> = ({ prefillData, onOrderCompl
             const updates: any = {};
             if (prefillData.pickup) updates.pickup = prefillData.pickup;
             if (prefillData.dropoff) updates.dropoff = prefillData.dropoff;
-            if (prefillData.serviceType) updates.serviceType = prefillData.serviceType;
+            if (prefillData.serviceType) {
+                // Normalise to the BookingContext enum ('Standard' | 'Express').
+                // Callers may pass the types.ts enum ('Standard (Same Day)' /
+                // 'Express Instant') or free text — match by keyword so the
+                // Standard quick-action on CustomerHome/Hero pre-selects correctly
+                // instead of leaving the user to re-pick Express/Standard.
+                const st = String(prefillData.serviceType).toLowerCase();
+                updates.serviceType = st.includes('express') ? 'Express' : 'Standard';
+            }
             if (prefillData.vehicle) updates.vehicle = prefillData.vehicle;
             if (prefillData.activeTab) updates.activeTab = prefillData.activeTab;
             if (prefillData.category) updates.category = prefillData.category;
