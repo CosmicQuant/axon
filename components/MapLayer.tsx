@@ -172,6 +172,7 @@ const getVehicleAccent = (type: string, isDriver: boolean): string => {
     if (t.includes('probox') || t.includes('car')) return '#3b82f6';
     if (t.includes('van')) return '#6366f1';
     if (t.includes('pickup') || t.includes('pick')) return '#10b981';
+    if (t.includes('reefer')) return '#06b6d4'; // cyan for refrigerated
     return '#475569'; // slate for trucks
 };
 
@@ -185,6 +186,7 @@ const getBirdEyeSvg = (type: string): React.FC<{ size: number; accent: string }>
     if (t.includes('pickup') || t.includes('pick-up') || t.includes('pick up')) return BirdEyePickup;
     if (t.includes('tipper')) return BirdEyeTruck;     // tipper body style
     if (t.includes('tanker')) return BirdEyeVan;        // tank body (rounded)
+    if (t.includes('reefer')) return BirdEyeVan;      // insulated box body (rounded)
     if (t.includes('container')) return BirdEyeTruck;  // skeletal trailer = box
     // All other trucks: rigid-truck-*, semi-truck-*, canter, etc.
     return BirdEyeTruck;
@@ -770,9 +772,20 @@ const MapLayer: React.FC = () => {
         }
 
         const padding = computePadding(bottomSheetHeight);
-        // Offset center upward so driver is visible above the bottom sheet
-        const padded = computeBoundsTarget([driverCoords], padding);
-        const target = padded ? padded.target : driverCoords;
+        // Center on the DRIVER only. We must NOT extend the bounds with the
+        // route polyline (as computeBoundsTarget does) â€” that would recenter
+        // on the route midpoint (the "centre of the page" bug). Instead, fit
+        // the single driver point with the sheet padding so the map centers on
+        // the driver, nudged upward to stay visible above the bottom sheet.
+        const startCenter = map.getCenter();
+        const startZoom = map.getZoom() ?? CAMERA.DEFAULT_ZOOM;
+        const spBounds = new google.maps.LatLngBounds();
+        spBounds.extend(driverCoords);
+        map.fitBounds(spBounds, padding);
+        const spCenter = map.getCenter();
+        const target = spCenter ? { lat: spCenter.lat(), lng: spCenter.lng() } : driverCoords;
+        // Snap map back before animating (fitBounds mutates center/zoom).
+        if (startCenter) map.moveCamera({ center: startCenter, zoom: startZoom });
 
         // Use a tighter zoom for 'arriving' mode (closer to destination)
         const zoom = cameraMode === 'arriving' ? CAMERA.DRIVER_FOLLOW_ZOOM + 2 : CAMERA.DRIVER_FOLLOW_ZOOM;
@@ -790,7 +803,7 @@ const MapLayer: React.FC = () => {
                 // heading/tilt only supported with vector maps (mapId set)
             }
         }
-    }, [map, driverCoords, orderState, cameraMode, userInteractedAt, flyTo, computeBoundsTarget, bottomSheetHeight, headingUp, driverBearing, pickupCoords, dropoffCoords, waypointCoords, setCameraMode]);
+    }, [map, driverCoords, orderState, cameraMode, userInteractedAt, flyTo, bottomSheetHeight, headingUp, driverBearing, pickupCoords, dropoffCoords, waypointCoords, setCameraMode]);
 
     // ── Effect: Phase 4 — Auto-return from overview to follow after 10s ──
     useEffect(() => {
@@ -1150,7 +1163,7 @@ const MapLayer: React.FC = () => {
 
                 {/* Overview / Recenter / Compass buttons — 3D Uber-style controls */}
                 {(orderState === 'IN_TRANSIT' || orderState === 'DRIVER_IDLE') && !isMapSelecting && (
-                    <div className="absolute right-4 top-24 z-10 flex flex-col gap-2.5">
+                    <div className={`absolute right-4 z-10 flex flex-col gap-2.5 ${orderState === 'IN_TRANSIT' && nextManeuver ? 'top-40' : 'top-24'}`}>
                         {/* Compass button — toggles heading-up vs north-up */}
                         {orderState === 'IN_TRANSIT' && (
                             <button

@@ -68,6 +68,13 @@ const WizardContent: React.FC<BookingWizardProps> = ({ prefillData, onOrderCompl
             if (prefillData.vehicle) updates.vehicle = prefillData.vehicle;
             if (prefillData.activeTab) updates.activeTab = prefillData.activeTab;
             if (prefillData.category) updates.category = prefillData.category;
+            if (prefillData.subCategory) {
+                // Preselecting a bulk subcategory (e.g. the cold-chain reefer
+                // quick-action) implies category 'B' so Step2 shows the right
+                // grid and the cargo preselect isn't dropped.
+                updates.subCategory = prefillData.subCategory;
+                updates.category = 'B';
+            }
             if (Object.keys(updates).length > 0) updateData(updates);
 
             if (prefillData.pickupCoords) setPickupCoords(prefillData.pickupCoords);

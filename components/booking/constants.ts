@@ -277,6 +277,38 @@ export const VEHICLES: VehicleCapability[] = [
             allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
             cargoHazardous: 'Class3', strictCargoFilter: true, allowConsolidated: false },
     },
+
+    // ── Tier: heavy (reefers — refrigerated trucks, temp-controlled) ──
+    // Insulated bodies with mechanical refrigeration (diesel/electric). For
+    // cold-chain cargo: fresh produce, meat, dairy, frozen, pharma/flowers.
+    // GVW follows axle limits; payload slightly less than dry (insulation weight).
+    {
+        id: 'reefer-van', label: 'Reefer Van', img: '/icons3d/delivery_truck.png',
+        accentText: 'text-cyan-500', accentBg: 'bg-cyan-500', accentBgLight: 'bg-cyan-50',
+        pricePerKm: 95, tier: 'medium',
+        constraints: { maxDist: UNLIMITED, maxWeight: 1500, maxStops: 5, allowedCats: ['A', 'B'],
+            weightUnit: 'kg', allowFragile: true, allowReturn: true,
+            allowAsap: true, allowScheduled: true, requiresHelpers: false, suggestedHelpers: 0,
+            cargoHazardous: false },
+    },
+    {
+        id: 'reefer-truck-3axle', label: 'Reefer Truck 26T (3-Axle)', img: '/icons3d/articulated_lorry.png',
+        accentText: 'text-cyan-600', accentBg: 'bg-cyan-600', accentBgLight: 'bg-cyan-50',
+        pricePerKm: 185, tier: 'heavy',
+        constraints: { maxDist: UNLIMITED, maxWeight: 24, maxStops: 3, allowedCats: ['B'],
+            weightUnit: 'tonnes', allowFragile: true, allowReturn: true,
+            allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 2,
+            cargoHazardous: false, allowConsolidated: false },
+    },
+    {
+        id: 'reefer-semi-6axle', label: 'Reefer Semi 50T (6-Axle)', img: '/icons3d/articulated_lorry.png',
+        accentText: 'text-cyan-700', accentBg: 'bg-cyan-700', accentBgLight: 'bg-cyan-100',
+        pricePerKm: 290, tier: 'heavy',
+        constraints: { maxDist: UNLIMITED, maxWeight: 44, maxStops: 3, allowedCats: ['B'],
+            weightUnit: 'tonnes', allowFragile: true, allowReturn: true,
+            allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
+            cargoHazardous: false, allowConsolidated: false },
+    },
 ];
 
 /* ── Cargo → Vehicle eligibility map ────────────────────────────
@@ -287,7 +319,8 @@ export const CARGO_VEHICLE_MAP: Record<string, string[]> = {
     'Large Appliances': ['van', 'pickup', 'canter', 'rigid-truck-2axle', 'rigid-truck-3axle', 'rigid-truck-4axle'],
     'Furniture': ['van', 'pickup', 'canter', 'rigid-truck-2axle', 'rigid-truck-3axle', 'rigid-truck-4axle'],
     'Hardware / Construction': ['pickup', 'canter', 'rigid-truck-2axle', 'rigid-truck-3axle', 'rigid-truck-4axle', 'semi-truck-4axle', 'semi-truck-5axle', 'semi-truck-6axle', 'semi-truck-7axle', 'tipper-2axle', 'tipper-3axle', 'tipper-4axle'],
-    'Agricultural': ['canter', 'rigid-truck-2axle', 'rigid-truck-3axle', 'rigid-truck-4axle', 'semi-truck-4axle', 'semi-truck-5axle'],
+    'Agricultural': ['canter', 'rigid-truck-2axle', 'rigid-truck-3axle', 'rigid-truck-4axle', 'semi-truck-4axle', 'semi-truck-5axle', 'reefer-van', 'reefer-truck-3axle', 'reefer-semi-6axle'],
+    'Perishables / Cold Chain': ['reefer-van', 'reefer-truck-3axle', 'reefer-semi-6axle'],
     'LPG / Gas (Bulk)': ['lpg-tanker-6axle'],
     'Petroleum / Oil': ['fuel-tanker-2axle-10kl', 'fuel-tanker-3axle-18kl', 'fuel-tanker-4axle-20kl', 'fuel-tanker-6axle-30kl'],
     'Loose Aggregate': ['tipper-2axle', 'tipper-3axle', 'tipper-4axle'],

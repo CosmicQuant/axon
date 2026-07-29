@@ -25,7 +25,7 @@ const calculateQuoteHandler = async (data, context) => {
         throw new functions.https.HttpsError('unauthenticated', 'You must be signed in to get a quote.');
     }
 
-    const { pickupCoords, dropoffCoords, waypoints = [], vehicle, serviceType, helpersCount = 0, isReturnTrip = false, isFragile = false, category = 'A', subCategory = '' } = data;
+    const { pickupCoords, dropoffCoords, waypoints = [], vehicle, serviceType, helpersCount = 0, isReturnTrip = false, isFragile = false, category = 'A', subCategory = '', payloadWeight } = data;
 
     if (!pickupCoords || !dropoffCoords || !vehicle) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing required coordinates or vehicle type.');
@@ -88,7 +88,7 @@ const calculateQuoteHandler = async (data, context) => {
     // ── Capability guard: validate (vehicle, category, distanceKm) against the
     // canonical capability map. Prevents spoofed API calls bypassing client UI.
     // Authoritative check (server is the only pricing/capability source per spec).
-    const capCheck = validateVehicleCapability({ vehicle, category, distanceKm, subCategory });
+    const capCheck = validateVehicleCapability({ vehicle, category, distanceKm, subCategory, payloadWeight });
     if (!capCheck.ok) {
         throw new functions.https.HttpsError(
             'failed-precondition',

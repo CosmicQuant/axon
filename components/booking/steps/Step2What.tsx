@@ -38,6 +38,7 @@ export const Step2What = () => {
             { id: 'Furniture', label: 'Furniture', desc: 'Sofas, beds, mattresses', img: '/icons3d/couch_and_lamp.png' },
             { id: 'Hardware / Construction', label: 'Hardware / Construction', desc: 'Raw materials', img: '/icons3d/hammer.png' },
             { id: 'Agricultural', label: '90kg Ag Sacks', desc: 'Cereals & produce', img: '/icons3d/sheaf_of_rice.png' },
+            { id: 'Perishables / Cold Chain', label: 'Perishables / Cold Chain', desc: 'Refrigerated — food, pharma, flowers', img: '/icons3d/ice.png' },
             { id: 'LPG / Gas (Bulk)', label: 'LPG / Gas (Bulk)', desc: 'Tanker transport', img: '/icons3d/fuel_pump.png' },
             { id: 'Petroleum / Oil', label: 'Petroleum / Oil', desc: 'Liquid bulk', img: '/icons3d/oil_drum.png' },
             { id: 'Loose Aggregate', label: 'Loose Aggregate', desc: 'Sand, gravel, ballast', img: '/icons3d/rock.png' }

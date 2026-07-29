@@ -96,7 +96,8 @@ export const Step3How = () => {
                     isReturnTrip: data.isReturnTrip || false,
                     isFragile: data.isFragile || false,
                     category: data.category,
-                    subCategory: data.subCategory
+                    subCategory: data.subCategory,
+                    payloadWeight: parseFloat(data.dimensions.weight) || 0
                 });
 
                 if (requestId !== quoteRequestRef.current) return;

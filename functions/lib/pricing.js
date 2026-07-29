@@ -63,6 +63,12 @@ const VEHICLE_RATES = {
     'fuel-tanker-3axle': { base: 8000, perKm: 200, perMin: 35, stopFee: 700, min: 8000 },    // 26T rigid, ~16-18kL
     'fuel-tanker-6axle': { base: 12000, perKm: 270, perMin: 45, stopFee: 1000, min: 12000 }, // 50T semi, ~35-42kL
 
+    // ── Refrigerated trucks (reefers) — temp-controlled cold chain ──
+    // Premium over dry trucks (refrigeration fuel + insulation tare).
+    'reefer-van':         { base: 1500, perKm: 95,  perMin: 14, stopFee: 150, min: 1500 },  // 1.5T
+    'reefer-truck-3axle': { base: 5500, perKm: 185, perMin: 28, stopFee: 600, min: 5500 },  // 26T 3-axle
+    'reefer-semi-6axle':  { base: 8500, perKm: 290, perMin: 40, stopFee: 800, min: 8500 },  // 50T 6-axle semi
+
     // Legacy IDs (backward compatibility with existing orders)
     'lorry': { base: 4500, perKm: 155, perMin: 25, stopFee: 500, min: 4500 },
     'tipper': { base: 5000, perKm: 160, perMin: 25, stopFee: 500, min: 5000 },
@@ -109,6 +115,10 @@ const VEHICLE_FUEL = {
     'fuel-tanker-6axle-30kl': { energy: 'diesel', lPerKm: 0.60, fuel: 'diesel' },
     'fuel-tanker-3axle': { energy: 'diesel', lPerKm: 0.45, fuel: 'diesel' },
     'fuel-tanker-6axle': { energy: 'diesel', lPerKm: 0.60, fuel: 'diesel' },
+    // Reefers: diesel hauling + ~15% extra burn for refrigeration unit
+    'reefer-van':         { energy: 'diesel', lPerKm: 0.13, fuel: 'diesel' },
+    'reefer-truck-3axle': { energy: 'diesel', lPerKm: 0.32, fuel: 'diesel' },
+    'reefer-semi-6axle':  { energy: 'diesel', lPerKm: 0.55, fuel: 'diesel' },
     'standard':    { energy: 'electric', kwhPerKm: 0.04, lPerKm: 0.045, fuel: 'petrol' },
 };
 
@@ -137,7 +147,7 @@ const INTERCITY_FLAT_PRICES = { small: 300, medium: 500, jumbo: 700 };
 const BULK_SUBCATEGORIES = [
     'Electronics', 'Large Appliances', 'Furniture',
     'Hardware / Construction', 'Agricultural', 'LPG / Gas (Bulk)',
-    'Petroleum / Oil', 'Loose Aggregate',
+    'Petroleum / Oil', 'Loose Aggregate', 'Perishables / Cold Chain',
 ];
 
 // Google Maps API key for server-side Routes API calls

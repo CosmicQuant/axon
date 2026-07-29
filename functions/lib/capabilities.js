@@ -41,6 +41,10 @@ const VEHICLE_CAPABILITIES = {
     'fuel-tanker-3axle-18kl': { label: 'Fuel Tanker 18,000L (3-Axle)', allowedCats: ['B'], maxWeightKg: 15120, maxDistKm: 9999, weightUnit: 'litres' }, // 18000L * 0.84
     'fuel-tanker-4axle-20kl': { label: 'Fuel Tanker 20,000L (4-Axle)', allowedCats: ['B'], maxWeightKg: 16800, maxDistKm: 9999, weightUnit: 'litres' }, // 20000L * 0.84
     'fuel-tanker-6axle-30kl': { label: 'Fuel Tanker 30,000L (6-Axle)', allowedCats: ['B'], maxWeightKg: 25200, maxDistKm: 9999, weightUnit: 'litres' }, // 30000L * 0.84
+    // Reefers (refrigerated) — temp-controlled cold chain
+    'reefer-van':         { label: 'Reefer Van',                  allowedCats: ['A','B'], maxWeightKg: 1500,  maxDistKm: 9999, weightUnit: 'kg' },
+    'reefer-truck-3axle': { label: 'Reefer Truck 26T (3-Axle)',   allowedCats: ['B'],     maxWeightKg: 24000, maxDistKm: 9999, weightUnit: 'tonnes' },
+    'reefer-semi-6axle':  { label: 'Reefer Semi 50T (6-Axle)',    allowedCats: ['B'],     maxWeightKg: 44000, maxDistKm: 9999, weightUnit: 'tonnes' },
 };
 
 // Legacy id shim ÃÂ¢ keep historical orders working.
@@ -74,7 +78,7 @@ const normalizeVehicleId = (raw) => {
     return LEGACY_ALIASES[t] || t;
 };
 
-function validateVehicleCapability({ vehicle, category, distanceKm, subCategory }) {
+function validateVehicleCapability({ vehicle, category, distanceKm, subCategory, payloadWeight, payloadWeightUnit }) {
     const id = normalizeVehicleId(vehicle);
     const cap = VEHICLE_CAPABILITIES[id];
     if (!cap) {
@@ -86,6 +90,15 @@ function validateVehicleCapability({ vehicle, category, distanceKm, subCategory 
     }
     if (typeof distanceKm === 'number' && distanceKm > cap.maxDistKm) {
         reasons.push(`distance ${distanceKm}km exceeds ${cap.label} max ${cap.maxDistKm}km`);
+    }
+    // Payload weight guard: reject when the (unit-converted) payload exceeds the
+    // vehicle's GVW-derived capacity. payloadWeight is in the vehicle's declared
+    // unit (kg/tonnes/litres); convert to kg before comparing to maxWeightKg.
+    if (typeof payloadWeight === 'number' && payloadWeight > 0 && cap.maxWeightKg) {
+        const payloadKg = toKg(payloadWeight, payloadWeightUnit || cap.weightUnit);
+        if (payloadKg > cap.maxWeightKg) {
+            reasons.push(`payload ${payloadWeight}${payloadWeightUnit || cap.weightUnit} exceeds ${cap.label} capacity (${cap.maxWeightKg}kg)`);
+        }
     }
     return reasons.length
         ? { ok: false, reason: reasons.join('; ') }
