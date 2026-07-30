@@ -50,15 +50,19 @@ const TrackingPageContent: React.FC = () => {
                     : (order?.status === 'delivered' ? 'Arrived' : null));
 
             setDriverLabel(dLabel);
-
         } else {
             setDriverLabel(null);
         }
+    }, [order?.status, order?.remainingDuration, setOrderState, setDriverLabel]);
+
+    // Only clear map state on unmount — clearing it on every order update
+    // caused the route/driver marker to flicker or disappear between Firestore snapshots.
+    useEffect(() => {
         return () => {
             setOrderState('IDLE');
             setDriverLabel(null);
         };
-    }, [order?.status, order?.remainingDuration, setOrderState, setDriverLabel]);
+    }, [setOrderState, setDriverLabel]);
 
     // Sync map data when order or isLoaded changes
     useEffect(() => {
@@ -94,46 +98,42 @@ const TrackingPageContent: React.FC = () => {
                     setWaypointCoords([]);
                 }
 
-                // Update Route for customer: prefer the live route geometry that
-                // the driver dashboard writes; only fall back to a local calculation
-                // if the driver is moving and we somehow don't have a stored route.
-                if (order.routeGeometry) {
+                // ── Route display (bulletproof fallback chain) ──
+                // 1. Use the live route the driver dashboard writes on the order.
+                // 2. Recalculate from the driver's current position → remaining stops
+                //    (throttled) when there's no stored geometry.
+                // 3. Otherwise show the static pickup → dropoff route.
+                const hasValidGeometry = typeof order.routeGeometry === 'string'
+                    && order.routeGeometry.length > 10;
+                if (hasValidGeometry) {
                     setRoutePolyline(order.routeGeometry);
                 } else if (order.driverLocation) {
-                    // Throttle driver-location-triggered route updates to every 15s
                     const now = Date.now();
                     if (now - lastRouteUpdate.current > 15000 || !lastRouteUpdate.current) {
                         lastRouteUpdate.current = now;
 
-                        // Multi-stop aware routing for customer
                         const remainingStops: { lat: number, lng: number }[] = [];
-
-                        // If heading to pickup
-                        if (order.status === 'driver_assigned' && p) {
-                            remainingStops.push(p);
-                        }
-
-                        // Add all pending waypoints and final dropoff
+                        if (order.status === 'driver_assigned' && p) remainingStops.push(p);
                         if (order.stops && order.stops.length > 0) {
-                            const pendingStops = order.stops
+                            order.stops
                                 .filter(s => s.status !== 'completed')
-                                .map(s => ({ lat: s.lat, lng: s.lng }));
-                            remainingStops.push(...pendingStops);
+                                .forEach(s => remainingStops.push({ lat: s.lat, lng: s.lng }));
                         }
-
-                        // If final dropoff is not in stops array and we are in transit or assigned
                         const hasDropoffInStops = order.stops?.some(s => s.type === 'dropoff');
                         if (!hasDropoffInStops && d && (order.status === 'in_transit' || order.status === 'driver_assigned')) {
                             remainingStops.push(d);
                         }
-
                         if (remainingStops.length > 0) {
                             const start = { lat: order.driverLocation.lat, lng: order.driverLocation.lng };
                             const end = remainingStops[remainingStops.length - 1];
                             const waypoints = remainingStops.slice(0, -1);
-
                             const route = await mapService.getRoute(start, end, waypoints, order.vehicle);
-                            if (route) setRoutePolyline(route.geometry);
+                            if (route && route.geometry) setRoutePolyline(route.geometry);
+                            else if (p && d) {
+                                // last resort: show pickup→dropoff even if driver route fails
+                                const r2 = await mapService.getRoute(p, d, [], order.vehicle);
+                                if (r2 && r2.geometry) setRoutePolyline(r2.geometry);
+                            }
                         }
                     }
                 } else if (p && d) {

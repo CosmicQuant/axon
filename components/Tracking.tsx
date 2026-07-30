@@ -784,7 +784,7 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
     <div className="fixed bottom-0 inset-x-0 md:inset-x-auto md:right-4 md:top-4 md:bottom-4 md:w-[400px] pointer-events-none z-[100] flex flex-col justify-end mx-auto max-w-lg md:max-w-none md:mx-0 ">
       <div
         ref={bottomSheetRef}
-        className={`w-full bg-white shadow-[0_-15px_40px_rgba(0,0,0,0.12)] md:shadow-2xl rounded-t-[2.5rem] md:rounded-2xl overflow-hidden pointer-events-auto border-t border-gray-100 md:border flex flex-col transition-all duration-300 pb-[env(safe-area-inset-bottom)] ${isLocationEditing ? 'max-h-[75vh]' : isCollapsed ? 'h-[260px] max-h-[260px]' : 'max-h-[85vh] md:max-h-[calc(100vh-2rem)]'}`}
+        className={`w-full bg-white shadow-[0_-15px_40px_rgba(0,0,0,0.12)] md:shadow-2xl rounded-t-[2.5rem] md:rounded-2xl overflow-hidden pointer-events-auto border-t border-gray-100 md:border flex flex-col transition-all duration-300 pb-[env(safe-area-inset-bottom)] ${isLocationEditing ? 'max-h-[75vh]' : isCollapsed ? 'max-h-[60vh]' : 'max-h-[85vh] md:max-h-[calc(100vh-2rem)]'}`}
       >
         {/* ── Colored Header with Journey Animation ────────── */}
         <div
