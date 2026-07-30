@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Loader2, Users, Clock } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, Users, Clock, Check } from 'lucide-react';
 import { useBooking } from '../BookingContext';
 import { VEHICLES, CARGO_VEHICLE_MAP } from '../constants';
 import { useMapState } from '@/context/MapContext';
@@ -139,6 +139,58 @@ export const Step3How = () => {
         if ((!isStandard && !data.vehicle) || fetchingQuote) return;
         nextStep();
     };
+
+    // ── Locked quick-booking: when the home screen already fixed the choice
+    // (Standard, or a single Express vehicle), there's nothing to pick here —
+    // just calculate the fare and move on. We render a tidy "preparing" card
+    // and auto-advance once the server quote returns.
+    // Multi-variant Express families (Container sizes, Truck axles…) keep the
+    // normal vehicle picker below.
+    const lockedNoChoice = (isStandard && serviceLocked)
+        || (vehicleLocked && !isStandard && eligibleVehicles.length <= 1);
+    const autoAdvancedRef = useRef(false);
+    useEffect(() => {
+        if (!lockedNoChoice) return;
+        if (autoAdvancedRef.current) return;
+        if (fetchingQuote) return;
+        const ready = !!(data.price) && (isStandard || !!data.vehicle);
+        if (ready) {
+            autoAdvancedRef.current = true;
+            // small delay so the user sees the fare for a beat
+            const t = setTimeout(() => nextStep(), 650);
+            return () => clearTimeout(t);
+        }
+    }, [lockedNoChoice, fetchingQuote, data.price, isStandard, data.vehicle, nextStep]);
+
+    if (lockedNoChoice) {
+        const choiceLabel = isStandard ? 'Standard parcel' : (activeVehicle?.label || data.vehicle || 'Express');
+        return (
+            <div className="space-y-4">
+                <div className="flex flex-col items-center text-center py-8">
+                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-brand-500/30 ${fetchingQuote ? 'bg-gradient-to-br from-brand-400 to-brand-600' : 'bg-gradient-to-br from-emerald-500 to-emerald-700'}`}>
+                        {fetchingQuote ? <Loader2 className="w-8 h-8 text-white animate-spin" /> : <Check className="w-8 h-8 text-white" />}
+                    </div>
+                    <h3 className="text-base font-black text-gray-900">Preparing your {choiceLabel} delivery</h3>
+                    <p className="text-xs text-gray-500 font-semibold mt-1">
+                        {fetchingQuote ? 'Calculating your fare…' : `Fare ready · KES ${(data.price || 0).toLocaleString()}`}
+                    </p>
+                    <div className="w-40 h-1.5 rounded-full bg-gray-100 mt-4 overflow-hidden">
+                        <div className={`h-full bg-brand-500 rounded-full transition-all duration-500 ${fetchingQuote ? 'w-1/3 animate-pulse' : 'w-full'}`} />
+                    </div>
+                </div>
+                <div className="flex gap-2 sticky bottom-0 bg-white z-10">
+                    <button onClick={() => prevStep()} className="w-12 h-[48px] bg-gray-100 text-gray-700 rounded-xl flex items-center justify-center hover:bg-gray-200"><ArrowLeft size={16} /></button>
+                    <button
+                        onClick={handleContinue}
+                        disabled={!data.price || fetchingQuote}
+                        className="flex-1 h-[48px] bg-gray-900 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    >
+                        {fetchingQuote ? <Loader2 size={16} className="animate-spin" /> : <>Continue <ArrowRight size={16} /></>}
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-4">

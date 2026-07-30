@@ -48,7 +48,7 @@ const CustomerDashboard: React.FC = () => {
 
     const stats = useMemo(() => {
         if (!orders) return { active: 0, delivered: 0, totalSpent: 0 };
-        const active = orders.filter(o => ['pending', 'driver_assigned', 'arriving_pickup', 'in_transit'].includes(o.status)).length;
+        const active = orders.filter(o => ['pending', 'driver_assigned', 'arriving_pickup', 'in_transit', 'disputed'].includes(o.status)).length;
         const delivered = orders.filter(o => ['delivered', 'reviewed'].includes(o.status)).length;
         const totalSpent = orders.filter(o => ['delivered', 'reviewed'].includes(o.status)).reduce((sum, o) => sum + (o.price || 0), 0);
         return { active, delivered, totalSpent };
@@ -56,7 +56,7 @@ const CustomerDashboard: React.FC = () => {
 
     const liveOrder = useMemo(() => {
         if (!orders) return null;
-        return orders.find(o => o.status === 'in_transit') || orders.find(o => o.status === 'driver_assigned') || null;
+        return orders.find(o => o.status === 'in_transit') || orders.find(o => o.status === 'driver_assigned') || orders.find(o => o.status === 'disputed') || null;
     }, [orders]);
 
     const lastDelivered = useMemo(() => {

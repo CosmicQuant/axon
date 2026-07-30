@@ -69,4 +69,8 @@ export const orderApi = {
     /** Raise a dispute (customer or driver, in_transit/delivered). */
     raiseDispute: (orderId: string, reason: string, description: string) =>
         call('raiseDispute', { orderId, reason, description }),
+
+    /** Withdraw a dispute and resume tracking (raised-by party only). */
+    resolveDispute: (orderId: string) =>
+        call<{ success: boolean; status: string }>('resolveDispute', { orderId }),
 };

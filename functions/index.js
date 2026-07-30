@@ -7,7 +7,7 @@ const functions = require('firebase-functions/v1');
 const { calculateQuoteHandler } = require('./lib/quotes');
 const { verifyDeliveryCodeHandler, updateOrderStatusHandler, cancelOrderHandler, attachDeliveryPhotoHandler } = require('./lib/orders');
 const { submitReviewHandler } = require('./lib/reviews');
-const { raiseDisputeHandler } = require('./lib/disputes');
+const { raiseDisputeHandler, resolveDisputeHandler } = require('./lib/disputes');
 const { registerFcmTokenHandler } = require('./lib/tokens');
 const { expirePendingOrdersHandler } = require('./lib/scheduled');
 const { notifyDriversOnNewOrderHandler } = require('./lib/dispatch');
@@ -30,6 +30,7 @@ exports.attachDeliveryPhoto = functions.https.onCall(attachDeliveryPhotoHandler)
 // ── Reviews & disputes ──────────────────────────────────────────
 exports.submitReview = functions.https.onCall(submitReviewHandler);
 exports.raiseDispute = functions.https.onCall(raiseDisputeHandler);
+exports.resolveDispute = functions.https.onCall(resolveDisputeHandler);
 
 // ── Push notifications ──────────────────────────────────────────
 exports.registerFcmToken = functions.https.onCall(registerFcmTokenHandler);

@@ -427,6 +427,20 @@ const MapLayer: React.FC = () => {
     const prevOrderStateRef = useRef(orderState);
     const [decodedPath, setDecodedPath] = useState<google.maps.LatLngLiteral[]>([]);
     const [mapVisible, setMapVisible] = useState(false);
+
+    // ── Route fallback: when the live/encoded route fails to load (API error,
+    // stale geometry, or DB write delay), draw a straight dashed connector so
+    // the customer always sees a line between the driver/route points. This is
+    // only a safety net — the real polyline (decodedPath) takes precedence.
+    const fallbackPath: google.maps.LatLngLiteral[] = useMemo(() => {
+        if (decodedPath.length > 0) return [];
+        const tracking = orderState === 'IN_TRANSIT' || orderState === 'MATCHING' || orderState === 'DRIVER_IDLE';
+        if (!tracking) return [];
+        if (driverCoords && dropoffCoords) return [driverCoords, dropoffCoords];
+        if (driverCoords && pickupCoords) return [driverCoords, pickupCoords];
+        if (pickupCoords && dropoffCoords) return [pickupCoords, dropoffCoords];
+        return [];
+    }, [decodedPath, orderState, driverCoords, dropoffCoords, pickupCoords]);
     const cameraTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
     const lastBoundsRef = useRef('');
     const interpolatedDriverCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
@@ -1139,7 +1153,20 @@ const MapLayer: React.FC = () => {
                             zIndex: 100,
                             visible: decodedPath.length > 0
                         }}
-/>
+                    />
+                    {/* Safety-net dashed connector when the real route isn't loaded yet */}
+                    <Polyline
+                        path={fallbackPath}
+                        options={{
+                            strokeColor: '#4285F4',
+                            strokeOpacity: 0.7,
+                            strokeWeight: 3,
+                            geodesic: true,
+                            zIndex: 98,
+                            visible: fallbackPath.length > 0,
+                            icons: [{ icon: { path: 2, scale: 3 }, offset: '0', repeat: '12px' }]
+                        }}
+                    />
                     </GoogleMap>
 
                 {/* ── Phase 3: Navigation banner (next maneuver) — Uber/Bolt style ── */}

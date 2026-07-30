@@ -10,6 +10,7 @@ import { db } from '../firebase';
 import type { DeliveryOrder } from '../types';
 import { MapProvider, useMapState } from '@/context/MapContext';
 import { mapService } from '@/services/mapService';
+import { orderApi } from '../services/orderApi';
 
 const TrackingPageContent: React.FC = () => {
     const { orderId: paramId } = useParams<{ orderId: string }>();
@@ -378,10 +379,20 @@ const TrackingPageContent: React.FC = () => {
                         <AlertTriangle className="w-8 h-8 text-orange-500" />
                     </div>
                     <h2 className="text-2xl font-extrabold text-gray-900 mb-2">Dispute Under Review</h2>
-                    <p className="text-gray-500 font-bold text-sm mb-6">Your dispute has been recorded. Our team is reviewing it and will contact you via WhatsApp shortly.</p>
+                    <p className="text-gray-500 font-bold text-sm mb-6">Your dispute has been recorded. Our team is reviewing it and will contact you via WhatsApp shortly. You can still resume live tracking any time.</p>
+                    <button
+                        onClick={async () => {
+                            try { await orderApi.resolveDispute(orderId as string); }
+                            catch (e: any) { showAlert('Could not resume', e?.message || 'Please try again.', 'error'); return; }
+                            navigate(user?.role === 'business' ? '/business-dashboard' : (user ? '/customer-dashboard' : '/'));
+                        }}
+                        className="w-full bg-brand-600 text-white py-4 rounded-2xl font-black shadow-lg hover:bg-brand-700 transition-all mb-3"
+                    >
+                        Resume Live Tracking
+                    </button>
                     <button
                         onClick={() => navigate(user?.role === 'business' ? '/business-dashboard' : (user ? '/customer-dashboard' : '/'))}
-                        className="w-full bg-brand-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-brand-700 transition-all"
+                        className="w-full bg-gray-100 text-gray-700 py-4 rounded-2xl font-bold hover:bg-gray-200 transition-all"
                     >
                         Back to Dashboard
                     </button>
