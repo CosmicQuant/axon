@@ -64,8 +64,12 @@ const WizardContent: React.FC<BookingWizardProps> = ({ prefillData, onOrderCompl
                 // instead of leaving the user to re-pick Express/Standard.
                 const st = String(prefillData.serviceType).toLowerCase();
                 updates.serviceType = st.includes('express') ? 'Express' : 'Standard';
+                updates.serviceTypeLocked = prefillData.serviceTypeLocked === true;
             }
-            if (prefillData.vehicle) updates.vehicle = prefillData.vehicle;
+            if (prefillData.vehicle) {
+                updates.vehicle = prefillData.vehicle;
+                updates.vehicleLocked = prefillData.vehicleLocked === true;
+            }
             if (prefillData.activeTab) updates.activeTab = prefillData.activeTab;
             if (prefillData.category) updates.category = prefillData.category;
             if (prefillData.subCategory) {

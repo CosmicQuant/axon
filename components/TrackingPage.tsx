@@ -20,7 +20,7 @@ const TrackingPageContent: React.FC = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { showAlert } = usePrompt();
-    const { isLoaded, setOrderState, setPickupCoords, setDropoffCoords, setDriverCoords, setDriverBearing, setDriverVehicleType, setRoutePolyline, fitBounds, requestUserLocation, setMapCenter, setWaypointCoords, setDriverLabel } = useMapState();
+    const { isLoaded, setOrderState, setPickupCoords, setDropoffCoords, setDriverCoords, setDriverBearing, setDriverVehicleType, setRoutePolyline, fitBounds, requestUserLocation, setMapCenter, setWaypointCoords, setDriverLabel, setCameraMode } = useMapState();
 
     const [order, setOrder] = React.useState<DeliveryOrder | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
@@ -94,49 +94,49 @@ const TrackingPageContent: React.FC = () => {
                     setWaypointCoords([]);
                 }
 
-                // Update Route for customer
-                if (order.routeGeometry && !order.driverLocation) {
-                    // No live driver location yet ÃÂ¢ restore the stored route geometry
-                    // (covers reload before driver is assigned or while idling).
+                // Update Route for customer: prefer the live route geometry that
+                // the driver dashboard writes; only fall back to a local calculation
+                // if the driver is moving and we somehow don't have a stored route.
+                if (order.routeGeometry) {
                     setRoutePolyline(order.routeGeometry);
                 } else if (order.driverLocation) {
-                        // Throttle driver-location-triggered route updates to every 15s
-                        const now = Date.now();
-                        if (now - lastRouteUpdate.current > 15000 || !lastRouteUpdate.current) {
-                            lastRouteUpdate.current = now;
+                    // Throttle driver-location-triggered route updates to every 15s
+                    const now = Date.now();
+                    if (now - lastRouteUpdate.current > 15000 || !lastRouteUpdate.current) {
+                        lastRouteUpdate.current = now;
 
-                            // Multi-stop aware routing for customer
-                            const remainingStops: { lat: number, lng: number }[] = [];
+                        // Multi-stop aware routing for customer
+                        const remainingStops: { lat: number, lng: number }[] = [];
 
-                            // If heading to pickup
-                            if (order.status === 'driver_assigned' && p) {
-                                remainingStops.push(p);
-                            }
-
-                            // Add all pending waypoints and final dropoff
-                            if (order.stops && order.stops.length > 0) {
-                                const pendingStops = order.stops
-                                    .filter(s => s.status !== 'completed')
-                                    .map(s => ({ lat: s.lat, lng: s.lng }));
-                                remainingStops.push(...pendingStops);
-                            }
-
-                            // If final dropoff is not in stops array and we are in transit or assigned
-                            const hasDropoffInStops = order.stops?.some(s => s.type === 'dropoff');
-                            if (!hasDropoffInStops && d && (order.status === 'in_transit' || order.status === 'driver_assigned')) {
-                                remainingStops.push(d);
-                            }
-
-                            if (remainingStops.length > 0) {
-                                const start = { lat: order.driverLocation.lat, lng: order.driverLocation.lng };
-                                const end = remainingStops[remainingStops.length - 1];
-                                const waypoints = remainingStops.slice(0, -1);
-
-                                const route = await mapService.getRoute(start, end, waypoints, order.vehicle);
-                                if (route) setRoutePolyline(route.geometry);
-                            }
+                        // If heading to pickup
+                        if (order.status === 'driver_assigned' && p) {
+                            remainingStops.push(p);
                         }
-                    } else if (p && d) {
+
+                        // Add all pending waypoints and final dropoff
+                        if (order.stops && order.stops.length > 0) {
+                            const pendingStops = order.stops
+                                .filter(s => s.status !== 'completed')
+                                .map(s => ({ lat: s.lat, lng: s.lng }));
+                            remainingStops.push(...pendingStops);
+                        }
+
+                        // If final dropoff is not in stops array and we are in transit or assigned
+                        const hasDropoffInStops = order.stops?.some(s => s.type === 'dropoff');
+                        if (!hasDropoffInStops && d && (order.status === 'in_transit' || order.status === 'driver_assigned')) {
+                            remainingStops.push(d);
+                        }
+
+                        if (remainingStops.length > 0) {
+                            const start = { lat: order.driverLocation.lat, lng: order.driverLocation.lng };
+                            const end = remainingStops[remainingStops.length - 1];
+                            const waypoints = remainingStops.slice(0, -1);
+
+                            const route = await mapService.getRoute(start, end, waypoints, order.vehicle);
+                            if (route) setRoutePolyline(route.geometry);
+                        }
+                    }
+                } else if (p && d) {
                         // No driver yet — always recalculate (no throttle needed)
                         const waypoints = order.stops
                             ?.filter(s => s.type !== 'dropoff')
@@ -158,14 +158,22 @@ const TrackingPageContent: React.FC = () => {
                         setDriverBearing(order.driverLocation.bearing);
                     }
 
+                    // Once the driver is located, keep the customer map locked on
+                    // the driver at navigation zoom level (same follow mode as driver app).
+                    setCameraMode('follow');
+
                     // Fit bounds to include driver and their current destination —
                     // BUT only on status transitions, not every Firestore snapshot.
                     // Repeated fitBounds on every location update fights the follow-mode camera.
                     const statusChanged = lastFitBoundsStatus.current !== order.status;
-                    if (order.status === 'driver_assigned' && p && statusChanged) {
-                        fitBounds([driverPos, p]);
-                    } else if (order.status === 'in_transit' && d && statusChanged) {
-                        fitBounds([driverPos, d]);
+                    if (statusChanged) {
+                        const allRemaining: Array<{ lat: number; lng: number }> = [driverPos];
+                        if (order.status === 'driver_assigned' && p) allRemaining.push(p);
+                        if (order.stops && order.stops.length > 0) {
+                            order.stops.filter(s => s.status !== 'completed').forEach(s => allRemaining.push({ lat: s.lat, lng: s.lng }));
+                        }
+                        if (d && (order.status === 'in_transit' || order.status === 'driver_assigned')) allRemaining.push(d);
+                        if (allRemaining.length > 1) fitBounds(allRemaining);
                     }
                     lastFitBoundsStatus.current = order.status;
                 } else if (p && d && lastFitBoundsStatus.current !== 'no-driver') {
@@ -187,7 +195,7 @@ const TrackingPageContent: React.FC = () => {
         };
 
         syncMap();
-    }, [order, isLoaded, setPickupCoords, setDropoffCoords, setDriverCoords, setDriverBearing, setRoutePolyline, fitBounds, setMapCenter, setWaypointCoords, setDriverVehicleType, setDriverLabel, setOrderState]);
+    }, [order, isLoaded, setPickupCoords, setDropoffCoords, setDriverCoords, setDriverBearing, setRoutePolyline, fitBounds, setMapCenter, setWaypointCoords, setDriverVehicleType, setDriverLabel, setOrderState, setCameraMode]);
 
     React.useEffect(() => {
         if (!orderId) {

@@ -112,6 +112,7 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
   const [disputeReason, setDisputeReason] = useState('');
   const [disputeDescription, setDisputeDescription] = useState('');
   const [submittingDispute, setSubmittingDispute] = useState(false);
+  const [showHelpMenu, setShowHelpMenu] = useState(false);
 
   // ── Bottom sheet height reporting (map refit) ─────
   useEffect(() => {
@@ -783,7 +784,7 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
     <div className="fixed bottom-0 inset-x-0 md:inset-x-auto md:right-4 md:top-4 md:bottom-4 md:w-[400px] pointer-events-none z-[100] flex flex-col justify-end mx-auto max-w-lg md:max-w-none md:mx-0 ">
       <div
         ref={bottomSheetRef}
-        className={`w-full bg-white shadow-[0_-15px_40px_rgba(0,0,0,0.12)] md:shadow-2xl rounded-t-[2.5rem] md:rounded-2xl overflow-hidden pointer-events-auto border-t border-gray-100 md:border flex flex-col transition-all duration-300 pb-[env(safe-area-inset-bottom)] ${isLocationEditing ? 'max-h-[75vh]' : isCollapsed ? 'max-h-[180px]' : 'max-h-[85vh] md:max-h-[calc(100vh-2rem)]'}`}
+        className={`w-full bg-white shadow-[0_-15px_40px_rgba(0,0,0,0.12)] md:shadow-2xl rounded-t-[2.5rem] md:rounded-2xl overflow-hidden pointer-events-auto border-t border-gray-100 md:border flex flex-col transition-all duration-300 pb-[env(safe-area-inset-bottom)] ${isLocationEditing ? 'max-h-[75vh]' : isCollapsed ? 'h-[260px] max-h-[260px]' : 'max-h-[85vh] md:max-h-[calc(100vh-2rem)]'}`}
       >
         {/* ── Colored Header with Journey Animation ────────── */}
         <div
@@ -1422,19 +1423,11 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
                 <X size={14} /> Cancel
               </button>
             )}
-            {(isInTransit || isDelivered) && !isDisputed && (
-              <button
-                onClick={() => setShowDisputeModal(true)}
-                className="flex items-center justify-center gap-2 py-3 px-4 bg-orange-50 border border-orange-100 rounded-xl text-xs font-bold text-orange-600 hover:bg-orange-100 active:scale-95 transition-all"
-              >
-                <AlertTriangle size={14} /> Report
-              </button>
-            )}
             <button
-              onClick={() => openKifaru(true)}
-              className="flex items-center justify-center gap-2 py-3 px-4 bg-red-50 border border-red-100 rounded-xl text-xs font-bold text-red-600 hover:bg-red-100 active:scale-95 transition-all"
+              onClick={() => setShowHelpMenu(true)}
+              className="flex items-center justify-center gap-2 py-3 px-4 bg-gray-900 text-white rounded-xl text-xs font-bold hover:bg-gray-800 active:scale-95 transition-all"
             >
-              <ShieldAlert size={14} /> SOS
+              <ShieldAlert size={14} /> Help
             </button>
           </div>
 
@@ -1857,6 +1850,61 @@ const Tracking: React.FC<TrackingProps> = ({ order, onUpdateStatus, onUpdateOrde
                     {submittingDispute ? <Loader2 size={16} className="animate-spin mx-auto" /> : 'Submit & WhatsApp'}
                   </button>
                 </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Help Menu (merged Report + SOS) ───────────────── */}
+      <AnimatePresence>
+        {showHelpMenu && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-end md:items-center justify-center p-4 pointer-events-auto"
+          >
+            <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-md" onClick={() => setShowHelpMenu(false)} />
+            <motion.div
+              initial={{ y: 100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 100, opacity: 0 }}
+              className="relative bg-white rounded-t-2xl md:rounded-2xl p-5 w-full max-w-md mx-auto md:mx-0 shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-black text-gray-900">Need help?</h3>
+                <button onClick={() => setShowHelpMenu(false)} className="p-1.5 rounded-lg hover:bg-gray-100">
+                  <X size={16} className="text-gray-400" />
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-3">
+                {(isInTransit || isDelivered) && !isDisputed && (
+                  <button
+                    onClick={() => { setShowHelpMenu(false); setShowDisputeModal(true); }}
+                    className="flex items-center gap-3 p-4 rounded-2xl bg-orange-50 border border-orange-100 text-left hover:bg-orange-100 transition-colors"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
+                      <AlertTriangle size={18} />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-gray-900">Report a Problem</div>
+                      <div className="text-[10px] text-gray-500 font-medium">Damage, wrong item, driver issue...</div>
+                    </div>
+                  </button>
+                )}
+                <button
+                  onClick={() => { setShowHelpMenu(false); openKifaru(true); }}
+                  className="flex items-center gap-3 p-4 rounded-2xl bg-red-50 border border-red-100 text-left hover:bg-red-100 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600">
+                    <ShieldAlert size={18} />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-gray-900">Emergency SOS</div>
+                    <div className="text-[10px] text-gray-500 font-medium">Get immediate Axon support.</div>
+                  </div>
+                </button>
               </div>
             </motion.div>
           </motion.div>

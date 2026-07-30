@@ -80,6 +80,15 @@ const normalizeVehicleId = (raw) => {
 
 function validateVehicleCapability({ vehicle, category, distanceKm, subCategory, payloadWeight, payloadWeightUnit }) {
     const id = normalizeVehicleId(vehicle);
+    // 'standard' is a service-level pseudo-vehicle for Standard consolidated
+    // parcel deliveries. It doesn't exist in the physical vehicle map; pricing
+    // handles it separately. Only category-A (parcel) orders may use it.
+    if (id === 'standard') {
+        if (category && category !== 'A') {
+            return { ok: false, reason: 'Standard service is only available for parcel deliveries' };
+        }
+        return { ok: true };
+    }
     const cap = VEHICLE_CAPABILITIES[id];
     if (!cap) {
         return { ok: false, reason: `Unsupported vehicle: ${vehicle}` };

@@ -313,7 +313,7 @@ const CustomerHome: React.FC = () => {
 
                     {/* ── LEFT: Standard Consolidated — tall card with CTA ── */}
                     <button
-                        onClick={() => handleQuickAction({ serviceType: ServiceType.STANDARD })}
+                        onClick={() => handleQuickAction({ serviceType: ServiceType.STANDARD, serviceTypeLocked: true })}
                         className="relative overflow-hidden bg-gradient-to-b from-emerald-50 to-emerald-100 border-2 border-emerald-200 rounded-2xl p-3.5 text-left shadow-sm hover:shadow-lg hover:border-emerald-300 transition-all active:scale-[0.98] group min-[360px]:w-[36%] flex-shrink-0 flex flex-col"
                     >
                         <div className="absolute -right-3 -bottom-3 opacity-[0.08]">
@@ -349,7 +349,7 @@ const CustomerHome: React.FC = () => {
                                 { v: 'lpg-tanker-6axle', label: 'LPG', img: '/icons3d/tanker_truck.svg', sub: 'Pressurized gas', from: 'from-sky-600', to: 'to-cyan-700', txt: 'text-sky-200', cat: '' },
                                 { v: 'reefer-truck-3axle', label: 'Reefer', img: '/icons3d/delivery_truck.png', sub: 'Cold chain', from: 'from-cyan-500', to: 'to-blue-600', txt: 'text-cyan-100', cat: 'Perishables / Cold Chain' },
                             ].map(t => (
-                                <button key={t.v} onClick={() => handleQuickAction({ vehicle: t.v, ...(t.cat ? { subCategory: t.cat } : {}) })} className={`group relative overflow-hidden bg-gradient-to-br ${t.from} ${t.to} rounded-2xl p-2 text-center shadow-lg ring-1 ring-white/10 hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200`}>
+                                <button key={t.v} onClick={() => handleQuickAction({ vehicle: t.v, vehicleLocked: true, ...(t.cat ? { subCategory: t.cat } : {}) })} className={`group relative overflow-hidden bg-gradient-to-br ${t.from} ${t.to} rounded-2xl p-2 text-center shadow-lg ring-1 ring-white/10 hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200`}>
                                     <img src={t.img} alt={t.label} className="w-8 h-8 object-contain mx-auto mb-0.5 drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)] group-hover:scale-110 group-hover:-rotate-2 transition-transform duration-300" />
                                     <p className="text-white font-black text-[10px] leading-tight tracking-tight">{t.label}</p>
                                     <p className={`${t.txt} text-[8px] font-semibold leading-tight`}>{t.sub}</p>
@@ -365,7 +365,7 @@ const CustomerHome: React.FC = () => {
                                 { v: 'van', label: 'Van', img: '/icons3d/delivery_truck.png', ring: 'ring-sky-200/70', bg: 'bg-sky-50/80' },
                                 { v: 'tuktuk', label: 'Tuk-Tuk', img: '/icons3d/auto_rickshaw.png', ring: 'ring-orange-200/70', bg: 'bg-orange-50/80' },
                             ].map(t => (
-                                <button key={t.v} onClick={() => handleQuickAction({ vehicle: t.v })} className={`group ${t.bg} backdrop-blur-sm rounded-2xl p-1.5 pt-2 text-center shadow-sm ring-1 ${t.ring} hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200`}>
+                                <button key={t.v} onClick={() => handleQuickAction({ vehicle: t.v, vehicleLocked: true })} className={`group ${t.bg} backdrop-blur-sm rounded-2xl p-1.5 pt-2 text-center shadow-sm ring-1 ${t.ring} hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200`}>
                                     <img src={t.img} alt={t.label} className="w-7 h-7 object-contain mx-auto mb-0.5 drop-shadow-sm group-hover:scale-110 transition-transform duration-300" />
                                     <p className="text-gray-800 font-bold text-[9px] leading-tight">{t.label}</p>
                                 </button>
@@ -375,7 +375,7 @@ const CustomerHome: React.FC = () => {
 
                         
                         {/* Boda — wide strip with 3D motorcycle */}
-                        <button onClick={() => handleQuickAction({ vehicle: 'boda' })} className="group relative overflow-hidden flex items-center gap-2.5 bg-gradient-to-r from-indigo-600 to-purple-700 rounded-2xl px-3 py-2.5 shadow-lg shadow-indigo-300/40 ring-1 ring-white/10 hover:shadow-xl hover:shadow-indigo-400/50 transition-all text-left active:scale-[0.98]">
+                        <button onClick={() => handleQuickAction({ vehicle: 'boda', vehicleLocked: true })} className="group relative overflow-hidden flex items-center gap-2.5 bg-gradient-to-r from-indigo-600 to-purple-700 rounded-2xl px-3 py-2.5 shadow-lg shadow-indigo-300/40 ring-1 ring-white/10 hover:shadow-xl hover:shadow-indigo-400/50 transition-all text-left active:scale-[0.98]">
                             <img src="/icons3d/motorcycle.png" alt="Boda" className="w-9 h-9 object-contain flex-shrink-0 drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)] group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300" />
                             <div className="flex-1 min-w-0">
                                 <p className="text-[12px] font-black text-white tracking-tight">Boda Boda</p>

@@ -7,7 +7,8 @@ import { useMapState } from '@/context/MapContext';
 import { httpsCallable } from 'firebase/functions';
 import {
     getEligibleVehicles, allowsFragile, allowsReturnTrip,
-    requiresHelpers, getSuggestedHelpers, requiresScheduling, allowsConsolidated
+    requiresHelpers, getSuggestedHelpers, requiresScheduling, allowsConsolidated,
+    getVehicleFamily, getFamilyVehicles
 } from '../../../services/vehicleCapabilities';
 
 export const Step3How = () => {
@@ -18,13 +19,20 @@ export const Step3How = () => {
 
     const isStandard = data.serviceType === 'Standard';
     const weightVal = parseFloat(data.dimensions.weight) || 0;
+    const serviceLocked = data.serviceTypeLocked === true;
+    const vehicleLocked = data.vehicleLocked === true;
+    const lockedFamily = vehicleLocked ? getVehicleFamily(data.vehicle) : null;
 
     // Smart filter (Option A): use the capability service so all gating logic
     // lives in one place (vehicleCapabilities.ts). Also normalizes weight units.
-    const eligibleVehicles = useMemo(
-        () => getEligibleVehicles({ category: data.category, weightKg: weightVal, distanceKm: data.distanceKm, subCategory: data.subCategory }),
-        [data.category, weightVal, data.distanceKm, data.subCategory]
-    );
+    const eligibleVehicles = useMemo(() => {
+        const base = getEligibleVehicles({ category: data.category, weightKg: weightVal, distanceKm: data.distanceKm, subCategory: data.subCategory });
+        if (!vehicleLocked || !lockedFamily) return base;
+        // When a home-screen vehicle card was tapped, only show vehicles in the
+        // same family (e.g. Container → 5/6/7-axle variants, not random trucks).
+        const familyIds = new Set(getFamilyVehicles(data.vehicle).map(v => v.id));
+        return base.filter(v => familyIds.has(v.id));
+    }, [data.category, weightVal, data.distanceKm, data.subCategory, vehicleLocked, data.vehicle, lockedFamily]);
     const activeVehicle = eligibleVehicles.find(v => v.id === data.vehicle) || eligibleVehicles[0];
 
     // ── Vehicle-aware derived flags ──
@@ -35,9 +43,12 @@ export const Step3How = () => {
     // Standard toggle and force Express so the user can't accidentally clear
     // the vehicle by picking "Standard".
     const canConsolidate = allowsConsolidated(data.vehicle);
-    const visibleServiceTypes = canConsolidate
-        ? [{ id: 'Standard', label: '📦 Standard', desc: 'Consolidated & affordable', accent: 'brand' }, { id: 'Express', label: '⚡ Express', desc: 'Dedicated vehicle, fast', accent: 'orange' }]
-        : [{ id: 'Express', label: '⚡ Express', desc: 'Dedicated vehicle', accent: 'orange' }];
+    // When the home screen pre-selected the service, don't ask again.
+    const visibleServiceTypes = serviceLocked
+        ? []
+        : canConsolidate
+            ? [{ id: 'Standard', label: '📦 Standard', desc: 'Consolidated & affordable', accent: 'brand' }, { id: 'Express', label: '⚡ Express', desc: 'Dedicated vehicle, fast', accent: 'orange' }]
+            : [{ id: 'Express', label: '⚡ Express', desc: 'Dedicated vehicle', accent: 'orange' }];
 
     // Auto-select first eligible vehicle + auto-prescribed helpers when heavy
     useEffect(() => {
@@ -47,8 +58,13 @@ export const Step3How = () => {
         }
         if (eligibleVehicles.length > 0) {
             let updates: any = {};
-            if (!data.vehicle || !eligibleVehicles.some(v => v.id === data.vehicle)) {
-                updates.vehicle = eligibleVehicles[0].id;
+            const currentEligible = data.vehicle && eligibleVehicles.some(v => v.id === data.vehicle);
+            if (!currentEligible) {
+                // Prefer the locked home-screen vehicle if it is still eligible;
+                // otherwise fall back to the first matching family vehicle.
+                updates.vehicle = (vehicleLocked && data.vehicle && eligibleVehicles.some(v => v.id === data.vehicle))
+                    ? data.vehicle
+                    : eligibleVehicles[0].id;
             }
             // If the chosen vehicle requires helpers, pre-select the suggested count
             const chosenId = updates.vehicle ?? data.vehicle;
@@ -59,12 +75,12 @@ export const Step3How = () => {
             if (requiresScheduling(chosenId) && !data.isScheduled) {
                 updates.isScheduled = true;
             }
-            if (!allowsConsolidated(chosenId) && data.serviceType !== 'Express') {
+            if (!allowsConsolidated(chosenId) && data.serviceType !== 'Express' && !serviceLocked) {
                 updates.serviceType = 'Express';
             }
             if (Object.keys(updates).length > 0) updateData(updates);
         }
-    }, [isStandard, eligibleVehicles, data.vehicle, data.helpersCount, data.isScheduled, updateData]);
+    }, [isStandard, eligibleVehicles, data.vehicle, data.helpersCount, data.isScheduled, data.serviceType, serviceLocked, vehicleLocked, updateData]);
 
     // Live Quote Fetcher: Triggered whenever selection changes
     useEffect(() => {
@@ -151,9 +167,11 @@ export const Step3How = () => {
                 ))}
             </div>
 
-            {/* Vehicle Grid - Only for Express */}
+            {/* Vehicle Grid - Only for Express. Hidden when a singleton home-card
+                vehicle is locked (no choice needed) but shown when a family has
+                multiple eligible variants (e.g. Container sizes). */}
             <AnimatePresence>
-                {!isStandard && (
+                {!isStandard && eligibleVehicles.length > 1 && (
                     <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
@@ -231,7 +249,11 @@ export const Step3How = () => {
                     disabled={(!isStandard && !data.vehicle) || fetchingQuote}
                     className="flex-1 h-[48px] bg-gray-900 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 disabled:opacity-50"
                 >
-                    {fetchingQuote ? <Loader2 size={16} className="animate-spin" /> : (isStandard ? "Confirm Service" : "Confirm Vehicle")}
+                    {fetchingQuote ? <Loader2 size={16} className="animate-spin" /> : (
+                        isStandard ? "Confirm Standard" :
+                        vehicleLocked ? `Confirm ${activeVehicle?.label || 'Vehicle'}` :
+                        "Confirm Vehicle"
+                    )}
                     {!fetchingQuote && <ArrowRight size={16} />}
                 </button>
             </div>

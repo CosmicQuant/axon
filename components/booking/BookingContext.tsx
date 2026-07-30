@@ -38,6 +38,11 @@ export interface BookingState {
     driverRate?: number;
     calculatingQuote?: boolean;
     helpersCount?: number;
+
+    // Lock flags when the user picked a service/vehicle on the home screen —
+    // prevents re-showing the same choice inside the wizard.
+    serviceTypeLocked?: boolean;
+    vehicleLocked?: boolean;
 }
 
 export const INITIAL_STATE: BookingState = {

@@ -41,6 +41,28 @@ const normalizeVehicleId = (raw: string | undefined | null): string => {
     return LEGACY_ALIASES[t] || t;
 };
 
+// ── Vehicle family (used when a home-screen card locks the user to a family) ─
+// Returns the family ID for a vehicle, or the vehicle id itself for singletons.
+export const getVehicleFamily = (rawId?: string | null): string | null => {
+    const id = normalizeVehicleId(rawId);
+    if (!id) return null;
+    if (id.startsWith('rigid-truck-') || id.startsWith('semi-truck-') || id === 'canter') return 'truck';
+    if (id.startsWith('container-')) return 'container';
+    if (id.startsWith('tipper-')) return 'tipper';
+    if (id.startsWith('fuel-tanker-')) return 'fuel-tanker';
+    if (id.startsWith('lpg-tanker-')) return 'lpg-tanker';
+    if (id.startsWith('reefer-')) return 'reefer';
+    return id; // singletons: boda, tuktuk, probox, van, pickup
+};
+
+// Returns all vehicles belonging to the same family as the given vehicle.
+export const getFamilyVehicles = (rawId?: string | null): VehicleCapability[] => {
+    const family = getVehicleFamily(rawId);
+    if (!family) return [];
+    if (family === rawId) return VEHICLES.filter(v => v.id === family); // singleton
+    return VEHICLES.filter(v => getVehicleFamily(v.id) === family);
+};
+
 // ── Core lookups ─────────────────────────────────────────────────
 export const getVehicle = (rawId?: string | null): VehicleCapability | null => {
     if (!rawId) return null;
@@ -194,6 +216,13 @@ export const getHazardClass = (vehicleId?: string | null): string | null => {
 // API calls bypassing client UI gates. Mirrors the client logic so any change
 // here must be applied identically on the server (copy-paste safe — no React).
 export const validateVehicleCapability = (vehicleId: string, inputs: EligibilityInputs): { ok: boolean; reason?: string } => {
+    const id = normalizeVehicleId(vehicleId);
+    if (id === 'standard') {
+        if (inputs.category && inputs.category !== 'A') {
+            return { ok: false, reason: 'Standard service is only available for parcel deliveries' };
+        }
+        return { ok: true };
+    }
     const v = getVehicle(vehicleId);
     if (!v) return { ok: false, reason: `Unknown vehicle id: ${vehicleId}` };
     if (!isEligible(v, inputs)) {

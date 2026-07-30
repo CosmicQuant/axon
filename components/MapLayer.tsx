@@ -18,7 +18,7 @@ const HEATMAP_OPTIONS = {
 };
 import { useMapState } from '@/context/MapContext';
 import { APP_CONFIG } from '@/config';
-import { Truck, Navigation, MapPin, GripVertical, X, Compass, Flag, ArrowUp, ArrowUpRight, ArrowRight, ArrowDownRight, ArrowDown, ArrowLeft, ArrowUpLeft, CornerUpLeft, CornerUpRight, Merge, Navigation2 } from 'lucide-react';
+import { Truck, Navigation, MapPin, GripVertical, X, Flag, ArrowUp, ArrowUpRight, ArrowRight, ArrowDownRight, ArrowDown, ArrowLeft, ArrowUpLeft, CornerUpLeft, CornerUpRight, Merge, Navigation2 } from 'lucide-react';
 
 /* ── Bird's-eye (top-down) vehicle SVGs — Uber/Bolt style ─────
    All face NORTH at 0°. Parent div rotates by GPS bearing.
@@ -264,8 +264,8 @@ const CAMERA = {
     SHEET_DELTA_THRESHOLD: 15,
     SHEET_MAX_RATIO: 0.85,
     PAD_MAX_RATIO: 0.55,
-    DRIVER_FOLLOW_ZOOM: 17,
-    DRIVER_FOLLOW_MS: 1200,
+    DRIVER_FOLLOW_ZOOM: 18,
+    DRIVER_FOLLOW_MS: 900,
 } as const;
 
 // ── Easing functions (GPU-friendly parametric curves) ──────────────
@@ -1161,28 +1161,10 @@ const MapLayer: React.FC = () => {
                     </div>
                 )}
 
-                {/* Overview / Recenter / Compass buttons — 3D Uber-style controls */}
+                {/* Single follow/overview toggle — Uber-style right-hand control */}
                 {(orderState === 'IN_TRANSIT' || orderState === 'DRIVER_IDLE') && !isMapSelecting && (
-                    <div className={`absolute right-4 z-10 flex flex-col gap-2.5 ${orderState === 'IN_TRANSIT' && nextManeuver ? 'top-40' : 'top-24'}`}>
-                        {/* Compass button — toggles heading-up vs north-up */}
-                        {orderState === 'IN_TRANSIT' && (
-                            <button
-                                onClick={() => setHeadingUp(!headingUp)}
-                                className={`group relative w-13 h-13 rounded-2xl flex items-center justify-center transition-all active:scale-90 active:shadow-lg ${
-                                    headingUp
-                                        ? 'bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-[0_6px_16px_rgba(22,163,74,0.45),0_2px_4px_rgba(0,0,0,0.2)] ring-1 ring-brand-400/40'
-                                        : 'bg-gradient-to-br from-white to-gray-50 text-gray-700 shadow-[0_4px_12px_rgba(0,0,0,0.18),0_1px_2px_rgba(0,0,0,0.1)] ring-1 ring-gray-200/60 hover:from-gray-50 hover:to-gray-100'
-                                }`}
-                                title={headingUp ? 'Switch to North-up' : 'Switch to heading-up navigation'}
-                                style={{ width: '52px', height: '52px' }}
-                            >
-                                {/* top inner highlight for 3D depth */}
-                                <span className="absolute inset-x-3 top-1.5 h-2.5 rounded-full bg-white/30 pointer-events-none" />
-                                <Compass className={`relative w-6 h-6 drop-shadow-sm ${headingUp ? 'animate-pulse' : ''}`} style={headingUp ? { transform: `rotate(${driverBearing}deg)` } : undefined} strokeWidth={2.2} />
-                            </button>
-                        )}
-                        {/* Overview button — show full route */}
-                        {orderState === 'IN_TRANSIT' && cameraMode !== 'overview' && (pickupCoords || dropoffCoords) && (
+                    <div className={`absolute right-4 z-10 ${orderState === 'IN_TRANSIT' && nextManeuver ? 'top-40' : 'top-24'}`}>
+                        {cameraMode === 'follow' || cameraMode === 'arriving' ? (
                             <button
                                 onClick={() => {
                                     const points: any[] = [];
@@ -1193,24 +1175,20 @@ const MapLayer: React.FC = () => {
                                     if (points.length > 0) fitBounds(points);
                                     setCameraMode('overview');
                                 }}
-                                className="group relative w-13 h-13 rounded-2xl flex items-center justify-center text-gray-700 transition-all active:scale-90 active:shadow-lg bg-gradient-to-br from-white to-gray-50 shadow-[0_4px_12px_rgba(0,0,0,0.18),0_1px_2px_rgba(0,0,0,0.1)] ring-1 ring-gray-200/60 hover:from-gray-50 hover:to-gray-100"
+                                className="group relative w-[52px] h-[52px] rounded-2xl flex items-center justify-center text-gray-700 transition-all active:scale-90 active:shadow-lg bg-gradient-to-br from-white to-gray-50 shadow-[0_4px_12px_rgba(0,0,0,0.18),0_1px_2px_rgba(0,0,0,0.1)] ring-1 ring-gray-200/60 hover:from-gray-50 hover:to-gray-100"
                                 title="Show full route"
-                                style={{ width: '52px', height: '52px' }}
                             >
                                 <span className="absolute inset-x-3 top-1.5 h-2.5 rounded-full bg-white/30 pointer-events-none" />
                                 <Navigation className="relative w-6 h-6 drop-shadow-sm" strokeWidth={2.2} />
                             </button>
-                        )}
-                        {/* Recenter button — lock on driver */}
-                        {cameraMode !== 'follow' && (
+                        ) : (
                             <button
                                 onClick={() => {
                                     setCameraMode('follow');
                                     clearUserInteraction();
                                 }}
-                                className="group relative w-13 h-13 rounded-2xl flex items-center justify-center text-white transition-all active:scale-90 active:shadow-lg bg-gradient-to-br from-brand-500 to-brand-700 shadow-[0_6px_16px_rgba(22,163,74,0.45),0_2px_4px_rgba(0,0,0,0.2)] ring-1 ring-brand-400/40 hover:from-brand-600 hover:to-brand-800"
+                                className="group relative w-[52px] h-[52px] rounded-2xl flex items-center justify-center text-white transition-all active:scale-90 active:shadow-lg bg-gradient-to-br from-brand-500 to-brand-700 shadow-[0_6px_16px_rgba(22,163,74,0.45),0_2px_4px_rgba(0,0,0,0.2)] ring-1 ring-brand-400/40 hover:from-brand-600 hover:to-brand-800"
                                 title="Recenter on driver"
-                                style={{ width: '52px', height: '52px' }}
                             >
                                 <span className="absolute inset-x-3 top-1.5 h-2.5 rounded-full bg-white/30 pointer-events-none" />
                                 <MapPin className="relative w-6 h-6 drop-shadow-sm" strokeWidth={2.2} />
