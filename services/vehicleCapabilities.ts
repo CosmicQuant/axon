@@ -1,39 +1,8 @@
-import { VEHICLES, CARGO_VEHICLE_MAP, VehicleCapability, WeightUnit } from '../components/booking/constants';
+import { VEHICLES, CARGO_VEHICLE_MAP, VehicleCapability, WeightUnit, LEGACY_VEHICLE_ALIASES } from '../components/booking/constants';
 
-// ── Legacy alias map ─────────────────────────────────────────────
-// Old orders may carry simplified vehicle ids. Map them to the canonical
-// entry so historical data doesn't break the new capability model.
-const LEGACY_ALIASES: Record<string, string> = {
-    'tanker': 'fuel-tanker-6axle-30kl',          // legacy "tanker" → 30kL semi
-    'fuel-tanker': 'fuel-tanker-6axle-30kl',     // old pre-axle taxonomy
-    'fuel-tanker-3axle': 'fuel-tanker-3axle-18kl',
-    'fuel-tanker-6axle': 'fuel-tanker-6axle-30kl',
-    'lpg-tanker': 'lpg-tanker-6axle',
-    'lorry': 'rigid-truck-3axle',
-    'lorry-5t': 'rigid-truck-3axle',
-    'lorry-7t': 'rigid-truck-3axle',
-    'lorry-10t': 'rigid-truck-4axle',
-    'lorry-14t': 'rigid-truck-4axle',
-    'container': 'container-5axle',
-    'container-20ft': 'container-5axle',
-    'container-40ft': 'container-6axle',
-    'tipper': 'tipper-3axle',
-    'tipper-7t': 'tipper-2axle',
-    'tipper-14t': 'tipper-3axle',
-    'tipper-25t': 'tipper-4axle',
-    'motorbike': 'boda',
-    'motorcycle': 'boda',
-    'boda boda': 'boda',
-    'bodaboda': 'boda',
-    'cargo van': 'van',
-    'van': 'van',
-    'pickup truck': 'pickup',
-    'pick-up': 'pickup',
-    'tuk-tuk': 'tuktuk',
-    'tuk tuk': 'tuktuk',
-    'tuktuk': 'tuktuk',
-    'auto rickshaw': 'tuktuk',
-};
+// Legacy aliasing now lives with the taxonomy in constants.ts so the client
+// and any server mirror stay in sync. Re-export the canonical map here.
+const LEGACY_ALIASES = LEGACY_VEHICLE_ALIASES;
 
 const normalizeVehicleId = (raw: string | undefined | null): string => {
     if (!raw) return '';
@@ -41,18 +10,14 @@ const normalizeVehicleId = (raw: string | undefined | null): string => {
     return LEGACY_ALIASES[t] || t;
 };
 
-// ── Vehicle family (used when a home-screen card locks the user to a family) ─
-// Returns the family ID for a vehicle, or the vehicle id itself for singletons.
+// ── Vehicle family (used when a home-screen card locks the user to a family)
+// The family is now a first-class field on each VehicleCapability, so we read
+// it directly instead of inferring by id prefix (keeps legacy ids consistent).
 export const getVehicleFamily = (rawId?: string | null): string | null => {
     const id = normalizeVehicleId(rawId);
     if (!id) return null;
-    if (id.startsWith('rigid-truck-') || id.startsWith('semi-truck-') || id === 'canter') return 'truck';
-    if (id.startsWith('container-')) return 'container';
-    if (id.startsWith('tipper-')) return 'tipper';
-    if (id.startsWith('fuel-tanker-')) return 'fuel-tanker';
-    if (id.startsWith('lpg-tanker-')) return 'lpg-tanker';
-    if (id.startsWith('reefer-')) return 'reefer';
-    return id; // singletons: boda, tuktuk, probox, van, pickup
+    const v = VEHICLES.find(x => x.id === id);
+    return v ? v.family : id; // singletons fall back to their own id
 };
 
 // Returns all vehicles belonging to the same family as the given vehicle.
@@ -208,6 +173,43 @@ export const getHazardClass = (vehicleId?: string | null): string | null => {
     const v = getVehicle(vehicleId);
     const h = v?.constraints.cargoHazardous;
     return h ? String(h) : null;
+};
+
+// ── Driver ↔ order matching (payload-aware) ──────────────────────
+// A driver declares their real vehicle spec at onboarding (GVW, payload, tare,
+// axle count/weights). A customer's chosen tier has a payload Tonnes range.
+// A driver matches an order when:
+//   1. families match (order.vehicle family === driver.vehicleType family), AND
+//   2. the driver's declared payload covers the order tier's upper bound.
+// Drivers without declared payload data fall back to exact-id match (legacy).
+export interface DriverVehicleSpec {
+    vehicleType?: string;          // canonical id the driver registered
+    payloadTonnes?: number;        // actual declared payload (net cargo capacity)
+    gvwTonnes?: number;
+    tareTonnes?: number;
+    axleCount?: number;
+}
+
+export const matchesDriverVehicle = (orderVehicleId: string, driver: DriverVehicleSpec): boolean => {
+    const orderVehicle = getVehicle(orderVehicleId);
+    if (!orderVehicle) {
+        // Unknown order vehicle → exact-id fallback
+        return normalizeVehicleId(driver.vehicleType) === normalizeVehicleId(orderVehicleId);
+    }
+    const driverFamily = getVehicleFamily(driver.vehicleType);
+    // Standard (consolidated) pseudo-vehicle → any light consolidated carrier
+    if (orderVehicle.id === 'standard') {
+        return ['boda', 'tuktuk', 'probox', 'van', 'pickup'].includes(driverFamily || '');
+    }
+    // Family gate
+    if (driverFamily !== orderVehicle.family) return false;
+    // Payload gate: if the tier defines a payload range and the driver declared a
+    // payload, the driver must cover the tier's upper payload bound.
+    if (orderVehicle.payloadTonnes && typeof driver.payloadTonnes === 'number' && driver.payloadTonnes > 0) {
+        const [_, tierMax] = orderVehicle.payloadTonnes;
+        if (driver.payloadTonnes < tierMax) return false;
+    }
+    return true;
 };
 
 // ── Server-side guard ────────────────────────────────────────────

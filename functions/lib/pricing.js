@@ -69,6 +69,23 @@ const VEHICLE_RATES = {
     'reefer-truck-3axle': { base: 5500, perKm: 185, perMin: 28, stopFee: 600, min: 5500 },  // 26T 3-axle
     'reefer-semi-6axle':  { base: 8500, perKm: 290, perMin: 40, stopFee: 800, min: 8500 },  // 50T 6-axle semi
 
+    // ── New payload-tier taxonomy (canonical). Legacy axle ids kept above ──
+    'truck-3t':  { base: 2000, perKm: 95,  perMin: 18, stopFee: 250, min: 2000 },
+    'truck-5t':  { base: 2500, perKm: 115, perMin: 20, stopFee: 350, min: 2500 },
+    'truck-7t':  { base: 3000, perKm: 140, perMin: 22, stopFee: 400, min: 3000 },
+    'truck-10t': { base: 4500, perKm: 170, perMin: 26, stopFee: 500, min: 4500 },
+    'truck-15t': { base: 6000, perKm: 200, perMin: 30, stopFee: 600, min: 6000 },
+    'trailer-20ft': { base: 8000, perKm: 210, perMin: 35, stopFee: 800, min: 8000 },
+    'trailer-40ft': { base: 11000, perKm: 270, perMin: 45, stopFee: 1000, min: 11000 },
+    // Fuel tankers (canonical litre ids)
+    'fuel-tanker-10kl': { base: 6000,  perKm: 180, perMin: 30, stopFee: 600,  min: 6000 },
+    'fuel-tanker-18kl': { base: 8000,  perKm: 200, perMin: 35, stopFee: 700,  min: 8000 },
+    'fuel-tanker-30kl': { base: 11000, perKm: 260, perMin: 45, stopFee: 1000, min: 11000 },
+    'lpg-tanker':  { base: 10000, perKm: 240, perMin: 40, stopFee: 900, min: 10000 },
+    // Reefers (new tiers)
+    'reefer-truck-3t':  { base: 4000,  perKm: 165, perMin: 24, stopFee: 500, min: 4000 },
+    'reefer-truck-10t': { base: 6500,  perKm: 210, perMin: 32, stopFee: 700, min: 6500 },
+
     // Legacy IDs (backward compatibility with existing orders)
     'lorry': { base: 4500, perKm: 155, perMin: 25, stopFee: 500, min: 4500 },
     'tipper': { base: 5000, perKm: 160, perMin: 25, stopFee: 500, min: 5000 },
@@ -120,6 +137,20 @@ const VEHICLE_FUEL = {
     'reefer-truck-3axle': { energy: 'diesel', lPerKm: 0.32, fuel: 'diesel' },
     'reefer-semi-6axle':  { energy: 'diesel', lPerKm: 0.55, fuel: 'diesel' },
     'standard':    { energy: 'electric', kwhPerKm: 0.04, lPerKm: 0.045, fuel: 'petrol' },
+
+    // New payload-tier taxonomy fuel profiles (canonical)
+    'truck-3t':  { energy: 'diesel', lPerKm: 0.18, fuel: 'diesel' },
+    'truck-5t':  { energy: 'diesel', lPerKm: 0.22, fuel: 'diesel' },
+    'truck-7t':  { energy: 'diesel', lPerKm: 0.28, fuel: 'diesel' },
+    'truck-10t': { energy: 'diesel', lPerKm: 0.35, fuel: 'diesel' },
+    'truck-15t': { energy: 'diesel', lPerKm: 0.42, fuel: 'diesel' },
+    'trailer-20ft': { energy: 'diesel', lPerKm: 0.48, fuel: 'diesel' },
+    'trailer-40ft': { energy: 'diesel', lPerKm: 0.60, fuel: 'diesel' },
+    'fuel-tanker-10kl': { energy: 'diesel', lPerKm: 0.35, fuel: 'diesel' },
+    'fuel-tanker-18kl': { energy: 'diesel', lPerKm: 0.45, fuel: 'diesel' },
+    'fuel-tanker-30kl': { energy: 'diesel', lPerKm: 0.60, fuel: 'diesel' },
+    'reefer-truck-3t':  { energy: 'diesel', lPerKm: 0.21, fuel: 'diesel' },
+    'reefer-truck-10t': { energy: 'diesel', lPerKm: 0.36, fuel: 'diesel' },
 };
 
 // Business parameters

@@ -8,6 +8,7 @@ import {
     Camera, Upload, Image as ImageIcon, Navigation
 } from 'lucide-react';
 import { VehicleType } from '../types';
+import { VEHICLES } from './booking/constants';
 import { storageService } from '../services/storageService';
 import { mapService } from '../services/mapService';
 import { compressImage } from '../utils/imageUtils';
@@ -46,6 +47,15 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen: propIsOpen, o
     const [plateNumber, setPlateNumber] = useState('');
     const [idNumber, setIdNumber] = useState('');
     const [licenseNumber, setLicenseNumber] = useState('');
+
+    // Driver vehicle spec (KeNHA / EAC Vehicle Load Control Act compliance)
+    // — actual GVW, payload, tare, and axle count as declared by the driver/
+    // fleet partner. Used for payload-aware order matching.
+    const [vehicleId, setVehicleId] = useState('');
+    const [payloadTonnes, setPayloadTonnes] = useState('');
+    const [gvwTonnes, setGvwTonnes] = useState('');
+    const [tareTonnes, setTareTonnes] = useState('');
+    const [axleCount, setAxleCount] = useState('');
 
     // Business specific
     const [businessRegNumber, setBusinessRegNumber] = useState('');
@@ -160,6 +170,11 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen: propIsOpen, o
                     setVehicleType(user.vehicleType || VehicleType.BODA);
                     setPlateNumber(user.plateNumber || '');
                     setLicenseNumber(user.licenseNumber || '');
+                    setVehicleId((user as any).vehicleId || '');
+                    setPayloadTonnes((user as any).payloadTonnes ? String((user as any).payloadTonnes) : '');
+                    setGvwTonnes((user as any).gvwTonnes ? String((user as any).gvwTonnes) : '');
+                    setTareTonnes((user as any).tareTonnes ? String((user as any).tareTonnes) : '');
+                    setAxleCount((user as any).axleCount ? String((user as any).axleCount) : '');
                 } else if (isBusiness) {
                     setBusinessRegNumber(user.businessRegNumber || '');
                 }
@@ -256,6 +271,12 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen: propIsOpen, o
                 updates.licenseNumber = licenseNumber;
                 updates.plateNumber = plateNumber.toUpperCase();
                 updates.vehicleType = vehicleType;
+                // Vehicle spec — feeds payload-aware matching.
+                if (vehicleId) updates.vehicleId = vehicleId;
+                if (payloadTonnes) updates.payloadTonnes = parseFloat(payloadTonnes);
+                if (gvwTonnes) updates.gvwTonnes = parseFloat(gvwTonnes);
+                if (tareTonnes) updates.tareTonnes = parseFloat(tareTonnes);
+                if (axleCount) updates.axleCount = parseInt(axleCount);
             } else if (user.role === 'business') {
                 updates.companyName = name;
                 updates.businessRegNumber = businessRegNumber;
@@ -514,6 +535,52 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen: propIsOpen, o
                                         className="w-full px-4 py-3.5 rounded-2xl border border-gray-200 bg-gray-50 text-gray-900 focus:bg-white focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 transition-all outline-none font-medium text-sm uppercase placeholder:text-gray-400"
                                         placeholder="KDA 001A"
                                     />
+                                </div>
+
+                                {/* Vehicle spec — KeNHA / EAC Load Control Act compliance.
+                                    Actual GVW / payload / tare / axle as declared by the driver or
+                                    fleet partner. Drives payload-aware order matching. */}
+                                <div className="rounded-2xl border border-gray-200 bg-gray-50/50 p-4 space-y-3">
+                                    <div className="flex items-center gap-2">
+                                        <Truck className="w-4 h-4 text-brand-600" />
+                                        <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Vehicle Specs (matching)</span>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Vehicle Model / Tier</label>
+                                        <select
+                                            value={vehicleId}
+                                            onChange={(e) => setVehicleId(e.target.value)}
+                                            className="w-full px-4 py-3.5 rounded-2xl border border-gray-200 bg-white text-gray-900 focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 transition-all outline-none font-medium text-sm"
+                                        >
+                                            <option value="">Select your vehicle…</option>
+                                            {[...new Set(VEHICLES.map(v => v.family))].map(fam => (
+                                                <optgroup key={fam} label={fam.charAt(0).toUpperCase() + fam.slice(1)}>
+                                                    {VEHICLES.filter(v => v.family === fam).map(v => (
+                                                        <option key={v.id} value={v.id}>{v.label}</option>
+                                                    ))}
+                                                </optgroup>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Payload (T)</label>
+                                            <input type="number" step="0.1" min="0" value={payloadTonnes} onChange={e => setPayloadTonnes(e.target.value)} placeholder="e.g. 7" className="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-sm font-medium focus:ring-2 focus:ring-brand-500/10 focus:border-brand-500 outline-none" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">GVW (T)</label>
+                                            <input type="number" step="0.1" min="0" value={gvwTonnes} onChange={e => setGvwTonnes(e.target.value)} placeholder="e.g. 18" className="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-sm font-medium focus:ring-2 focus:ring-brand-500/10 focus:border-brand-500 outline-none" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Tare (T)</label>
+                                            <input type="number" step="0.1" min="0" value={tareTonnes} onChange={e => setTareTonnes(e.target.value)} placeholder="e.g. 8" className="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-sm font-medium focus:ring-2 focus:ring-brand-500/10 focus:border-brand-500 outline-none" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Axles</label>
+                                            <input type="number" min="0" value={axleCount} onChange={e => setAxleCount(e.target.value)} placeholder="e.g. 3" className="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-sm font-medium focus:ring-2 focus:ring-brand-500/10 focus:border-brand-500 outline-none" />
+                                        </div>
+                                    </div>
+                                    <p className="text-[10px] text-gray-400 font-medium ml-1">Used to match you to orders your vehicle can legally carry. KeNHA weighbridge limits apply.</p>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">

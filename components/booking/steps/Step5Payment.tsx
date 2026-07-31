@@ -2,7 +2,7 @@ import React from 'react';
 import { Banknote, Check, ArrowLeft, ChevronRight } from 'lucide-react';
 import { useBooking } from '../BookingContext';
 import { VEHICLES } from '../constants';
-import { getEligibleVehicles, getWeightUnitLabel, allowsReturnTrip } from '../../../services/vehicleCapabilities';
+import { getEligibleVehicles, getWeightUnitLabel, allowsReturnTrip, getVehicle, getFamilyVehicles } from '../../../services/vehicleCapabilities';
 import mpesaLogo from '../../../assets/mpesa.png';
 
 interface Step5Props {
@@ -13,10 +13,19 @@ export const Step5Payment: React.FC<Step5Props> = ({ submit }) => {
     const { data, updateData, prevStep, setStep } = useBooking();
     const routeStops = [data.pickup, ...data.waypoints, data.dropoff].filter(Boolean);
     const weightVal = parseFloat(data.dimensions.weight) || 0;
-    const eligibleVehicles = getEligibleVehicles({ category: data.category, weightKg: weightVal, distanceKm: data.distanceKm, subCategory: data.subCategory });
-    const activeVehicle = eligibleVehicles.find(v => v.id === data.vehicle) || eligibleVehicles[0];
+    const baseEligible = getEligibleVehicles({ category: data.category, weightKg: weightVal, distanceKm: data.distanceKm, subCategory: data.subCategory });
+    // Respect the locked vehicle family (set when a home card was tapped) so a
+    // category-B cargo like Hardware can't silently swap a Container for a Pickup.
+    const eligibleVehicles = data.vehicleLocked ? (() => {
+        const familyIds = new Set(getFamilyVehicles(data.vehicle).map(v => v.id));
+        const within = baseEligible.filter(v => familyIds.has(v.id));
+        return within.length > 0 ? within : baseEligible.filter(v => v.id === data.vehicle);
+    })() : baseEligible;
+    const activeVehicle = data.vehicle
+        ? (baseEligible.find(v => v.id === data.vehicle) || getVehicle(data.vehicle) || eligibleVehicles[0])
+        : eligibleVehicles[0];
     const displayPrice = data.price || 0;
-    const weightUnit = getWeightUnitLabel(data.vehicle);
+    const weightUnit = getWeightUnitLabel(activeVehicle?.id || data.vehicle);
 
     // Cash only available for Express (Standard = consolidated, M-Pesa only).
     const allowCash = data.serviceType !== 'Standard';
