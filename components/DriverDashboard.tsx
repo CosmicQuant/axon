@@ -5,6 +5,7 @@ import { VehicleType } from '../types';
 import { orderService } from '../services/orderService';
 import { orderApi } from '../services/orderApi';
 import { mapService } from '../services/mapService';
+import { matchesDriverVehicle } from '../services/vehicleCapabilities';
 import { storageService } from '../services/storageService';
 import { MapProvider, useMapState } from '@/context/MapContext';
 import { collection, query, where, onSnapshot, limit, doc, updateDoc } from 'firebase/firestore';
@@ -586,31 +587,38 @@ if (p && d) {
       }
      }, [hasActiveJob, isLoaded, setDriverCoords, setDriverBearing, activeJob?.id, activeJob?.status, activeJobCoords.pickup, activeJobCoords.dropoff, setRoutePolyline, setRouteDuration, setRouteDistance, setTotalRouteDuration, setTotalRouteDistance]);
 
-   // Normalize VehicleType enum display names to lowercase vehicle IDs used in orders
-   const normalizeVehicle = (vt?: string): string | null => {
-      if (!vt) return null;
-      const lower = vt.toLowerCase();
-      if (lower.includes('boda') || lower.includes('motorbike') || lower.includes('bike')) return 'boda';
-      if (lower.includes('tuk') || lower.includes('auto')) return 'tuktuk';
-      if (lower.includes('probox')) return 'probox';
-      if (lower.includes('van')) return 'van';
-      if (lower.includes('pickup')) return 'pickup';
-      if (lower.includes('lorry') || lower.includes('truck')) return 'lorry-5t';
-      if (lower.includes('trailer') || lower.includes('container')) return 'container-20ft';
-      // Already a lowercase ID
-      return lower;
-   };
+   // Resolve the driver's canonical vehicle id. Prefer the explicit `vehicleId`
+// captured at onboarding (a canonical tier id like 'truck-7t'); otherwise infer
+// from the legacy VehicleType enum string.
+const normalizeVehicle = (vt?: string): string | null => {
+   if (!vt) return null;
+   const lower = vt.toLowerCase();
+   if (lower.includes('boda') || lower.includes('motorbike') || lower.includes('bike')) return 'boda';
+   if (lower.includes('tuk') || lower.includes('auto')) return 'tuktuk';
+   if (lower.includes('probox')) return 'probox';
+   if (lower.includes('van')) return 'van';
+   if (lower.includes('pickup')) return 'pickup';
+   if (lower.includes('lorry') || lower.includes('truck')) return 'truck-7t';
+   if (lower.includes('trailer') || lower.includes('container')) return 'trailer-20ft';
+   // Already a lowercase ID or canonical tier id
+   return lower;
+};
 
-    const driverVehicleId = normalizeVehicle(user?.vehicleType);
+    const driverVehicleId = normalizeVehicle((user as any)?.vehicleId || user?.vehicleType);
 
-    // Single source of truth for vehicle matching (used in filter + disabled prop)
+    // Single source of truth for vehicle matching (used in filter + disabled prop).
+// Payload-aware: matches by family + the driver's declared payload covering the
+// order tier's upper bound. Drivers without declared payload fall back to
+// family-only matching. `standard` (consolidated) → any light carrier.
     const vehicleMatches = (order: DeliveryOrder): boolean => {
-       if (!driverVehicleId) return true;
-       const orderVehicle = String(order.vehicle || '').toLowerCase();
-       if (orderVehicle === 'standard') {
-          return ['boda', 'tuktuk', 'probox'].includes(driverVehicleId);
-       }
-       return orderVehicle === driverVehicleId;
+        if (!driverVehicleId) return true;
+        return matchesDriverVehicle(String(order.vehicle || ''), {
+            vehicleType: driverVehicleId,
+            payloadTonnes: (user as any)?.payloadTonnes,
+            gvwTonnes: (user as any)?.gvwTonnes,
+            tareTonnes: (user as any)?.tareTonnes,
+            axleCount: (user as any)?.axleCount,
+        });
     };
 
     // Filtered Orders Logic (memoized + null-safe) + proximity sort.

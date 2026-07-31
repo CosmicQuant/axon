@@ -187,8 +187,8 @@ const getBirdEyeSvg = (type: string): React.FC<{ size: number; accent: string }>
     if (t.includes('tipper')) return BirdEyeTruck;     // tipper body style
     if (t.includes('tanker')) return BirdEyeVan;        // tank body (rounded)
     if (t.includes('reefer')) return BirdEyeVan;      // insulated box body (rounded)
-    if (t.includes('container')) return BirdEyeTruck;  // skeletal trailer = box
-    // All other trucks: rigid-truck-*, semi-truck-*, canter, etc.
+    if (t.includes('container') || t.includes('trailer')) return BirdEyeTruck;  // skeletal trailer = box
+    // All other trucks: truck-3t/5t/7t/10t/15t, canter, etc.
     return BirdEyeTruck;
 };
 

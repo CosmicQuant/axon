@@ -126,6 +126,15 @@ export interface User {
   status?: 'active' | 'suspended' | 'pending';
   photoURL?: string;
   onboarded?: boolean;
+
+  // Vehicle spec — drivers/fleet partners capture the actual GVW, payload,
+  // tare, and axle count per KeNHA / EAC Vehicle Load Control Act. Drives
+  // payload-aware order matching (vehicleCapabilities.matchesDriverVehicle).
+  vehicleId?: string;       // canonical tier id (e.g. 'truck-7t')
+  payloadTonnes?: number;   // net cargo capacity (T)
+  gvwTonnes?: number;       // gross vehicle weight (T)
+  tareTonnes?: number;      // unladen weight (T)
+  axleCount?: number;       // number of axles
 }
 
 export interface SignupProfileDetails {
