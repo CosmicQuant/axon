@@ -68,15 +68,6 @@ export const VEHICLES: VehicleCapability[] = [
             cargoHazardous: false },
     },
     {
-        id: 'tuktuk', label: 'Cargo Tuk-Tuk', img: '/icons3d/auto_rickshaw.png',
-        accentText: 'text-yellow-500', accentBg: 'bg-yellow-500', accentBgLight: 'bg-yellow-50',
-        pricePerKm: 40, tier: 'light', family: 'boda', payloadTonnes: [0.05, 0.5],
-        constraints: { maxDist: 65, maxWeight: 500, maxStops: 3, allowedCats: ['A'],
-            weightUnit: 'kg', allowFragile: true, allowReturn: true,
-            allowAsap: true, allowScheduled: true, requiresHelpers: false, suggestedHelpers: 0,
-            cargoHazardous: false },
-    },
-    {
         id: 'probox', label: 'Probox', img: '/icons3d/automobile.png',
         accentText: 'text-violet-500', accentBg: 'bg-violet-500', accentBgLight: 'bg-violet-50',
         pricePerKm: 55, tier: 'medium', family: 'probox', payloadTonnes: [0.5, 1],
@@ -85,11 +76,21 @@ export const VEHICLES: VehicleCapability[] = [
             allowAsap: true, allowScheduled: true, requiresHelpers: false, suggestedHelpers: 0,
             cargoHazardous: false },
     },
+    // Van family — two payload tiers (legacy single van is split here).
     {
-        id: 'van', label: 'Cargo Van', img: '/icons3d/minibus.png',
+        id: 'van-1t', label: 'Van <1T', img: '/icons3d/minibus.png',
         accentText: 'text-sky-500', accentBg: 'bg-sky-500', accentBgLight: 'bg-sky-50',
-        pricePerKm: 75, tier: 'medium', family: 'van', payloadTonnes: [1, 1.5],
-        constraints: { maxDist: UNLIMITED, maxWeight: 1500, maxStops: 5, allowedCats: ['A', 'B'],
+        pricePerKm: 75, tier: 'medium', family: 'van', payloadTonnes: [0.5, 1],
+        constraints: { maxDist: UNLIMITED, maxWeight: 1000, maxStops: 5, allowedCats: ['A', 'B'],
+            weightUnit: 'kg', allowFragile: true, allowReturn: true,
+            allowAsap: true, allowScheduled: true, requiresHelpers: false, suggestedHelpers: 0,
+            cargoHazardous: false },
+    },
+    {
+        id: 'van-3t', label: 'Van 3T (1-3T)', img: '/icons3d/delivery_truck.png',
+        accentText: 'text-sky-600', accentBg: 'bg-sky-600', accentBgLight: 'bg-sky-100',
+        pricePerKm: 95, tier: 'medium', family: 'van', payloadTonnes: [1, 3],
+        constraints: { maxDist: UNLIMITED, maxWeight: 3000, maxStops: 5, allowedCats: ['A', 'B'],
             weightUnit: 'kg', allowFragile: true, allowReturn: true,
             allowAsap: true, allowScheduled: true, requiresHelpers: false, suggestedHelpers: 0,
             cargoHazardous: false },
@@ -246,7 +247,7 @@ export const VEHICLES: VehicleCapability[] = [
         constraints: { maxDist: UNLIMITED, maxWeight: 1500, maxStops: 5, allowedCats: ['A', 'B'],
             weightUnit: 'kg', allowFragile: true, allowReturn: true,
             allowAsap: true, allowScheduled: true, requiresHelpers: false, suggestedHelpers: 0,
-            cargoHazardous: false },
+            cargoHazardous: false, strictCargoFilter: true },
     },
     {
         id: 'reefer-truck-3t', label: 'Reefer Truck 3T (2-4T)', img: '/icons3d/delivery_truck.png',
@@ -255,7 +256,7 @@ export const VEHICLES: VehicleCapability[] = [
         constraints: { maxDist: UNLIMITED, maxWeight: 4, maxStops: 5, allowedCats: ['A', 'B'],
             weightUnit: 'tonnes', allowFragile: true, allowReturn: true,
             allowAsap: true, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 1,
-            cargoHazardous: false, allowConsolidated: false },
+            cargoHazardous: false, allowConsolidated: false, strictCargoFilter: true },
     },
     {
         id: 'reefer-truck-10t', label: 'Reefer Truck 10T', img: '/icons3d/articulated_lorry.png',
@@ -264,7 +265,7 @@ export const VEHICLES: VehicleCapability[] = [
         constraints: { maxDist: UNLIMITED, maxWeight: 10, maxStops: 3, allowedCats: ['B'],
             weightUnit: 'tonnes', allowFragile: true, allowReturn: true,
             allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 2,
-            cargoHazardous: false, allowConsolidated: false },
+            cargoHazardous: false, allowConsolidated: false, strictCargoFilter: true },
     },
 ];
 
