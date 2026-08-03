@@ -25,7 +25,7 @@ const calculateQuoteHandler = async (data, context) => {
         throw new functions.https.HttpsError('unauthenticated', 'You must be signed in to get a quote.');
     }
 
-    const { pickupCoords, dropoffCoords, waypoints = [], vehicle, serviceType, helpersCount = 0, isReturnTrip = false, isFragile = false, category = 'A', subCategory = '', payloadWeight } = data;
+    const { pickupCoords, dropoffCoords, waypoints = [], vehicle, serviceType, helpersCount = 0, isReturnTrip = false, isFragile = false, category = 'A', subCategory = '', payloadWeight, payloadWeightUnit } = data;
 
     if (!pickupCoords || !dropoffCoords || !vehicle) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing required coordinates or vehicle type.');
@@ -88,7 +88,8 @@ const calculateQuoteHandler = async (data, context) => {
     // ── Capability guard: validate (vehicle, category, distanceKm) against the
     // canonical capability map. Prevents spoofed API calls bypassing client UI.
     // Authoritative check (server is the only pricing/capability source per spec).
-    const capCheck = validateVehicleCapability({ vehicle, category, distanceKm, subCategory, payloadWeight });
+    // Forward the weight unit so toKg() inside the guard converts correctly.
+    const capCheck = validateVehicleCapability({ vehicle, category, distanceKm, subCategory, payloadWeight, payloadWeightUnit });
     if (!capCheck.ok) {
         throw new functions.https.HttpsError(
             'failed-precondition',
@@ -96,10 +97,24 @@ const calculateQuoteHandler = async (data, context) => {
         );
     }
 
+    // ── Normalise the cargo weight to kg for the Consolidated LTL branch.
+    // The client always sends the raw number + its unit (kg/tonnes/litres/m³).
+    // pricing.computePrice then auto-selects a truck tier from this kg value.
+    const toKg = (value, unit) => {
+        const v = Number(value) || 0;
+        if (unit === 'tonnes') return v * 1000;
+        if (unit === 'litres') return v * 0.84;     // petrol ≈ 0.84 kg/L
+        if (unit === 'm3')     return v * 1000;     // water ≈ 1000 kg/m³
+        return v;                                   // kg
+    };
+    const payloadWeightKg = payloadWeightUnit
+        ? toKg(payloadWeight, payloadWeightUnit)
+        : (Number(payloadWeight) || 0);
+
     const result = computePrice({
         distanceKm, durationMinutes, vehicle, serviceType,
         helpersCount, isReturnTrip, isFragile, stopCount,
-        isIntercity, category, subCategory
+        isIntercity, category, subCategory, payloadWeightKg
     });
     const finalPrice = result.price;
     const driverRate = Math.max(100, result.driverCut);
@@ -127,6 +142,7 @@ const calculateQuoteHandler = async (data, context) => {
         distanceKm: Number(distanceKm.toFixed(1)),
         durationMinutes: Number(durationMinutes.toFixed(1)),
         pricingModel: result.model,
+        consolidatedTruck: result.consolidatedTruck || undefined,
         isIntercity,
         breakdown: {
             baseFare: rates.base,

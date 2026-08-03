@@ -1,4 +1,11 @@
 // ── Disputes (lightweight, WhatsApp-supported resolution) ───────
+// Raise: customer/driver flags an in_transit/delivered order; status flips
+// to 'disputed' and the pre-dispute status is stashed on `dispute.previousStatus`.
+// Resolve: the party who raised it withdraws the dispute; status is restored
+// from `dispute.previousStatus` (fallback: deliveredAt ? 'delivered' : 'in_transit').
+// Both handlers use the shared v1 callable runtime; their invoker IAM must
+// remain public ('allUsers') so browsers can complete the CORS preflight — the
+// SDK supplies per-call auth via the Firebase ID token, not the invoker role.
 const functions = require('firebase-functions/v1');
 const admin = require('./admin');
 

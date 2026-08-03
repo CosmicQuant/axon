@@ -15,6 +15,17 @@ const toKg = (value, unit) => {
     return value;                                       // kg
 };
 
+// Specialised cargo → requires a dedicated vehicle. Mirrors pricing.js
+// SPECIALIZED_SUBCATEGORIES. Defined inline (no circular require) to keep
+// capabilities.js dependency-free.
+const SPECIALIZED_SUBCATEGORIES = [
+    'Loose Aggregate',
+    'LPG / Gas (Bulk)',
+    'Petroleum / Oil',
+    'Perishables / Cold Chain',
+];
+const isSpecializedBulk = (sub) => SPECIALIZED_SUBCATEGORIES.includes(sub);
+
 // Capability map (canonical id → capability bundle). Keep in sync with the
 // client constants.ts. Payload tiers replace the old axle-based taxonomy; legacy
 // ids are aliased in LEGACY_ALIASES so historical orders still resolve.
@@ -24,6 +35,8 @@ const VEHICLE_CAPABILITIES = {
     'tuktuk': { label: 'Cargo Tuk-Tuk', allowedCats: ['A'],     maxWeightKg: 500,  maxDistKm: 65,  weightUnit: 'kg' },
     'probox': { label: 'Probox',        allowedCats: ['A','B'], maxWeightKg: 1000, maxDistKm: 9999, weightUnit: 'kg' },
     'van':    { label: 'Cargo Van',     allowedCats: ['A','B'], maxWeightKg: 1500, maxDistKm: 9999, weightUnit: 'kg' },
+    'van-1t': { label: 'Van <1T',       allowedCats: ['A','B'], maxWeightKg: 1000, maxDistKm: 9999, weightUnit: 'kg' },
+    'van-3t': { label: 'Van 1-3T',      allowedCats: ['A','B'], maxWeightKg: 3000, maxDistKm: 9999, weightUnit: 'kg' },
     'pickup': { label: 'Pickup',        allowedCats: ['A','B'], maxWeightKg: 2000, maxDistKm: 9999, weightUnit: 'kg' },
     // Truck payload tiers
     'truck-3t':  { label: 'Truck 3T',  allowedCats: ['A','B'], maxWeightKg: 3000,  maxDistKm: 9999, weightUnit: 'tonnes' },
@@ -82,7 +95,8 @@ const normalizeVehicleId = (raw) => {
 
 // Family map derived from the canonical ids (mirrors client getVehicleFamily).
 const VEHICLE_FAMILY = {
-    'boda': 'boda', 'tuktuk': 'boda', 'probox': 'probox', 'van': 'van', 'pickup': 'pickup',
+    'boda': 'boda', 'tuktuk': 'boda', 'probox': 'probox',
+    'van': 'van', 'van-1t': 'van', 'van-3t': 'van', 'pickup': 'pickup',
     'truck-3t': 'truck', 'truck-5t': 'truck', 'truck-7t': 'truck', 'truck-10t': 'truck', 'truck-15t': 'truck',
     'trailer-20ft': 'trailer', 'trailer-40ft': 'trailer',
     'tipper-7t': 'tipper', 'tipper-14t': 'tipper', 'tipper-25t': 'tipper',
@@ -98,7 +112,8 @@ const getVehicleFamily = (raw) => {
 
 // Payload tier ranges (tonnes) for matching driver-declared payload capacity.
 const VEHICLE_PAYLOAD_TONNES = {
-    'boda': [0.01, 0.05], 'tuktuk': [0.05, 0.5], 'probox': [0.5, 1], 'van': [1, 1.5], 'pickup': [1, 2],
+    'boda': [0.01, 0.05], 'tuktuk': [0.05, 0.5], 'probox': [0.5, 1],
+    'van': [1, 1.5], 'van-1t': [0.5, 1], 'van-3t': [1, 3], 'pickup': [1, 2],
     'truck-3t': [2, 3.5], 'truck-5t': [4, 5.5], 'truck-7t': [6, 9], 'truck-10t': [10, 13], 'truck-15t': [14, 18],
     'trailer-20ft': [20, 25], 'trailer-40ft': [26, 34],
     'tipper-7t': [5, 8], 'tipper-14t': [10, 14], 'tipper-25t': [18, 25],
@@ -131,12 +146,16 @@ const matchesDriverVehicle = (orderVehicleId, driver) => {
 
 function validateVehicleCapability({ vehicle, category, distanceKm, subCategory, payloadWeight, payloadWeightUnit }) {
     const id = normalizeVehicleId(vehicle);
-    // 'standard' is a service-level pseudo-vehicle for Standard consolidated
-    // parcel deliveries. It doesn't exist in the physical vehicle map; pricing
-    // handles it separately. Only category-A (parcel) orders may use it.
+    // 'standard' is a service-level pseudo-vehicle for Standard Consolidated.
+    // It now covers both intra-city parcel batching (Cat A) and LTL bulk
+    // consolidation (general Cat B bulky: Electronics, Appliances, Furniture,
+    // Agricultural, Hardware/Construction) — the pricing engine
+    // (pricing.computePrice) auto-selects an LTL truck tier by weight.
+    // Specialised cargo (aggregate / LPG / petroleum / cold chain) requires a
+    // dedicated vehicle → reject here so the UI forces Express.
     if (id === 'standard') {
-        if (category && category !== 'A') {
-            return { ok: false, reason: 'Standard service is only available for parcel deliveries' };
+        if (isSpecializedBulk(subCategory)) {
+            return { ok: false, reason: `This cargo needs a dedicated vehicle — use Express instead of Standard.` };
         }
         return { ok: true };
     }
@@ -168,4 +187,6 @@ module.exports = {
     normalizeVehicleId,
     getVehicleFamily,
     matchesDriverVehicle,
+    isSpecializedBulk,
+    SPECIALIZED_SUBCATEGORIES,
 };

@@ -30,6 +30,10 @@ const TrackingPageContent: React.FC = () => {
     const lastRouteUpdate = React.useRef<number>(0);
     const lastSyncedOrderId = React.useRef<string>(''); // gate setMapCenter to first-load-per-order
     const lastFitBoundsStatus = React.useRef<string>(''); // gate fitBounds to status transitions only
+    // Per-order gate so the base pickup→dropoff polyline is computed at most once.
+    // Guarantees the customer ALWAYS sees a route line, even if the driver hasn't
+    // written fresh geometry and the throttled driver→nextstop upgrade fails/skips.
+    const baseRouteSetRef = React.useRef<string>('');
     const updateStatusMutation = useUpdateOrderStatus();
     const updateOrderMutation = useUpdateOrder();
 
@@ -99,53 +103,70 @@ const TrackingPageContent: React.FC = () => {
                     setWaypointCoords([]);
                 }
 
-                // ── Route display (bulletproof fallback chain) ──
-                // 1. Use the live route the driver dashboard writes on the order.
-                // 2. Recalculate from the driver's current position → remaining stops
-                //    (throttled) when there's no stored geometry.
-                // 3. Otherwise show the static pickup → dropoff route.
+                // ── Route display (guaranteed base line + live driver upgrade) ──
+                // The customer must ALWAYS see at least a pickup→dropoff line so the
+                // map is never just a lone pickup marker. Order of resolution:
+                //   1. Live route the driver writes on the order (routeGeometry).
+                //   2. One-shot base pickup→dropoff recalc per order (unthrottled) so a
+                //      visible line appears even if the driver hasn't moved or the
+                //      throttled upgrade is skipped.
+                //   3. Throttled driver→next-stop upgrade that overrides the base.
+                // MapLayer's dashed connector is the final safety net for API failure.
+                const baseWaypoints = order.stops
+                    ?.filter(s => s.type !== 'dropoff')
+                    .sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0))
+                    .map(s => ({ lat: s.lat, lng: s.lng })) || [];
+
                 const hasValidGeometry = typeof order.routeGeometry === 'string'
                     && order.routeGeometry.length > 10;
+
                 if (hasValidGeometry) {
                     setRoutePolyline(order.routeGeometry);
-                } else if (order.driverLocation) {
-                    const now = Date.now();
-                    if (now - lastRouteUpdate.current > 15000 || !lastRouteUpdate.current) {
-                        lastRouteUpdate.current = now;
+                    baseRouteSetRef.current = order.id; // live geometry already satisfies the base
+                } else {
+                    let upgraded = false;
 
-                        const remainingStops: { lat: number, lng: number }[] = [];
-                        if (order.status === 'driver_assigned' && p) remainingStops.push(p);
-                        if (order.stops && order.stops.length > 0) {
-                            order.stops
-                                .filter(s => s.status !== 'completed')
-                                .forEach(s => remainingStops.push({ lat: s.lat, lng: s.lng }));
-                        }
-                        const hasDropoffInStops = order.stops?.some(s => s.type === 'dropoff');
-                        if (!hasDropoffInStops && d && (order.status === 'in_transit' || order.status === 'driver_assigned')) {
-                            remainingStops.push(d);
-                        }
-                        if (remainingStops.length > 0) {
-                            const start = { lat: order.driverLocation.lat, lng: order.driverLocation.lng };
-                            const end = remainingStops[remainingStops.length - 1];
-                            const waypoints = remainingStops.slice(0, -1);
-                            const route = await mapService.getRoute(start, end, waypoints, order.vehicle);
-                            if (route && route.geometry) setRoutePolyline(route.geometry);
-                            else if (p && d) {
-                                // last resort: show pickup→dropoff even if driver route fails
-                                const r2 = await mapService.getRoute(p, d, [], order.vehicle);
-                                if (r2 && r2.geometry) setRoutePolyline(r2.geometry);
+                    // Throttled live driver→next-stop upgrade (once / 15s)
+                    if (order.driverLocation) {
+                        const now = Date.now();
+                        if (now - lastRouteUpdate.current > 15000 || !lastRouteUpdate.current) {
+                            lastRouteUpdate.current = now;
+
+                            const remainingStops: { lat: number, lng: number }[] = [];
+                            if (order.status === 'driver_assigned' && p) remainingStops.push(p);
+                            if (order.stops && order.stops.length > 0) {
+                                order.stops
+                                    .filter(s => s.status !== 'completed')
+                                    .forEach(s => remainingStops.push({ lat: s.lat, lng: s.lng }));
+                            }
+                            const hasDropoffInStops = order.stops?.some(s => s.type === 'dropoff');
+                            if (!hasDropoffInStops && d && (order.status === 'in_transit' || order.status === 'driver_assigned')) {
+                                remainingStops.push(d);
+                            }
+                            if (remainingStops.length > 0) {
+                                const start = { lat: order.driverLocation.lat, lng: order.driverLocation.lng };
+                                const end = remainingStops[remainingStops.length - 1];
+                                const waypoints = remainingStops.slice(0, -1);
+                                const route = await mapService.getRoute(start, end, waypoints, order.vehicle);
+                                if (route && route.geometry && route.geometry.length > 10) {
+                                    setRoutePolyline(route.geometry);
+                                    upgraded = true;
+                                }
                             }
                         }
                     }
-                } else if (p && d) {
-                        // No driver yet — always recalculate (no throttle needed)
-                        const waypoints = order.stops
-                            ?.filter(s => s.type !== 'dropoff')
-                            .sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0))
-                            .map(s => ({ lat: s.lat, lng: s.lng })) || [];
-                        const route = await mapService.getRoute(p, d, waypoints, order.vehicle, false);
-                        if (route) setRoutePolyline(route.geometry);
+
+                    // One-shot base pickup→dropoff line so the customer always sees a
+                    // route even before fresh live geometry arrives.
+                    if (!upgraded && p && d && baseRouteSetRef.current !== order.id) {
+                        const route = await mapService.getRoute(p, d, baseWaypoints, order.vehicle, false);
+                        if (route && route.geometry && route.geometry.length > 10) {
+                            setRoutePolyline(route.geometry);
+                        }
                     }
+                    // Mark the base attempt for this order so we never recompute it.
+                    baseRouteSetRef.current = order.id;
+                }
 
                 // Default to 'boda' when the order vehicle is unset (legacy orders
                 // with empty vehicle field) so the map never shows the Truck fallback.
@@ -382,13 +403,27 @@ const TrackingPageContent: React.FC = () => {
                     <p className="text-gray-500 font-bold text-sm mb-6">Your dispute has been recorded. Our team is reviewing it and will contact you via WhatsApp shortly. You can still resume live tracking any time.</p>
                     <button
                         onClick={async () => {
-                            try { await orderApi.resolveDispute(orderId as string); }
-                            catch (e: any) { showAlert('Could not resume', e?.message || 'Please try again.', 'error'); return; }
-                            navigate(user?.role === 'business' ? '/business-dashboard' : (user ? '/customer-dashboard' : '/'));
+                            setIsLoading(true);
+                            try {
+                                await orderApi.resolveDispute(orderId as string);
+                                // Don't navigate away — the order snapshot on this page
+                                // will flip disputed→in_transit/delivered and the live
+                                // tracking map re-renders automatically. Keep a short
+                                // fallback redirect in case the snapshot is slow.
+                                setTimeout(() => {
+                                    setIsLoading(false);
+                                    navigate(window.location.pathname + window.location.search, { replace: true });
+                                }, 4000);
+                            } catch (e: any) {
+                                setIsLoading(false);
+                                showAlert('Could not resume', e?.message || 'Please try again.', 'error');
+                            }
                         }}
-                        className="w-full bg-brand-600 text-white py-4 rounded-2xl font-black shadow-lg hover:bg-brand-700 transition-all mb-3"
+                        disabled={isLoading}
+                        className="w-full bg-brand-600 text-white py-4 rounded-2xl font-black shadow-lg hover:bg-brand-700 transition-all mb-3 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
-                        Resume Live Tracking
+                        {isLoading && <Loader className="w-5 h-5 animate-spin" />}
+                        {isLoading ? 'Resuming...' : 'Resume Live Tracking'}
                     </button>
                     <button
                         onClick={() => navigate(user?.role === 'business' ? '/business-dashboard' : (user ? '/customer-dashboard' : '/'))}

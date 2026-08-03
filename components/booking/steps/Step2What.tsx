@@ -1,8 +1,63 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Camera, ShieldCheck, AlertTriangle, X, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Camera, ShieldCheck, ShieldAlert, AlertTriangle, X, Loader2 } from 'lucide-react';
 import { useBooking } from '../BookingContext';
 import { allowsFragile, getWeightUnitLabel, getVehicle, getStrictSubcategories, getForcedCategory } from '../../../services/vehicleCapabilities';
+import type { WeightUnit } from '../constants';
+
+// ── Specialised Cat B cargo that requires a dedicated vehicle (tipper / tanker
+// / reefer). Under Standard Consolidated they're hidden so the customer can't
+// pick them and reach the server-side guard failure (which would zero out the
+// quote). Mirrors functions/lib/pricing.js SPECIALIZED_SUBCATEGORIES (kept here
+// so the booking UI never offers an unreachable combo).
+const SPECIALIZED_SUBCATEGORIES = [
+    'Loose Aggregate',
+    'LPG / Gas (Bulk)',
+    'Petroleum / Oil',
+    'Perishables / Cold Chain',
+];
+
+// Returns the subcategories visible for the current (serviceType, vehicle-lock)
+// combo. Standard Consolidated hides specialised Cat B (they force Express).
+// Specialised vehicles (strictCargoFilter) keep only their mapped cargo.
+const getVisibleCargo = (baseItems: any[], serviceType: string, strictSubs: string[] | null): any[] => {
+    let items = baseItems;
+    if (strictSubs && strictSubs.length > 0) {
+        items = items.filter((item: any) => strictSubs.includes(item.id));
+    } else if (serviceType === 'Standard') {
+        // Standard Consolidated handles all Cat A + general Cat B; specialised
+        // cargo (aggregate/LPG/petroleum/cold-chain) requires a dedicated vehicle
+        // and is never offered under Standard.
+        items = items.filter((item: any) => !SPECIALIZED_SUBCATEGORIES.includes(item.id));
+    }
+    return items;
+};
+
+// Client-side mirror of pricing.pickConsolidationTruck — purely informational:
+// gives the customer a "this will ride in a Truck 3T" hint under Standard LTL
+// without exposing the server pricing table. Real tier selection happens server-
+// side in functions/lib/pricing.js — keep this in lockstep.
+const pickConsolidationTruckLabel = (weightKg: number): string | null => {
+    const w = Number(weightKg) || 0;
+    if (w <= 0) return null;
+    if (w <= 3500)  return 'Truck 3T';
+    if (w <= 5500)  return 'Truck 5T';
+    if (w <= 9000)  return 'Truck 7T';
+    if (w <= 13000) return 'Truck 10T';
+    if (w <= 18000) return 'Truck 15T';
+    if (w <= 24000) return 'Trailer 20ft';
+    return 'Trailer 40ft';
+};
+
+// Convert a bulk cargo weight to kilograms given the customer's unit choice,
+// mirroring functions/lib/pricing.js toKg() so the chip matches the server's
+// tier decision exactly.
+const toKg = (value: number, unit: WeightUnit | undefined): number => {
+    if (unit === 'tonnes') return value * 1000;
+    if (unit === 'litres') return value * 0.84;
+    if (unit === 'm3') return value * 1000;
+    return value; // kg
+};
 
 export const Step2What = () => {
     const { data, updateData, nextStep, prevStep } = useBooking();
@@ -41,11 +96,15 @@ export const Step2What = () => {
             { id: 'Perishables / Cold Chain', label: 'Perishables / Cold Chain', desc: 'Refrigerated — food, pharma, flowers', img: '/icons3d/ice.png' },
             { id: 'LPG / Gas (Bulk)', label: 'LPG / Gas (Bulk)', desc: 'Tanker transport', img: '/icons3d/fuel_pump.png' },
             { id: 'Petroleum / Oil', label: 'Petroleum / Oil', desc: 'Liquid bulk', img: '/icons3d/oil_drum.png' },
-            { id: 'Loose Aggregate', label: 'Loose Aggregate', desc: 'Sand, gravel, ballast', img: '/icons3d/rock.png' }
+            { id: 'Loose Aggregate', label: 'Loose Aggregate', desc: 'Sand, gravel, ballast', img: '/icons3d/rock.png' },
+            // Custom bulk description — appears for both general and (when hidden
+            // by Standard filter) specialised flows. Always last so it reads like
+            // a fallback "tell us what it is" option.
+            { id: 'Custom', label: 'Custom Cargo', desc: 'Describe your bulky freight', img: '/icons3d/triangular_ruler.png' }
         ]
     };
 
-    const activeItems = subcategories[data.category as keyof typeof subcategories];
+    const activeItems = subcategories[data.category as keyof typeof subcategories] || [];
 
     // ── Auto-lock category + strict subcategory filter ──
     // If the pre-selected vehicle restricts allowedCats to one (e.g. tanker → B,
@@ -53,9 +112,10 @@ export const Step2What = () => {
     // vehicles (tippers/tankers), only show subcategories explicitly in the
     // CARGO_VEHICLE_MAP for that vehicle. Auto-select when only one option.
     const strictSubs = getStrictSubcategories(data.vehicle);
-    const visibleItems = strictSubs && strictSubs.length > 0
-        ? activeItems.filter((item: any) => strictSubs.includes(item.id))
-        : activeItems;
+    const visibleItems = useMemo(
+        () => getVisibleCargo(activeItems, data.serviceType, strictSubs),
+        [activeItems, data.serviceType, strictSubs]
+    );
 
     useEffect(() => {
         const forcedCat = getForcedCategory(data.vehicle);
@@ -70,9 +130,16 @@ export const Step2What = () => {
         } else if (subs && subs.length > 0 && data.subCategory && !subs.includes(data.subCategory)) {
             // Current subcategory not compatible with this vehicle → clear it
             updateData({ subCategory: '' });
+        } else if (data.serviceType === 'Standard'
+            && data.subCategory
+            && SPECIALIZED_SUBCATEGORIES.includes(data.subCategory)
+            && !(subs && subs.length > 0)) {
+            // User was on a specialised cargo then switched to Standard: clear it
+            // so we don't trip the server-side guard / zero out the quote.
+            updateData({ subCategory: '' });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [data.vehicle, data.category, data.subCategory]);
+    }, [data.vehicle, data.category, data.subCategory, data.serviceType]);
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -176,6 +243,96 @@ export const Step2What = () => {
                                         </div>
                                     );
                                 })}
+                            </div>
+                        )}
+
+                        {data.category === 'B' && (
+                            <div className="space-y-3 px-1">
+                                {/* Bulk weight + unit + insured + quantity — the consolidated LTL server
+                                    engine auto-selects the truck tier from this weight (kg-normalized). */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase">Total Weight</label>
+                                        <input
+                                            type="number"
+                                            inputMode="decimal"
+                                            placeholder="e.g. 900"
+                                            value={data.dimensions.weight}
+                                            onChange={e => updateData({ dimensions: { ...data.dimensions, weight: e.target.value } })}
+                                            className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase">Unit</label>
+                                        <select
+                                            value={data.quantityUnit || 'kg'}
+                                            onChange={e => updateData({ quantityUnit: e.target.value as WeightUnit })}
+                                            className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all"
+                                        >
+                                            <option value="kg">kilograms (kg)</option>
+                                            <option value="tonnes">tonnes (T)</option>
+                                            <option value="litres">litres (L)</option>
+                                            <option value="m3">cubic metres (m³)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase">Quantity</label>
+                                        <input
+                                            type="number"
+                                            inputMode="numeric"
+                                            min={1}
+                                            value={data.quantity ?? 1}
+                                            onChange={e => updateData({ quantity: Math.max(1, parseInt(e.target.value) || 1) })}
+                                            className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1">
+                                            <ShieldCheck size={10} className="text-blue-500" /> Insured?
+                                        </label>
+                                        <button
+                                            onClick={() => updateData({ isInsured: !data.isInsured })}
+                                            className={`w-full py-2.5 rounded-lg border text-xs font-bold flex items-center justify-center gap-2 transition-all ${data.isInsured ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-500'}`}
+                                        >
+                                            <div className={`w-3 h-3 rounded-full ${data.isInsured ? 'bg-blue-500 animate-pulse' : 'bg-gray-200'}`} />
+                                            {data.isInsured ? 'Insured' : 'Not insured'}
+                                        </button>
+                                    </div>
+                                </div>
+                                {/* Custom cargo description — required when the user picked
+                                    the "Custom" subcategory (general or specialised flow). */}
+                                {(data.subCategory === 'Custom') && (
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1">
+                                            <ShieldAlert size={10} className="text-amber-500" /> Describe this cargo
+                                        </label>
+                                        <textarea
+                                            placeholder="e.g. 10×90kg sacks of Irish potatoes, packed on pallets, keep dry"
+                                            value={data.customCargoDesc || ''}
+                                            onChange={e => updateData({ customCargoDesc: e.target.value })}
+                                            className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all min-h-[64px]"
+                                        />
+                                    </div>
+                                )}
+                                {/* Vehicle-for-weight chip — only under Standard Consolidated LTL.
+                                    Reads the cargo weight + unit, maps it to a truck tier (Client mirror
+                                    of pricing.pickConsolidationTruck) so the customer knows which shared
+                                    truck will be allocated before the quote runs. */}
+                                {data.serviceType === 'Standard' && data.subCategory !== '' && data.subCategory !== 'Custom' && (() => {
+                                    const weightKg = toKg(parseFloat(data.dimensions.weight) || 0, data.quantityUnit);
+                                    const tierLabel = pickConsolidationTruckLabel(weightKg);
+                                    if (!tierLabel) return null;
+                                    return (
+                                        <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5 text-emerald-800">
+                                            <ShieldCheck size={14} className="text-emerald-600" />
+                                            <p className="text-[11px] font-bold leading-tight">
+                                                Consolidated in a shared <span className="font-black">{tierLabel}</span> truck ({Math.round(weightKg).toLocaleString()} kg payload)
+                                            </p>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         )}
 

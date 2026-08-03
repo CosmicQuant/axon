@@ -9,6 +9,9 @@ const VEHICLE_RATES = {
     'tuktuk': { base: 180, perKm: 35, perMin: 3, stopFee: 50, min: 180 },
     'probox': { base: 500, perKm: 50, perMin: 8, stopFee: 80, min: 500 },
     'van': { base: 800, perKm: 65, perMin: 12, stopFee: 120, min: 800 },
+    // Van family split (legacy single 'van' kept above for historical orders).
+    'van-1t': { base: 600, perKm: 55, perMin: 10, stopFee: 100, min: 600 },
+    'van-3t': { base: 850, perKm: 70, perMin: 12, stopFee: 120, min: 850 },
     'pickup': { base: 1000, perKm: 75, perMin: 14, stopFee: 150, min: 1000 },
 
     // Medium trucks
@@ -113,6 +116,8 @@ const VEHICLE_FUEL = {
     'tuktuk':    { energy: 'petrol',   lPerKm: 0.06,  fuel: 'petrol' },
     'probox':    { energy: 'petrol',   lPerKm: 0.08,  fuel: 'petrol' },
     'van':       { energy: 'diesel',   lPerKm: 0.10,  fuel: 'diesel' },
+    'van-1t':    { energy: 'diesel',   lPerKm: 0.08,  fuel: 'diesel' },
+    'van-3t':    { energy: 'diesel',   lPerKm: 0.11,  fuel: 'diesel' },
     'pickup':    { energy: 'diesel',   lPerKm: 0.12,  fuel: 'diesel' },
     'canter':    { energy: 'diesel',   lPerKm: 0.18,  fuel: 'diesel' },
     'lorry-5t':  { energy: 'diesel',   lPerKm: 0.22,  fuel: 'diesel' },
@@ -180,6 +185,34 @@ const BULK_SUBCATEGORIES = [
     'Hardware / Construction', 'Agricultural', 'LPG / Gas (Bulk)',
     'Petroleum / Oil', 'Loose Aggregate', 'Perishables / Cold Chain',
 ];
+
+// ── Specialised cargo → must use a dedicated vehicle (Express). Standard
+// Consolidated cannot carry them because the truck is shared with other
+// shippers' freight that the dedicated cargo would damage/contaminate.
+const SPECIALIZED_SUBCATEGORIES = [
+    'Loose Aggregate',     // tipper-only
+    'LPG / Gas (Bulk)',    // pressurised tanker
+    'Petroleum / Oil',     // fuel tanker
+    'Perishables / Cold Chain', // reefer
+];
+const isSpecializedBulk = (sub) => SPECIALIZED_SUBCATEGORIES.includes(sub);
+
+// ── Pick the LTL truck tier for a consolidated shipment from its weight in kg.
+// Covers everything from a single 90kg ag sack up to ~18T of furniture. Cargo
+// heavier than the truck tier bounds still gets a consolidated share but is
+// upsized to a trailer rate — never blocks the quote. No weight cap: Standard
+// Consolidated is full LTL support (Nairobi–Mombasa heavy furniture, tonnes
+// of produce, etc.) and the truck tier is auto-selected by payload size.
+const pickConsolidationTruck = (weightKg) => {
+    const w = Number(weightKg) || 0;
+    if (w <= 3500)  return 'truck-3t';        // up to ~3T (most common LTL)
+    if (w <= 5500)  return 'truck-5t';
+    if (w <= 9000)  return 'truck-7t';
+    if (w <= 13000) return 'truck-10t';
+    if (w <= 18000) return 'truck-15t';
+    if (w <= 24000) return 'trailer-20ft';
+    return 'trailer-40ft';                  // very heavy consolidated freight
+};
 
 // Google Maps API key for server-side Routes API calls
 const GOOGLE_MAPS_KEY = process.env.GOOGLE_MAPS_KEY || '';
@@ -274,11 +307,15 @@ async function getRouteFromGoogleV2(origin, destination, waypoints = [], vehicle
 }
 
 // ── UNIFIED PRICE FORMULA (v2) ─────────────────────────────────
-// Three pricing models:
-//   1. intercity_flat   — parcel tiers, flat KES between supported towns
-//   2. intra_city       — fuel-aware formula (Standard = consolidated electric boda, Express = on-demand)
-//   3. bulk             — distance × vehicle rates for heavy / specialised cargo
-function computePrice({ distanceKm, durationMinutes, vehicle, serviceType, helpersCount = 0, isReturnTrip = false, isFragile = false, stopCount = 0, isIntercity = false, category = 'A', subCategory = '' }) {
+// Four pricing models:
+//   1. intercity_flat      — parcel tiers, flat KES between supported towns
+//   2. consolidated_ltl    — Standard Consolidated LTL freight (Cat B general
+//                            bulky cargo in a shared truck; tier by weight ×
+//                            CONSOLIDATION_DISCOUNT). No weight cap.
+//   3. intra_city          — fuel-aware formula (Standard = consolidated parcel;
+//                            Express = on-demand). Cat A parcels only.
+//   4. bulk                — distance × vehicle rates for heavy / dedicated cargo
+function computePrice({ distanceKm, durationMinutes, vehicle, serviceType, helpersCount = 0, isReturnTrip = false, isFragile = false, stopCount = 0, isIntercity = false, category = 'A', subCategory = '', payloadWeightKg = 0 }) {
     const rates = VEHICLE_RATES[vehicle] || VEHICLE_RATES['boda'];
     const fuel = VEHICLE_FUEL[vehicle] || VEHICLE_FUEL['boda'];
     const isBulk = category === 'B' || BULK_SUBCATEGORIES.includes(subCategory);
@@ -297,7 +334,35 @@ function computePrice({ distanceKm, durationMinutes, vehicle, serviceType, helpe
         return { price: round10(Math.max(price, INTERCITY_FLAT_PRICES.small)), driverCut, model: 'intercity_flat' };
     }
 
-    // ── 3. Bulk / specialised cargo (inter-city or intra-city) ─
+    // ── 2. Standard Consolidated LTL (shared truck, general bulky cargo) ──
+    // Standard + general Cat B bulk = less-than-truckload freight. The customer's
+    // share rides in a shared truck; the consolidated discount (0.55) is applied
+    // to the LTL truck rate auto-picked from cargo weight. No weight cap — from
+    // a few kg up to ~18T (truck-15t) and beyond (trailer share). Specialised
+    // cargo (aggregate/LPG/petroleum/cold-chain) is rejected upstream by the
+    // capability guard, so it never reaches this branch.
+    if (serviceType === 'Standard' && isBulk && !isSpecializedBulk(subCategory)) {
+        const weightKg = Number(payloadWeightKg) || 0;
+        const tierVehicle = pickConsolidationTruck(weightKg);
+        const tierRates = VEHICLE_RATES[tierVehicle] || VEHICLE_RATES['truck-10t'];
+        const billableKm = Math.max(0, distanceKm - 2);
+        // Shared truck: stops are subsidised between shippers.
+        const extraStopFee = Math.max(0, stopCount) * tierRates.stopFee * 0.3;
+        const intercitySurcharge = isIntercity ? (tierRates.base * 0.2) : 0;
+
+        let total = tierRates.base + (billableKm * tierRates.perKm) + extraStopFee + intercitySurcharge;
+        total *= CONSOLIDATION_DISCOUNT;
+        if (isReturnTrip) total *= RETURN_TRIP_MULTIPLIER;
+        total += helpersCount * HELPER_FEE;
+        if (isFragile) total += FRAGILE_SURCHARGE;
+        // Modest LTL floor (~2× the intra-city parcel minimum) protects against
+        // tiny-distance undercharging on consolidated freight.
+        total = Math.max(total, MIN_INTRA_CITY * 2);
+        const driverCut = Math.round(total * 0.7);
+        return { price: round10(total), driverCut, model: 'consolidated_ltl', consolidatedTruck: tierVehicle };
+    }
+
+    // ── 4. Bulk / specialised cargo (inter-city or intra-city) ─
     if (isBulk) {
         const billableKm = Math.max(0, distanceKm - 2);
         const extraStopFee = Math.max(0, stopCount) * rates.stopFee;
@@ -312,7 +377,7 @@ function computePrice({ distanceKm, durationMinutes, vehicle, serviceType, helpe
         return { price: round10(total), driverCut, model: 'bulk' };
     }
 
-    // ── 2. Intra-city parcels (fuel-aware) ─────────────────────
+    // ── 3. Intra-city parcels (fuel-aware) ─────────────────────
     const fuelCost = fuel.energy === 'electric'
         ? distanceKm * fuel.kwhPerKm * POWER_TARIFF
         : distanceKm * fuel.lPerKm * (fuel.fuel === 'diesel' ? FUEL_PRICE_DIESEL : FUEL_PRICE_PETROL);
@@ -366,6 +431,9 @@ module.exports = {
     PARCEL_TIERS,
     INTERCITY_FLAT_PRICES,
     BULK_SUBCATEGORIES,
+    SPECIALIZED_SUBCATEGORIES,
+    isSpecializedBulk,
+    pickConsolidationTruck,
     GOOGLE_MAPS_KEY,
     SUPPORTED_TOWNS,
     haversineKm,

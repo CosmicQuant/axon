@@ -706,12 +706,15 @@ const normalizeVehicle = (vt?: string): string | null => {
           setLoading(false);
        });
 
-        // 2. Listen for My Jobs (active + delivered + reviewed, all-in-one)
-        // Sorting/splitting active vs completed is handled in render.
-        const qJobs = query(collection(db, 'orders'),
-           where('driver.id', '==', user.id),
-           where('status', 'in', ['driver_assigned', 'arriving_pickup', 'in_transit', 'delivered', 'reviewed'])
-        );
+// 2. Listen for My Jobs (active + delivered + reviewed, all-in-one).
+         // 'disputed' MUST be included so an order under review stays visible in
+         // the driver's portal — otherwise the moment a customer raises a dispute
+         // the job vanishes from the driver's active list with no way to recover.
+         // Sorting/splitting active vs completed is handled in render.
+         const qJobs = query(collection(db, 'orders'),
+            where('driver.id', '==', user.id),
+            where('status', 'in', ['driver_assigned', 'arriving_pickup', 'in_transit', 'disputed', 'delivered', 'reviewed'])
+         );
         const unsubJobs = onSnapshot(qJobs, async (snapshot) => {
            const jobs = snapshot.docs.map(doc => ({ ...doc.data() as any, id: doc.id } as DeliveryOrder));
            const uniqueJobs = jobs.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
@@ -2328,13 +2331,17 @@ const closeVerificationModal = () => {
                         </button>
 
                         <div className="flex items-center justify-between mb-4">
-                           <div className="flex items-center space-x-2">
-                              <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border shadow-sm ${activeJob.status === 'in_transit'
-                                 ? 'bg-emerald-500 text-white border-emerald-400'
-                                 : 'bg-brand-600 text-white border-brand-500'
-                                 }`}>
-                                 {activeJob.status === 'driver_assigned' || activeJob.status === 'arriving_pickup' ? 'Heading to Pickup' : 'Delivering'}
-                              </span>
+<div className="flex items-center space-x-2">
+                               <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border shadow-sm ${activeJob.status === 'disputed'
+                                  ? 'bg-orange-500 text-white border-orange-400'
+                                  : activeJob.status === 'in_transit'
+                                     ? 'bg-emerald-500 text-white border-emerald-400'
+                                     : 'bg-brand-600 text-white border-brand-500'
+                                  }`}>
+                                  {activeJob.status === 'disputed'
+                                     ? 'Dispute Under Review'
+                                     : (activeJob.status === 'driver_assigned' || activeJob.status === 'arriving_pickup' ? 'Heading to Pickup' : 'Delivering')}
+                               </span>
                               {routeDuration !== null && (
                                  <span className="bg-emerald-500 text-white text-sm font-black px-3 py-1.5 rounded-xl flex items-center shadow-lg border border-emerald-400 animate-pulse">
                                     <Clock className="w-4 h-4 mr-1.5" /> {Math.ceil(routeDuration / 60)} MINS
@@ -2377,11 +2384,23 @@ const closeVerificationModal = () => {
                                  </div>
                               </div>
 
-                              <div className="space-y-6 relative max-h-80 overflow-y-auto pr-2 no-scrollbar py-2">
-                                 {/* Connecting Line */}
-                                 <div className="absolute left-[11px] top-4 bottom-4 w-0.5 bg-gray-100"></div>
+<div className="space-y-6 relative max-h-80 overflow-y-auto pr-2 no-scrollbar py-2">
+                                  {/* Connecting Line */}
+                                  <div className="absolute left-[11px] top-4 bottom-4 w-0.5 bg-gray-100"></div>
 
-                                 {allStops.map((stop, idx) => (
+                                  {activeJob.status === 'disputed' && (
+                                     <div className="mb-4 p-4 rounded-2xl bg-orange-50 border border-orange-200 flex items-start space-x-3">
+                                        <AlertTriangle className="w-5 h-5 text-orange-500 flex-shrink-0 mt-0.5" />
+                                        <div>
+                                           <p className="text-sm font-black text-orange-700">Dispute Under Review</p>
+                                           <p className="text-xs font-medium text-orange-600 mt-0.5 leading-snug">
+                                              This job is paused while a dispute is reviewed. You'll be able to resume once the customer withdraws it.
+                                           </p>
+                                        </div>
+                                     </div>
+                                  )}
+
+                                  {allStops.map((stop, idx) => (
                                     <div key={stop.id} className="relative flex items-start space-x-4 group z-10">
                                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-300 shadow-sm ${stop.status === 'completed'
                                           ? 'bg-emerald-500 border-emerald-500'
@@ -2436,25 +2455,25 @@ const closeVerificationModal = () => {
                                      </button>
                                   )}
 
-                                 {nextStop && nextStop.id !== 'pickup-start' && nextStop.id !== 'dropoff-end' && (
-                                    <button
-                                       onClick={() => handleUpdateStopStatus(activeJob.id, nextStop.id, 'completed')}
-                                       className="col-span-2 w-full bg-brand-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-sm hover:bg-brand-700 transition-all shadow-xl shadow-brand-500/20 flex items-center justify-center space-x-3"
-                                    >
-                                       <CheckCircle className="w-5 h-5" />
-                                       <span>Complete Waystop</span>
-                                    </button>
-                                 )}
+{nextStop && nextStop.id !== 'pickup-start' && nextStop.id !== 'dropoff-end' && activeJob.status !== 'disputed' && (
+                                     <button
+                                        onClick={() => handleUpdateStopStatus(activeJob.id, nextStop.id, 'completed')}
+                                        className="col-span-2 w-full bg-brand-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-sm hover:bg-brand-700 transition-all shadow-xl shadow-brand-500/20 flex items-center justify-center space-x-3"
+                                     >
+                                        <CheckCircle className="w-5 h-5" />
+                                        <span>Complete Waystop</span>
+                                     </button>
+                                  )}
 
-                                 {nextStop?.id === 'dropoff-end' && (
-                                    <button
-                                       onClick={() => handleUpdateStatus(activeJob.id, 'delivered')}
-                                       className="col-span-2 w-full bg-emerald-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-sm hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 flex items-center justify-center space-x-3"
-                                    >
-                                       <CheckCircle className="w-5 h-5" />
-                                       <span>Final Delivery Complete</span>
-                                    </button>
-                                 )}
+                                 {nextStop?.id === 'dropoff-end' && activeJob.status !== 'disputed' && (
+                                     <button
+                                        onClick={() => handleUpdateStatus(activeJob.id, 'delivered')}
+                                        className="col-span-2 w-full bg-emerald-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-sm hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 flex items-center justify-center space-x-3"
+                                     >
+                                        <CheckCircle className="w-5 h-5" />
+                                        <span>Final Delivery Complete</span>
+                                     </button>
+                                  )}
                                   <button
                                      onClick={() => { if (activeJob?.recipient?.phone) window.open(`tel:${activeJob.recipient.phone}`); }}
                                      className="flex items-center justify-center py-3 bg-gray-100 text-gray-900 rounded-xl font-bold hover:bg-gray-200 border border-gray-200"

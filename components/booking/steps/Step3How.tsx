@@ -113,7 +113,11 @@ export const Step3How = () => {
                     isFragile: data.isFragile || false,
                     category: data.category,
                     subCategory: data.subCategory,
-                    payloadWeight: parseFloat(data.dimensions.weight) || 0
+                    // Bulk cargo weights are entered in the unit the customer picked
+                    // (kg/tonnes/litres) — forward it so the server LTL engine
+                    // normalizes to kg before picking the consolidated truck tier.
+                    payloadWeight: parseFloat(data.dimensions.weight) || 0,
+                    payloadWeightUnit: data.quantityUnit || 'kg'
                 });
 
                 if (requestId !== quoteRequestRef.current) return;

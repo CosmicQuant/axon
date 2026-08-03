@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
+import type { WeightUnit } from './constants';
 
 export type Category = 'A' | 'B' | 'C';
 export type ServiceType = 'Express' | 'Standard';
@@ -32,6 +33,17 @@ export interface BookingState {
     isFragile?: boolean;
     handlingNotes?: string;
     isReturnTrip?: boolean;
+    // Bulk cargo capture (Category B) — captured alongside the existing
+    // `dimensions.weight` so the Step5 receipt + server LTL pricing know the
+    // cargo's true payload. `quantity` = number of items, `quantityUnit` =
+    // weight unit the customer chose (kg/tonnes/litres), `isInsured` flags
+    // insured freight, `customCargoDesc` describes the cargo when the user
+    // picked a "Custom" subcategory (both Cat A "Custom Dimensions" and Cat B
+    // "Custom").
+    quantity?: number;
+    quantityUnit?: WeightUnit;
+    isInsured?: boolean;
+    customCargoDesc?: string;
     // Enterprise Pricing Fields
     quoteId?: string;
     price?: number;
@@ -53,7 +65,12 @@ export const INITIAL_STATE: BookingState = {
     paymentMethod: 'M-Pesa', paymentPhone: '0712345678',
     isScheduled: false, pickupTime: '',
     helpersCount: 0,
-    isReturnTrip: false
+    isReturnTrip: false,
+    // Bulk cargo defaults — updated by Step2 bulk capture / Cat A defaults.
+    quantity: 1,
+    quantityUnit: 'kg',
+    isInsured: false,
+    customCargoDesc: ''
 };
 
 interface BookingContextType {
