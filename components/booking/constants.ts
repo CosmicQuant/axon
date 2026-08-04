@@ -247,7 +247,7 @@ export const VEHICLES: VehicleCapability[] = [
         constraints: { maxDist: UNLIMITED, maxWeight: 1500, maxStops: 5, allowedCats: ['A', 'B'],
             weightUnit: 'kg', allowFragile: true, allowReturn: true,
             allowAsap: true, allowScheduled: true, requiresHelpers: false, suggestedHelpers: 0,
-            cargoHazardous: false, strictCargoFilter: true },
+            cargoHazardous: false, allowConsolidated: false, strictCargoFilter: true },
     },
     {
         id: 'reefer-truck-3t', label: 'Reefer Truck 3T (2-4T)', img: '/icons3d/delivery_truck.png',
