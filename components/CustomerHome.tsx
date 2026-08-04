@@ -358,12 +358,11 @@ const CustomerHome: React.FC = () => {
                         </div>
 
                         {/* 4-column mid-tier vehicles — glass cards + 3D icons */}
-                        <div className="grid grid-cols-4 gap-1.5">
+                        <div className="grid grid-cols-3 gap-1.5">
                             {[
                                 { v: 'pickup', label: 'Pickup', img: '/icons3d/pickup_truck.png', ring: 'ring-teal-200/70', bg: 'bg-teal-50/80' },
                                 { v: 'probox', label: 'Probox', img: '/icons3d/automobile.png', ring: 'ring-violet-200/70', bg: 'bg-violet-50/80' },
-                                { v: 'van-3t', label: 'Van', img: '/icons3d/delivery_truck.png', ring: 'ring-sky-200/70', bg: 'bg-sky-50/80' },
-                                { v: 'van-1t', label: 'Van <1T', img: '/icons3d/minibus.png', ring: 'ring-sky-300/70', bg: 'bg-sky-100/80' },
+                                { v: 'van-1t', label: 'Van', img: '/icons3d/delivery_truck.png', ring: 'ring-sky-200/70', bg: 'bg-sky-50/80' },
                             ].map(t => (
                                 <button key={t.v} onClick={() => handleQuickAction({ vehicle: t.v, vehicleLocked: true })} className={`group ${t.bg} backdrop-blur-sm rounded-2xl p-1.5 pt-2 text-center shadow-sm ring-1 ${t.ring} hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200`}>
                                     <img src={t.img} alt={t.label} className="w-7 h-7 object-contain mx-auto mb-0.5 drop-shadow-sm group-hover:scale-110 transition-transform duration-300" />

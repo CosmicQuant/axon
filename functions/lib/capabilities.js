@@ -67,7 +67,7 @@ const VEHICLE_CAPABILITIES = {
 const LEGACY_ALIASES = {
     'boda boda': 'boda', 'bodaboda': 'boda', 'motorbike': 'boda', 'motorcycle': 'boda',
     'tuk-tuk': 'tuktuk', 'tuk tuk': 'tuktuk', 'auto rickshaw': 'tuktuk',
-    'cargo van': 'van',
+    'cargo van': 'van-3t', 'van': 'van-3t',
     'pickup truck': 'pickup', 'pick-up': 'pickup',
     'canter': 'truck-3t',
     'lorry': 'truck-7t', 'lorry-5t': 'truck-5t', 'lorry-7t': 'truck-7t',

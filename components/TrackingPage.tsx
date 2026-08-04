@@ -8,7 +8,7 @@ import { Loader, XCircle, Navigation, ArrowLeft, Search, AlertCircle, Clock, Ale
 import { doc, onSnapshot, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { DeliveryOrder } from '../types';
-import { MapProvider, useMapState } from '@/context/MapContext';
+import { useMapState } from '@/context/MapContext';
 import { mapService } from '@/services/mapService';
 import { orderApi } from '../services/orderApi';
 
@@ -180,22 +180,26 @@ const TrackingPageContent: React.FC = () => {
                         setDriverBearing(order.driverLocation.bearing);
                     }
 
-                    // Once the driver is located, keep the customer map locked on
-                    // the driver at navigation zoom level (same follow mode as driver app).
-                    setCameraMode('follow');
+                    // IMPORTANT: customer-facing tracking uses 'overview' mode, not
+                    // the nav-tight 'follow' mode. Overview keeps the whole
+                    // pickup→dropoff→driver route visible at once. Follow mode snaps
+                    // to DRIVER_FOLLOW_ZOOM (~18) which would hide the dropoff and
+                    // most of the route when the driver is near the pickup.
+                    setCameraMode('overview');
 
-                    // Fit bounds to include driver and their current destination —
-                    // BUT only on status transitions, not every Firestore snapshot.
-                    // Repeated fitBounds on every location update fights the follow-mode camera.
+                    // Always fit bounds to the full route so the customer sees
+                    // every point: driver + pickup + remaining stops + dropoff.
+                    // Gated to status transitions so it doesn't fight overview mode
+                    // on every Firestore snapshot.
                     const statusChanged = lastFitBoundsStatus.current !== order.status;
                     if (statusChanged) {
-                        const allRemaining: Array<{ lat: number; lng: number }> = [driverPos];
-                        if (order.status === 'driver_assigned' && p) allRemaining.push(p);
+                        const all: Array<{ lat: number; lng: number }> = [driverPos];
+                        if (order.status === 'driver_assigned' && p) all.push(p);
                         if (order.stops && order.stops.length > 0) {
-                            order.stops.filter(s => s.status !== 'completed').forEach(s => allRemaining.push({ lat: s.lat, lng: s.lng }));
+                            order.stops.filter(s => s.status !== 'completed').forEach(s => all.push({ lat: s.lat, lng: s.lng }));
                         }
-                        if (d && (order.status === 'in_transit' || order.status === 'driver_assigned')) allRemaining.push(d);
-                        if (allRemaining.length > 1) fitBounds(allRemaining);
+                        if (d && (order.status === 'in_transit' || order.status === 'driver_assigned')) all.push(d);
+                        if (all.length > 1) fitBounds(all);
                     }
                     lastFitBoundsStatus.current = order.status;
                 } else if (p && d && lastFitBoundsStatus.current !== 'no-driver') {
@@ -482,11 +486,14 @@ const TrackingPageContent: React.FC = () => {
 };
 
 const TrackingPage: React.FC = () => {
-    return (
-        <MapProvider>
-            <TrackingPageContent />
-        </MapProvider>
-    );
+    // IMPORTANT: do NOT wrap TrackingPageContent in a nested <MapProvider>.
+    // The global <MapLayer/> rendered by App.tsx reads from the SINGLE
+    // top-level MapProvider that wraps the whole app. A nested provider here
+    // would shadow it — setPickupCoords/setDropoffCoords/setRoutePolyline
+    // would update this nested context, but the global MapLayer could not see
+    // them, so customers would never see pickup/dropoff markers or the route
+    // polyline on the map. Reuse the outer provider instead.
+    return <TrackingPageContent />;
 };
 
 export default TrackingPage;

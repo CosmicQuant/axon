@@ -65,7 +65,7 @@ export const VEHICLES: VehicleCapability[] = [
         constraints: { maxDist: 65, maxWeight: 50, maxStops: 2, allowedCats: ['A'],
             weightUnit: 'kg', allowFragile: false, allowReturn: true,
             allowAsap: true, allowScheduled: true, requiresHelpers: false, suggestedHelpers: 0,
-            cargoHazardous: false },
+            cargoHazardous: false, strictCargoFilter: true },
     },
     {
         id: 'probox', label: 'Probox', img: '/icons3d/automobile.png',
@@ -74,7 +74,7 @@ export const VEHICLES: VehicleCapability[] = [
         constraints: { maxDist: UNLIMITED, maxWeight: 1000, maxStops: 5, allowedCats: ['A', 'B'],
             weightUnit: 'kg', allowFragile: true, allowReturn: true,
             allowAsap: true, allowScheduled: true, requiresHelpers: false, suggestedHelpers: 0,
-            cargoHazardous: false },
+            cargoHazardous: false, strictCargoFilter: true },
     },
     // Van family — two payload tiers (legacy single van is split here).
     {
@@ -84,16 +84,16 @@ export const VEHICLES: VehicleCapability[] = [
         constraints: { maxDist: UNLIMITED, maxWeight: 1000, maxStops: 5, allowedCats: ['A', 'B'],
             weightUnit: 'kg', allowFragile: true, allowReturn: true,
             allowAsap: true, allowScheduled: true, requiresHelpers: false, suggestedHelpers: 0,
-            cargoHazardous: false },
+            cargoHazardous: false, strictCargoFilter: true },
     },
     {
-        id: 'van-3t', label: 'Van 3T (1-3T)', img: '/icons3d/delivery_truck.png',
+        id: 'van-3t', label: 'Van 1-3T', img: '/icons3d/delivery_truck.png',
         accentText: 'text-sky-600', accentBg: 'bg-sky-600', accentBgLight: 'bg-sky-100',
         pricePerKm: 95, tier: 'medium', family: 'van', payloadTonnes: [1, 3],
         constraints: { maxDist: UNLIMITED, maxWeight: 3000, maxStops: 5, allowedCats: ['A', 'B'],
             weightUnit: 'kg', allowFragile: true, allowReturn: true,
             allowAsap: true, allowScheduled: true, requiresHelpers: false, suggestedHelpers: 0,
-            cargoHazardous: false },
+            cargoHazardous: false, strictCargoFilter: true },
     },
     {
         id: 'pickup', label: 'Pickup', img: '/icons3d/pickup_truck.png',
@@ -102,7 +102,7 @@ export const VEHICLES: VehicleCapability[] = [
         constraints: { maxDist: UNLIMITED, maxWeight: 2000, maxStops: 5, allowedCats: ['A', 'B'],
             weightUnit: 'kg', allowFragile: false, allowReturn: true,
             allowAsap: true, allowScheduled: true, requiresHelpers: false, suggestedHelpers: 0,
-            cargoHazardous: false },
+            cargoHazardous: false, strictCargoFilter: true },
     },
 
     // ── Truck family — payload tiers (Kenya market: Canter → FVZ) ──────
@@ -113,7 +113,7 @@ export const VEHICLES: VehicleCapability[] = [
         constraints: { maxDist: UNLIMITED, maxWeight: 3, maxStops: 5, allowedCats: ['A', 'B'],
             weightUnit: 'tonnes', allowFragile: true, allowReturn: true,
             allowAsap: true, allowScheduled: true, requiresHelpers: false, suggestedHelpers: 0,
-            cargoHazardous: false },
+            cargoHazardous: false, strictCargoFilter: true },
     },
     {
         id: 'truck-5t', label: 'Truck 5T', img: '/icons3d/delivery_truck.png',
@@ -122,7 +122,7 @@ export const VEHICLES: VehicleCapability[] = [
         constraints: { maxDist: UNLIMITED, maxWeight: 5, maxStops: 5, allowedCats: ['B'],
             weightUnit: 'tonnes', allowFragile: true, allowReturn: true,
             allowAsap: true, allowScheduled: true, requiresHelpers: false, suggestedHelpers: 1,
-            cargoHazardous: false },
+            cargoHazardous: false, strictCargoFilter: true },
     },
     {
         id: 'truck-7t', label: 'Truck 7T', img: '/icons3d/delivery_truck.png',
@@ -131,7 +131,7 @@ export const VEHICLES: VehicleCapability[] = [
         constraints: { maxDist: UNLIMITED, maxWeight: 7, maxStops: 5, allowedCats: ['B'],
             weightUnit: 'tonnes', allowFragile: true, allowReturn: true,
             allowAsap: true, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 1,
-            cargoHazardous: false, allowConsolidated: false },
+            cargoHazardous: false, allowConsolidated: false, strictCargoFilter: true },
     },
     {
         id: 'truck-10t', label: 'Truck 10T', img: '/icons3d/articulated_lorry.png',
@@ -140,7 +140,7 @@ export const VEHICLES: VehicleCapability[] = [
         constraints: { maxDist: UNLIMITED, maxWeight: 10, maxStops: 5, allowedCats: ['B'],
             weightUnit: 'tonnes', allowFragile: true, allowReturn: true,
             allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 2,
-            cargoHazardous: false, allowConsolidated: false },
+            cargoHazardous: false, allowConsolidated: false, strictCargoFilter: true },
     },
     {
         id: 'truck-15t', label: 'Truck 15T', img: '/icons3d/articulated_lorry.png',
@@ -149,7 +149,7 @@ export const VEHICLES: VehicleCapability[] = [
         constraints: { maxDist: UNLIMITED, maxWeight: 15, maxStops: 3, allowedCats: ['B'],
             weightUnit: 'tonnes', allowFragile: true, allowReturn: true,
             allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 2,
-            cargoHazardous: false, allowConsolidated: false },
+            cargoHazardous: false, allowConsolidated: false, strictCargoFilter: true },
     },
 
     // ── Trailer family (was "Container") — 20ft / 40ft semi-trailers ──
@@ -270,18 +270,42 @@ export const VEHICLES: VehicleCapability[] = [
 ];
 
 /* ── Cargo → Vehicle eligibility map ────────────────────────────
-    Maps each subCategory to the vehicle IDs it can use.
-    If a subCategory is NOT listed, all category-eligible vehicles are shown. */
+     Maps each subCategory to the vehicle IDs it can use. With
+     strictCargoFilter: true on every vehicle, Step 2 uses the INVERTED
+     lookup — a vehicle shows ONLY the subcategories whose entry lists
+     that vehicle id. This keeps fuel/LPG/aggregate/cold-chain off
+     trucks, vans, pickups, boda, etc., and keeps parcels off trucks
+     that are bulk-only (truck-5t..15t, trailer, tipper, tanker). */
 export const CARGO_VEHICLE_MAP: Record<string, string[]> = {
-    'Electronics': ['probox', 'van', 'pickup', 'truck-3t', 'truck-5t', 'truck-7t', 'truck-10t', 'trailer-20ft', 'trailer-40ft'],
-    'Large Appliances': ['van', 'pickup', 'truck-3t', 'truck-5t', 'truck-7t', 'truck-10t', 'truck-15t', 'trailer-20ft', 'trailer-40ft'],
-    'Furniture': ['van', 'pickup', 'truck-3t', 'truck-5t', 'truck-7t', 'truck-10t', 'truck-15t', 'trailer-20ft', 'trailer-40ft'],
-    'Hardware / Construction': ['pickup', 'truck-3t', 'truck-5t', 'truck-7t', 'truck-10t', 'truck-15t', 'tipper-7t', 'tipper-14t', 'tipper-25t', 'trailer-20ft', 'trailer-40ft'],
-    'Agricultural': ['truck-3t', 'truck-5t', 'truck-7t', 'truck-10t', 'truck-15t', 'trailer-20ft', 'trailer-40ft', 'reefer-van', 'reefer-truck-3t', 'reefer-truck-10t'],
+    // ── Cat A parcels (every Cat-A-capable vehicle sees all of these) ──
+    'Document':         ['boda', 'probox', 'van-1t', 'van-3t', 'pickup', 'truck-3t', 'reefer-van', 'reefer-truck-3t'],
+    'Small Box':        ['boda', 'probox', 'van-1t', 'van-3t', 'pickup', 'truck-3t', 'reefer-van', 'reefer-truck-3t'],
+    'Medium Box':       ['boda', 'probox', 'van-1t', 'van-3t', 'pickup', 'truck-3t', 'reefer-van', 'reefer-truck-3t'],
+    'Large Box':        ['boda', 'probox', 'van-1t', 'van-3t', 'pickup', 'truck-3t', 'reefer-van', 'reefer-truck-3t'],
+    'Jumbo Box':        ['boda', 'probox', 'van-1t', 'van-3t', 'pickup', 'truck-3t', 'reefer-van', 'reefer-truck-3t'],
+    'Custom Dimensions':['boda', 'probox', 'van-1t', 'van-3t', 'pickup', 'truck-3t', 'reefer-van', 'reefer-truck-3t'],
+
+    // ── Cat B general bulky cargo (trucks, vans, pickups, trailers) ──
+    'Electronics':              ['probox', 'van-1t', 'van-3t', 'pickup', 'truck-3t', 'truck-5t', 'truck-7t', 'truck-10t', 'truck-15t', 'trailer-20ft', 'trailer-40ft'],
+    'Large Appliances':         ['van-1t', 'van-3t', 'pickup', 'truck-3t', 'truck-5t', 'truck-7t', 'truck-10t', 'truck-15t', 'trailer-20ft', 'trailer-40ft'],
+    'Furniture':                ['van-1t', 'van-3t', 'pickup', 'truck-3t', 'truck-5t', 'truck-7t', 'truck-10t', 'truck-15t', 'trailer-20ft', 'trailer-40ft'],
+    'Hardware / Construction':  ['van-3t', 'pickup', 'truck-3t', 'truck-5t', 'truck-7t', 'truck-10t', 'truck-15t', 'tipper-7t', 'tipper-14t', 'tipper-25t', 'trailer-20ft', 'trailer-40ft'],
+    'Agricultural':             ['van-3t', 'pickup', 'truck-3t', 'truck-5t', 'truck-7t', 'truck-10t', 'truck-15t', 'trailer-20ft', 'trailer-40ft', 'reefer-van', 'reefer-truck-3t', 'reefer-truck-10t'],
+
+    // ── Cat B specialised cargo (single dedicated vehicle family each) ──
     'Perishables / Cold Chain': ['reefer-van', 'reefer-truck-3t', 'reefer-truck-10t'],
-    'LPG / Gas (Bulk)': ['lpg-tanker'],
-    'Petroleum / Oil': ['fuel-tanker-10kl', 'fuel-tanker-18kl', 'fuel-tanker-30kl'],
-    'Loose Aggregate': ['tipper-7t', 'tipper-14t', 'tipper-25t'],
+    'LPG / Gas (Bulk)':         ['lpg-tanker'],
+    'Petroleum / Oil':          ['fuel-tanker-10kl', 'fuel-tanker-18kl', 'fuel-tanker-30kl'],
+    'Loose Aggregate':          ['tipper-7t', 'tipper-14t', 'tipper-25t'],
+
+    // ── Cat B "Custom" — describe any bulky freight. Shown on every bulk-capable
+    //    vehicle so customers shipping unusual cargo (e.g. mixed loads, pallets,
+    //    equipment) can still book. A free-text description is captured in Step2.
+    //    Specialised vehicles (tipper, tanker, reefer) intentionally OMIT Custom
+    //    so the strict specialisation is preserved. ──
+    'Custom': ['probox', 'van-1t', 'van-3t', 'pickup',
+               'truck-3t', 'truck-5t', 'truck-7t', 'truck-10t', 'truck-15t',
+               'trailer-20ft', 'trailer-40ft'],
 };
 
 /* ── Legacy ID → canonical ID aliasing ───────────────────────────
@@ -289,7 +313,8 @@ export const CARGO_VEHICLE_MAP: Record<string, string[]> = {
 export const LEGACY_VEHICLE_ALIASES: Record<string, string> = {
     'boda boda': 'boda', 'bodaboda': 'boda', 'motorbike': 'boda', 'motorcycle': 'boda',
     'tuk-tuk': 'tuktuk', 'tuk tuk': 'tuktuk', 'auto rickshaw': 'tuktuk',
-    'cargo van': 'van',
+    'cargo van': 'van-3t',
+    'van': 'van-3t',
     'pickup truck': 'pickup', 'pick-up': 'pickup',
     'canter': 'truck-3t',
     'lorry': 'truck-7t', 'lorry-5t': 'truck-5t', 'lorry-7t': 'truck-7t',
