@@ -393,44 +393,68 @@ const TrackingPageContent: React.FC = () => {
     }
 
     if (order.status === 'disputed') {
+        // ── Dispute: keep the LIVE tracking map mounted underneath the dispute
+        // banner so the customer can still see the route line, driver marker,
+        // and bottom sheet (same surface as a normal in-progress order). The
+        // dispute banner floats on top with a "Resume Live Tracking" button that
+        // withdraws the dispute (calls resolveDispute CF) and flips the order
+        // back to its pre-dispute status — the Firestore snapshot (this page)
+        // then re-mounts live tracking fully and the banner disappears.
         return (
-            <div className="min-h-screen flex items-center justify-center pointer-events-none p-4">
-                <div className="bg-white/80 backdrop-blur-xl p-8 rounded-[2.5rem] shadow-2xl border border-white/50 text-center max-w-sm pointer-events-auto animate-in zoom-in duration-300">
-                    <div className="w-16 h-16 bg-orange-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                        <AlertTriangle className="w-8 h-8 text-orange-500" />
+            <div className="relative min-h-screen">
+                {/* Live map + bottom sheet (read-only — actions are disabled below) */}
+                <div className="dispute-blur-0">
+                    <Tracking
+                        order={order}
+                        onUpdateStatus={handleUpdateStatus}
+                        onUpdateOrder={handleUpdateOrder}
+                        onBack={() => navigate(user?.role === 'business' ? '/business-dashboard' : (user ? '/customer-dashboard' : '/'))}
+                        verificationCode={orderCodes.orderCode}
+                        stopCodes={orderCodes.stopCodes}
+                    />
+                </div>
+
+                {/* Floating dispute banner overlay — non-dismissible, action is Resolution */}
+                <div className="absolute inset-x-0 top-0 z-[1000] pointer-events-none">
+                    <div className="m-3 p-4 rounded-2xl bg-orange-50/95 backdrop-blur-md border border-orange-200 shadow-xl pointer-events-auto flex items-start gap-3">
+                        <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <AlertTriangle className="w-6 h-6 text-orange-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <h2 className="text-sm font-black text-orange-900">Dispute Under Review</h2>
+                            <p className="text-[11px] font-semibold text-orange-700 mt-0.5 leading-snug">
+                                Tracking is paused. Resolve the dispute to mark it complete or resume tracking.
+                            </p>
+                        </div>
+                        <div className="flex flex-col gap-1.5 flex-shrink-0">
+                            <button
+                                onClick={async () => {
+                                    setIsLoading(true);
+                                    try {
+                                        await orderApi.resolveDispute(orderId as string);
+                                        // Stay on the page — the snapshot will flip
+                                        // disputed → in_transit/delivered and the
+                                        // live-tracking map re-renders automatically.
+                                        setIsLoading(false);
+                                    } catch (e: any) {
+                                        setIsLoading(false);
+                                        showAlert('Could not resume', e?.message || 'Please try again.', 'error');
+                                    }
+                                }}
+                                disabled={isLoading}
+                                className="px-3 py-2 rounded-xl bg-brand-600 text-white text-xs font-black shadow-sm hover:bg-brand-700 transition-all disabled:opacity-60 flex items-center gap-1.5"
+                            >
+                                {isLoading && <Loader className="w-3.5 h-3.5 animate-spin" />}
+                                {isLoading ? 'Resuming…' : 'Resume'}
+                            </button>
+                            <button
+                                onClick={() => navigate(user?.role === 'business' ? '/business-dashboard' : (user ? '/customer-dashboard' : '/'))}
+                                className="px-3 py-1.5 rounded-xl bg-white text-gray-700 text-[11px] font-bold border border-gray-200 hover:bg-gray-50 transition-all"
+                            >
+                                Dashboard
+                            </button>
+                        </div>
                     </div>
-                    <h2 className="text-2xl font-extrabold text-gray-900 mb-2">Dispute Under Review</h2>
-                    <p className="text-gray-500 font-bold text-sm mb-6">Your dispute has been recorded. Our team is reviewing it and will contact you via WhatsApp shortly. You can still resume live tracking any time.</p>
-                    <button
-                        onClick={async () => {
-                            setIsLoading(true);
-                            try {
-                                await orderApi.resolveDispute(orderId as string);
-                                // Don't navigate away — the order snapshot on this page
-                                // will flip disputed→in_transit/delivered and the live
-                                // tracking map re-renders automatically. Keep a short
-                                // fallback redirect in case the snapshot is slow.
-                                setTimeout(() => {
-                                    setIsLoading(false);
-                                    navigate(window.location.pathname + window.location.search, { replace: true });
-                                }, 4000);
-                            } catch (e: any) {
-                                setIsLoading(false);
-                                showAlert('Could not resume', e?.message || 'Please try again.', 'error');
-                            }
-                        }}
-                        disabled={isLoading}
-                        className="w-full bg-brand-600 text-white py-4 rounded-2xl font-black shadow-lg hover:bg-brand-700 transition-all mb-3 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                        {isLoading && <Loader className="w-5 h-5 animate-spin" />}
-                        {isLoading ? 'Resuming...' : 'Resume Live Tracking'}
-                    </button>
-                    <button
-                        onClick={() => navigate(user?.role === 'business' ? '/business-dashboard' : (user ? '/customer-dashboard' : '/'))}
-                        className="w-full bg-gray-100 text-gray-700 py-4 rounded-2xl font-bold hover:bg-gray-200 transition-all"
-                    >
-                        Back to Dashboard
-                    </button>
                 </div>
             </div>
         );

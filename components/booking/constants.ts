@@ -160,7 +160,7 @@ export const VEHICLES: VehicleCapability[] = [
         constraints: { maxDist: UNLIMITED, maxWeight: 25, maxStops: 3, allowedCats: ['B'],
             weightUnit: 'tonnes', allowFragile: true, allowReturn: true,
             allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
-            cargoHazardous: false, allowConsolidated: false },
+            cargoHazardous: false, strictCargoFilter: true, allowConsolidated: false },
     },
     {
         id: 'trailer-40ft', label: 'Trailer 40ft', img: '/icons3d/container_truck.svg',
@@ -169,7 +169,7 @@ export const VEHICLES: VehicleCapability[] = [
         constraints: { maxDist: UNLIMITED, maxWeight: 34, maxStops: 3, allowedCats: ['B'],
             weightUnit: 'tonnes', allowFragile: true, allowReturn: true,
             allowAsap: false, allowScheduled: true, requiresHelpers: true, suggestedHelpers: 3,
-            cargoHazardous: false, allowConsolidated: false },
+            cargoHazardous: false, strictCargoFilter: true, allowConsolidated: false },
     },
 
     // ── Tipper family — payload tiers, strict loose-aggregate cargo ────
@@ -273,11 +273,11 @@ export const VEHICLES: VehicleCapability[] = [
     Maps each subCategory to the vehicle IDs it can use.
     If a subCategory is NOT listed, all category-eligible vehicles are shown. */
 export const CARGO_VEHICLE_MAP: Record<string, string[]> = {
-    'Electronics': ['probox', 'van', 'pickup', 'truck-3t', 'truck-5t', 'truck-7t'],
-    'Large Appliances': ['van', 'pickup', 'truck-3t', 'truck-5t', 'truck-7t'],
-    'Furniture': ['van', 'pickup', 'truck-3t', 'truck-5t', 'truck-7t', 'truck-10t', 'truck-15t'],
-    'Hardware / Construction': ['pickup', 'truck-3t', 'truck-5t', 'truck-7t', 'truck-10t', 'truck-15t', 'tipper-7t', 'tipper-14t', 'tipper-25t'],
-    'Agricultural': ['truck-3t', 'truck-5t', 'truck-7t', 'truck-10t', 'reefer-van', 'reefer-truck-3t', 'reefer-truck-10t'],
+    'Electronics': ['probox', 'van', 'pickup', 'truck-3t', 'truck-5t', 'truck-7t', 'truck-10t', 'trailer-20ft', 'trailer-40ft'],
+    'Large Appliances': ['van', 'pickup', 'truck-3t', 'truck-5t', 'truck-7t', 'truck-10t', 'truck-15t', 'trailer-20ft', 'trailer-40ft'],
+    'Furniture': ['van', 'pickup', 'truck-3t', 'truck-5t', 'truck-7t', 'truck-10t', 'truck-15t', 'trailer-20ft', 'trailer-40ft'],
+    'Hardware / Construction': ['pickup', 'truck-3t', 'truck-5t', 'truck-7t', 'truck-10t', 'truck-15t', 'tipper-7t', 'tipper-14t', 'tipper-25t', 'trailer-20ft', 'trailer-40ft'],
+    'Agricultural': ['truck-3t', 'truck-5t', 'truck-7t', 'truck-10t', 'truck-15t', 'trailer-20ft', 'trailer-40ft', 'reefer-van', 'reefer-truck-3t', 'reefer-truck-10t'],
     'Perishables / Cold Chain': ['reefer-van', 'reefer-truck-3t', 'reefer-truck-10t'],
     'LPG / Gas (Bulk)': ['lpg-tanker'],
     'Petroleum / Oil': ['fuel-tanker-10kl', 'fuel-tanker-18kl', 'fuel-tanker-30kl'],
